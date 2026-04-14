@@ -1,0 +1,54 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  
+  /* Custom Palette from Design System */
+  --color-primary: #4355b9;
+  --color-primary-dim: #3649ac;
+  --color-primary-container: #dee0ff;
+  --color-on-primary-container: #3648ac;
+  
+  --color-secondary: #526074;
+  --color-secondary-container: #d5e3fc;
+  
+  --color-tertiary: #535f78;
+  --color-tertiary-container: #d1ddfa;
+  
+  --color-surface: #f8f9ff;
+  --color-surface-container-lowest: #ffffff;
+  --color-surface-container-low: #eff4ff;
+  --color-surface-container: #e5eeff;
+  --color-surface-container-high: #dce9ff;
+  --color-surface-container-highest: #d2e4ff;
+  
+  --color-on-surface: #00345e;
+  --color-on-surface-variant: #26619d;
+  
+  --color-outline: #477dbb;
+  --color-outline-variant: #81b5f6;
+  
+  --color-error: #9e3f4e;
+  --color-error-container: #ff8b9a;
+  --color-on-error-container: #782232;
+}
+
+@layer base {
+  body {
+    @apply bg-surface text-on-surface antialiased;
+    font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+  }
+}
+
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+.glass-panel {
+  background: rgba(248, 249, 255, 0.7);
+  backdrop-filter: blur(12px);
+}
