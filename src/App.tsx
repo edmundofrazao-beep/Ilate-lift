@@ -4,6 +4,8 @@
  */
 
 import React, { useState, useMemo, useEffect } from 'react';
+import 'katex/dist/katex.min.css';
+import { InlineMath, BlockMath } from 'react-katex';
 import { 
   LayoutDashboard, 
   Globe, 
@@ -30,9 +32,13 @@ import {
   UserCircle,
   Maximize2,
   ChevronRight,
-  AlertCircle
+  AlertCircle,
+  Ruler,
+  Calculator
 } from 'lucide-react';
 import { Shaft3DModule } from './components/Shaft3DModule';
+import jsPDF from 'jspdf';
+import html2canvas from 'html2canvas';
 
 // --- Types & Interfaces ---
 
@@ -127,6 +133,45 @@ interface ProjectData {
   ucmpDetectionDist: number;
   ruptureValveFlow: number;
   ruptureValvePressure: number;
+  // New Traction & Belt Variables
+  grooveType: 'V' | 'semi-circular' | 'U';
+  undercutWidth: number; // mm
+  ropeAngleOfWrap: number; // deg
+  acceleration: number; // m/s2
+  deceleration: number; // m/s2
+  ropeSpecificPressure: number; // MPa
+  beltWidth: number; // mm
+  beltThickness: number; // mm
+  numBelts: number;
+  beltTensileStrength: number; // N
+  // New Clearances (ISO 8100-1)
+  pitDepth: number; // mm
+  headroomHeight: number; // mm
+  carToWallClearance: number; // mm
+  carToCounterweightClearance: number; // mm
+  carToLandingSillClearance: number; // mm
+  // Additional Variables from HTML Engine
+  Faux: number; // N
+  delta_str_x: number; // mm
+  delta_str_y: number; // mm
+  N_equiv_t: number;
+  Kp: number;
+  N_lift: number;
+  C_R: number;
+  wellToCarWall: number; // m
+  sillGap: number; // m
+  doorPanelGap: number; // m
+  pitRefugeHeight: number; // m
+  pitObstacleClearance: number; // m
+  pitFreeVerticalHazard: number; // m
+  carToCwtDistance: number; // m
+  headroomGeneral: number; // m
+  headroomGuideShoeZone: number; // m
+  balustradeVertical: number; // m
+  toeBoardOutside: number; // m
+  ramHeadClearance: number; // m
+  cwtScreenBottomFromPit: number; // m
+  cwtScreenHeight: number; // m
 }
 
 interface ModuleStatus {
@@ -135,6 +180,20 @@ interface ModuleStatus {
   icon: any;
   status: 'implemented' | 'partial' | 'placeholder';
 }
+
+// --- Profile Databases ---
+
+const RAIL_PROFILES = [
+  { id: 'T70/A', label: 'ISO T70/A', area: 1160, ix: 405000, iy: 186000, wx: 10200, wy: 5200, q1: 9.1 },
+  { id: 'T89/B', label: 'ISO T89/B', area: 1570, ix: 595000, iy: 320000, wx: 13400, wy: 10200, q1: 12.3 },
+  { id: 'T127-2/B', label: 'ISO T127-2/B', area: 2890, ix: 2550000, iy: 1020000, wx: 40200, wy: 16000, q1: 22.7 },
+  { id: 'T140-3/B', label: 'ISO T140-3/B', area: 4250, ix: 5730000, iy: 2140000, wx: 81800, wy: 30600, q1: 33.3 },
+];
+
+const BELT_PROFILES = [
+  { id: 'B30', label: 'Belt 30mm', width: 30, thickness: 3, mbf: 40000 },
+  { id: 'B60', label: 'Belt 60mm', width: 60, thickness: 4, mbf: 80000 },
+];
 
 // --- Helpers ---
 
@@ -148,6 +207,102 @@ const formatNumber = (val: number, decimals = 2) => {
 };
 
 const degToRad = (deg: number) => (deg * Math.PI) / 180;
+
+const InputGroup = ({ label, children }: { label: string, children: React.ReactNode }) => (
+  <div className="space-y-4 p-6 bg-surface-container-low border border-outline-variant/5">
+    <h3 className="text-xs font-bold uppercase tracking-widest text-primary border-b border-primary/20 pb-2">{label}</h3>
+    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      {children}
+    </div>
+  </div>
+);
+
+const LiftField = ({ 
+  label, 
+  name, 
+  unit, 
+  type = "number", 
+  data, 
+  onChange,
+  min,
+  max,
+  required = false
+}: { 
+  label: string, 
+  name: keyof ProjectData, 
+  unit?: string, 
+  type?: string, 
+  data: ProjectData, 
+  onChange: (newData: Partial<ProjectData>) => void,
+  min?: number,
+  max?: number,
+  required?: boolean
+}) => {
+  const [error, setError] = React.useState<string | null>(null);
+
+  const validate = (val: any) => {
+    if (type !== 'number') return null;
+    const n = parseFloat(val);
+    if (required && (val === '' || isNaN(n))) return 'Required';
+    if (!isNaN(n)) {
+      if (min !== undefined && n < min) return `Min: ${min}`;
+      if (max !== undefined && n > max) return `Max: ${max}`;
+    }
+    return null;
+  };
+
+  return (
+    <div className="space-y-1">
+      <div className="flex justify-between items-center">
+        <label className="text-[11px] font-bold text-on-surface-variant uppercase">{label}</label>
+        {error && <span className="text-[9px] text-error font-bold uppercase animate-pulse">{error}</span>}
+      </div>
+      <div className="relative">
+        <input 
+          type={type}
+          value={typeof data[name] === 'boolean' ? undefined : (data[name] as string | number)}
+          checked={typeof data[name] === 'boolean' ? (data[name] as boolean) : undefined}
+          onChange={(e) => {
+            const val = type === 'checkbox' ? e.target.checked : e.target.value;
+            const err = validate(val);
+            setError(err);
+            if (type === 'checkbox') {
+              onChange({ [name]: e.target.checked });
+            } else {
+              onChange({ [name]: type === 'number' ? safeNumber(e.target.value) : e.target.value });
+            }
+          }}
+          className={`
+            ${type === 'checkbox' ? "rounded-sm border-outline-variant/30 text-primary focus:ring-primary" : "w-full bg-surface-container-lowest border rounded-sm px-3 py-2 text-sm focus:ring-1 focus:ring-primary outline-none transition-all"}
+            ${error ? 'border-error ring-1 ring-error bg-error/5' : 'border-outline-variant/20'}
+          `}
+        />
+        {unit && <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] font-bold text-on-surface-variant opacity-50">{unit}</span>}
+      </div>
+    </div>
+  );
+};
+
+const CollapsibleSection = ({ title, children, icon: Icon }: { title: string, children: React.ReactNode, icon?: any }) => {
+  const [isOpen, setIsOpen] = React.useState(false);
+  return (
+    <div className="border border-outline-variant/10 rounded-sm overflow-hidden bg-surface-container-lowest">
+      <button 
+        onClick={() => setIsOpen(!isOpen)}
+        className="w-full flex items-center justify-between p-4 hover:bg-surface-container-low transition-colors text-left"
+      >
+        <div className="flex items-center gap-3">
+          {Icon && <Icon size={16} className="text-primary" />}
+          <span className="text-xs font-bold uppercase tracking-widest">{title}</span>
+        </div>
+        <ChevronRight size={16} className={`transition-transform duration-300 ${isOpen ? 'rotate-90' : ''}`} />
+      </button>
+      <div className={`transition-all duration-300 ease-in-out ${isOpen ? 'max-h-[1000px] opacity-100 p-6 border-t border-outline-variant/10' : 'max-h-0 opacity-0 pointer-events-none'}`}>
+        {children}
+      </div>
+    </div>
+  );
+};
 
 // --- Modules ---
 
@@ -225,37 +380,6 @@ const OverviewModule = ({ modules, onSelect }: { modules: ModuleStatus[], onSele
 );
 
 const GlobalProjectModule = ({ data, onChange }: { data: ProjectData, onChange: (newData: Partial<ProjectData>) => void }) => {
-  const InputGroup = ({ label, children }: { label: string, children: React.ReactNode }) => (
-    <div className="space-y-4 p-6 bg-surface-container-low border border-outline-variant/5">
-      <h3 className="text-xs font-bold uppercase tracking-widest text-primary border-b border-primary/20 pb-2">{label}</h3>
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {children}
-      </div>
-    </div>
-  );
-
-  const Field = ({ label, name, unit, type = "number" }: { label: string, name: keyof ProjectData, unit?: string, type?: string }) => (
-    <div className="space-y-1">
-      <label className="text-[11px] font-bold text-on-surface-variant uppercase">{label}</label>
-      <div className="relative">
-        <input 
-          type={type}
-          value={typeof data[name] === 'boolean' ? undefined : (data[name] as string | number)}
-          checked={typeof data[name] === 'boolean' ? (data[name] as boolean) : undefined}
-          onChange={(e) => {
-            if (type === 'checkbox') {
-              onChange({ [name]: e.target.checked });
-            } else {
-              onChange({ [name]: type === 'number' ? safeNumber(e.target.value) : e.target.value });
-            }
-          }}
-          className={type === 'checkbox' ? "rounded-sm border-outline-variant/30 text-primary focus:ring-primary" : "w-full bg-surface-container-lowest border border-outline-variant/20 rounded-sm px-3 py-2 text-sm focus:ring-1 focus:ring-primary outline-none"}
-        />
-        {unit && <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] font-bold text-on-surface-variant opacity-50">{unit}</span>}
-      </div>
-    </div>
-  );
-
   return (
     <div className="space-y-6">
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -283,40 +407,67 @@ const GlobalProjectModule = ({ data, onChange }: { data: ProjectData, onChange: 
               <option value="4:1">4:1</option>
             </select>
           </div>
-          <Field label="Rated Load (Q)" name="ratedLoad" unit="kg" />
-          <Field label="Car Mass (P)" name="carMass" unit="kg" />
-          <Field label="Counterweight Mass (Mcwt)" name="cwtMass" unit="kg" />
-          <Field label="Rated Speed (v)" name="speed" unit="m/s" />
+          <LiftField label="Rated Load (Q)" name="ratedLoad" unit="kg" data={data} onChange={onChange} min={50} required />
+          <LiftField label="Car Mass (P)" name="carMass" unit="kg" data={data} onChange={onChange} min={100} required />
+          <LiftField label="Counterweight Mass (Mcwt)" name="cwtMass" unit="kg" data={data} onChange={onChange} min={100} required />
+          <LiftField label="Rated Speed (v)" name="speed" unit="m/s" data={data} onChange={onChange} min={0.1} max={10} required />
         </InputGroup>
 
         <InputGroup label="Shaft & Travel">
-          <Field label="Travel (H)" name="travel" unit="m" />
-          <Field label="Number of Stops" name="stops" />
-          <Field label="Floor to Floor Height" name="floorHeight" unit="m" />
-          <Field label="Bracket Distance (l)" name="bracketDist" unit="mm" />
+          <LiftField label="Travel (H)" name="travel" unit="m" data={data} onChange={onChange} min={1} max={500} required />
+          <LiftField label="Number of Stops" name="stops" data={data} onChange={onChange} min={2} max={128} required />
+          <LiftField label="Floor to Floor Height" name="floorHeight" unit="m" data={data} onChange={onChange} min={2} required />
+          <LiftField label="Bracket Distance (l)" name="bracketDist" unit="mm" data={data} onChange={onChange} min={500} max={6000} required />
         </InputGroup>
 
         <InputGroup label="Traction System">
-          <Field label="Number of Ropes (n)" name="numRopes" />
-          <Field label="Rope Diameter (d)" name="ropeDiameter" unit="mm" />
-          <Field label="Sheave Diameter (D)" name="sheaveDiameter" unit="mm" />
-          <Field label="Wrap Angle (α)" name="wrapAngle" unit="deg" />
-          <Field label="Groove Angle (γ)" name="grooveAngle" unit="deg" />
-          <Field label="Undercut Angle (β)" name="undercutAngle" unit="deg" />
+          <LiftField label="Number of Ropes (n)" name="numRopes" data={data} onChange={onChange} min={1} required />
+          <LiftField label="Rope Diameter (d)" name="ropeDiameter" unit="mm" data={data} onChange={onChange} min={4} max={20} required />
+          <LiftField label="Sheave Diameter (D)" name="sheaveDiameter" unit="mm" data={data} onChange={onChange} min={160} required />
+          <LiftField label="Wrap Angle (α)" name="wrapAngle" unit="deg" data={data} onChange={onChange} min={90} max={270} required />
+          <LiftField label="Groove Angle (γ)" name="grooveAngle" unit="deg" data={data} onChange={onChange} min={30} max={60} required />
+          <LiftField label="Undercut Angle (β)" name="undercutAngle" unit="deg" data={data} onChange={onChange} min={70} max={110} required />
         </InputGroup>
 
         <InputGroup label="Materials & Guides">
-          <Field label="Guide Type" name="guideType" type="text" />
-          <Field label="Elastic Modulus (E)" name="materialE" unit="N/mm²" />
-          <Field label="Yield Strength (Rp0.2)" name="materialYield" unit="N/mm²" />
-          <Field label="Friction Coeff. (μ)" name="frictionCoeff" />
-          <Field label="Section Area (A)" name="railArea" unit="mm²" />
-          <Field label="Inertia Moment (Iy)" name="railIy" unit="mm⁴" />
-          <Field label="Inertia Moment (Ix)" name="railIx" unit="mm⁴" />
-          <Field label="Section Modulus (Wy)" name="railWy" unit="mm³" />
-          <Field label="Section Modulus (Wx)" name="railWx" unit="mm³" />
-          <Field label="Gyration Radius (iy)" name="railIyRadius" unit="mm" />
-          <Field label="Gyration Radius (ix)" name="railIxRadius" unit="mm" />
+          <LiftField label="Guide Type" name="guideType" type="text" data={data} onChange={onChange} required />
+          <LiftField label="Elastic Modulus (E)" name="materialE" unit="N/mm²" data={data} onChange={onChange} min={100000} required />
+          <LiftField label="Yield Strength (Rp0.2)" name="materialYield" unit="N/mm²" data={data} onChange={onChange} min={100} required />
+          <LiftField label="Friction Coeff. (μ)" name="frictionCoeff" data={data} onChange={onChange} min={0.01} max={0.5} required />
+          <LiftField label="Section Area (A)" name="railArea" unit="mm²" data={data} onChange={onChange} min={100} required />
+          <LiftField label="Inertia Moment (Iy)" name="railIy" unit="mm⁴" data={data} onChange={onChange} min={1000} required />
+          <LiftField label="Inertia Moment (Ix)" name="railIx" unit="mm⁴" data={data} onChange={onChange} min={1000} required />
+          <LiftField label="Section Modulus (Wy)" name="railWy" unit="mm³" data={data} onChange={onChange} min={100} required />
+          <LiftField label="Section Modulus (Wx)" name="railWx" unit="mm³" data={data} onChange={onChange} min={100} required />
+          <LiftField label="Gyration Radius (iy)" name="railIyRadius" unit="mm" data={data} onChange={onChange} min={1} required />
+          <LiftField label="Gyration Radius (ix)" name="railIxRadius" unit="mm" data={data} onChange={onChange} min={1} required />
+          <LiftField label="Auxiliary Force (Faux)" name="Faux" unit="N" data={data} onChange={onChange} min={0} />
+          <LiftField label="Structural Disp. X" name="delta_str_x" unit="mm" data={data} onChange={onChange} min={0} />
+          <LiftField label="Structural Disp. Y" name="delta_str_y" unit="mm" data={data} onChange={onChange} min={0} />
+        </InputGroup>
+
+        <InputGroup label="ISO 8100-1 Clearances (m)">
+          <LiftField label="Well to Car Wall" name="wellToCarWall" unit="m" data={data} onChange={onChange} min={0.02} required />
+          <LiftField label="Sill Gap" name="sillGap" unit="m" data={data} onChange={onChange} min={0.01} max={0.035} required />
+          <LiftField label="Door Panel Gap" name="doorPanelGap" unit="m" data={data} onChange={onChange} min={0.001} max={0.01} required />
+          <LiftField label="Pit Refuge Height" name="pitRefugeHeight" unit="m" data={data} onChange={onChange} min={0.5} required />
+          <LiftField label="Pit Obstacle Clearance" name="pitObstacleClearance" unit="m" data={data} onChange={onChange} min={0.05} required />
+          <LiftField label="Pit Free Vertical" name="pitFreeVerticalHazard" unit="m" data={data} onChange={onChange} min={0.3} required />
+          <LiftField label="Car to CWT Distance" name="carToCwtDistance" unit="m" data={data} onChange={onChange} min={0.05} required />
+          <LiftField label="Headroom General" name="headroomGeneral" unit="m" data={data} onChange={onChange} min={0.5} required />
+          <LiftField label="Headroom Guide Shoe" name="headroomGuideShoeZone" unit="m" data={data} onChange={onChange} min={0.1} required />
+          <LiftField label="Balustrade Vertical" name="balustradeVertical" unit="m" data={data} onChange={onChange} min={0.1} required />
+          <LiftField label="Toe Board Outside" name="toeBoardOutside" unit="m" data={data} onChange={onChange} min={0.1} required />
+          <LiftField label="Ram Head Clearance" name="ramHeadClearance" unit="m" data={data} onChange={onChange} min={0.1} />
+          <LiftField label="CWT Screen Bottom" name="cwtScreenBottomFromPit" unit="m" data={data} onChange={onChange} min={0.3} required />
+          <LiftField label="CWT Screen Height" name="cwtScreenHeight" unit="m" data={data} onChange={onChange} min={1.7} required />
+        </InputGroup>
+
+        <InputGroup label="Advanced Parameters">
+          <LiftField label="N_equiv(t)" name="N_equiv_t" data={data} onChange={onChange} min={1} required />
+          <LiftField label="Pulley Factor (Kp)" name="Kp" data={data} onChange={onChange} min={1} required />
+          <LiftField label="Trips per Year (N_lift)" name="N_lift" data={data} onChange={onChange} min={1000} required />
+          <LiftField label="Reeving Factor (C_R)" name="C_R" data={data} onChange={onChange} min={1} required />
         </InputGroup>
       </div>
     </div>
@@ -331,21 +482,37 @@ const TractionModule = ({ data, onChange }: { data: ProjectData, onChange: (newD
   const T1_static = ((data.carMass + data.ratedLoad) * g) / r;
   const T2_static = (data.cwtMass * g) / r;
   
-  const mu_dynamic = 0.1 / (1 + data.speed / 10); // Formula (28)
+  // Dynamic Loads (Formula 28)
+  const T1_dynamic = T1_static * (1 + data.acceleration / g);
+  const T2_dynamic = T2_static * (1 - data.acceleration / g);
   
-  // f_load for semi-circular undercut (Formula 24)
+  const mu_dynamic = 0.1 / (1 + data.speed / 10);
+  
   const beta = degToRad(data.undercutAngle);
   const gamma = degToRad(data.grooveAngle);
-  const f_load = data.frictionCoeff * (4 * (Math.cos(gamma/2) - Math.sin(beta/2))) / (Math.PI - beta - gamma - Math.sin(beta) + Math.sin(gamma));
+  
+  // f_load for different groove types
+  let f_load = 0;
+  if (data.grooveType === 'V') {
+    f_load = data.frictionCoeff * (4 / Math.sin(gamma / 2));
+  } else if (data.grooveType === 'semi-circular') {
+    f_load = data.frictionCoeff * (4 * (Math.cos(gamma/2) - Math.sin(beta/2))) / (Math.PI - beta - gamma - Math.sin(beta) + Math.sin(gamma));
+  } else {
+    f_load = data.frictionCoeff * 4 / Math.PI;
+  }
   
   const alpha = degToRad(data.wrapAngle);
   const expMuAlpha = Math.exp(f_load * alpha);
-  const ratio = T2_static > 0 ? T1_static / T2_static : 0;
-  const margin = ratio > 0 ? expMuAlpha / ratio : 0;
+  const ratio_static = T2_static > 0 ? T1_static / T2_static : 0;
+  const ratio_dynamic = T2_dynamic > 0 ? T1_dynamic / T2_dynamic : 0;
   
-  const isOk = ratio <= expMuAlpha && ratio > 0;
+  const isOk = ratio_static <= expMuAlpha && ratio_dynamic <= expMuAlpha;
 
   const DdRatio = data.ropeDiameter > 0 ? data.sheaveDiameter / data.ropeDiameter : 0;
+  
+  // Specific Pressure (Formula 34)
+  const p_groove = (T1_static + T2_static) / (data.numRopes * data.ropeDiameter * data.sheaveDiameter * Math.sin(gamma/2 || 1));
+  const p_allow = (data.sheaveHardness * 10) / (1 + 2 * data.speed);
 
   return (
     <div className="space-y-8">
@@ -353,114 +520,121 @@ const TractionModule = ({ data, onChange }: { data: ProjectData, onChange: (newD
         <div className="lg:col-span-2 space-y-6">
           <div className="bg-surface-container-low p-6 border-t-2 border-primary">
             <h3 className="text-lg font-bold mb-6 flex items-center justify-between">
-              Traction Verification
+              Traction Verification (ISO 8100-2:2026)
               <span className={`text-xs px-3 py-1 rounded-full font-bold uppercase ${isOk ? 'bg-emerald-100 text-emerald-700' : 'bg-error-container/20 text-error'}`}>
-                {isOk ? 'OK' : 'NOK'}
+                {isOk ? 'Compliant' : 'Non-Compliant'}
               </span>
             </h3>
             
             <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
               <div className="space-y-4">
                 <div className="p-4 bg-surface-container-lowest border border-outline-variant/10">
-                  <p className="text-[10px] font-bold text-on-surface-variant uppercase mb-1">T1 (Static Load Side)</p>
-                  <p className="text-xl font-black">{formatNumber(T1_static)} <span className="text-xs font-normal opacity-50">N</span></p>
+                  <p className="text-[10px] font-bold text-on-surface-variant uppercase mb-1">Static Ratio (T1/T2)</p>
+                  <p className="text-xl font-black">{formatNumber(ratio_static)}</p>
+                  <div className="mt-2 h-1 bg-surface-container-high rounded-full overflow-hidden">
+                    <div className="h-full bg-primary" style={{ width: `${Math.min(100, (ratio_static/expMuAlpha)*100)}%` }} />
+                  </div>
                 </div>
                 <div className="p-4 bg-surface-container-lowest border border-outline-variant/10">
-                  <p className="text-[10px] font-bold text-on-surface-variant uppercase mb-1">T2 (Counterweight Side)</p>
-                  <p className="text-xl font-black">{formatNumber(T2_static)} <span className="text-xs font-normal opacity-50">N</span></p>
-                </div>
-                <div className="p-4 bg-surface-container-lowest border border-outline-variant/10">
-                  <p className="text-[10px] font-bold text-on-surface-variant uppercase mb-1">T1/T2 Ratio</p>
-                  <p className="text-xl font-black">{formatNumber(ratio)}</p>
+                  <p className="text-[10px] font-bold text-on-surface-variant uppercase mb-1">Dynamic Ratio (T1/T2)</p>
+                  <p className="text-xl font-black">{formatNumber(ratio_dynamic)}</p>
+                  <div className="mt-2 h-1 bg-surface-container-high rounded-full overflow-hidden">
+                    <div className="h-full bg-primary" style={{ width: `${Math.min(100, (ratio_dynamic/expMuAlpha)*100)}%` }} />
+                  </div>
                 </div>
               </div>
               
               <div className="space-y-4">
                 <div className="p-4 bg-surface-container-lowest border border-outline-variant/10">
-                  <p className="text-[10px] font-bold text-on-surface-variant uppercase mb-1">exp(f·α)</p>
+                  <p className="text-[10px] font-bold text-on-surface-variant uppercase mb-1">Traction Limit (e^fα)</p>
                   <p className="text-xl font-black">{formatNumber(expMuAlpha)}</p>
                 </div>
                 <div className="p-4 bg-surface-container-lowest border border-outline-variant/10">
-                  <p className="text-[10px] font-bold text-on-surface-variant uppercase mb-1">Traction Margin</p>
-                  <p className={`text-xl font-black ${margin < 1.1 ? 'text-amber-600' : ''}`}>{formatNumber(margin)}</p>
-                </div>
-                <div className="p-4 bg-surface-container-lowest border border-outline-variant/10">
-                  <p className="text-[10px] font-bold text-on-surface-variant uppercase mb-1">D/d Ratio</p>
-                  <p className={`text-xl font-black ${DdRatio < 40 ? 'text-error' : ''}`}>{formatNumber(DdRatio)}</p>
+                  <p className="text-[10px] font-bold text-on-surface-variant uppercase mb-1">Specific Pressure</p>
+                  <p className={`text-xl font-black ${p_groove > p_allow ? 'text-error' : ''}`}>{formatNumber(p_groove)} <span className="text-xs font-normal opacity-50">MPa</span></p>
+                  <p className="text-[9px] opacity-50 mt-1">Allowed: {formatNumber(p_allow)} MPa</p>
                 </div>
               </div>
             </div>
 
-            <div className="mt-8 p-4 bg-primary/5 border border-primary/10 rounded-sm">
-              <h4 className="text-xs font-bold uppercase mb-2">Fórmulas Aplicadas (ISO 8100-2:2026)</h4>
-              <div className="font-mono text-[11px] space-y-1 opacity-70">
-                <p>• Verificação: T1/T2 ≤ exp(f · α) [Formula 22]</p>
-                <p>• Coef. Fricção μ (Dynamic): 0.1 / (1 + v/10) [Formula 28]</p>
-                <p>• f_load (Semi-circular): μ · 4(cos(γ/2) - sin(β/2)) / (π - β - γ - sin β + sin γ) [Formula 24]</p>
+            <div className="mt-8 p-6 bg-slate-900 text-white rounded-sm">
+              <h4 className="text-xs font-bold uppercase mb-4 text-primary">Applied ISO 8100-2 Formulas</h4>
+              <div className="space-y-4">
+                <div className="flex items-center justify-between border-b border-white/5 pb-2">
+                  <span className="text-[10px] opacity-60">Traction Condition</span>
+                  <InlineMath math="\frac{T_1}{T_2} \le e^{f \cdot \alpha}" />
+                </div>
+                <div className="flex items-center justify-between border-b border-white/5 pb-2">
+                  <span className="text-[10px] opacity-60">Friction Coeff (Dynamic)</span>
+                  <InlineMath math="\mu = \frac{0.1}{1 + v/10}" />
+                </div>
+                <div className="flex items-center justify-between border-b border-white/5 pb-2">
+                  <span className="text-[10px] opacity-60">Specific Pressure</span>
+                  <InlineMath math="p = \frac{T_1 + T_2}{n \cdot d \cdot D \cdot \sin(\gamma/2)}" />
+                </div>
+                <div className="flex items-center justify-between border-b border-white/5 pb-2">
+                  <span className="text-[10px] opacity-60">Stalling Condition</span>
+                  <InlineMath math="\frac{T_1}{T_2} \ge e^{f_{stall} \cdot \alpha}" />
+                </div>
               </div>
             </div>
-          </div>
-
-          {/* 4.13 Specific Pressure on Sheave */}
-          <div className="bg-surface-container-low p-6 border-t-2 border-primary">
-            <div className="flex items-center gap-4 border-b border-outline-variant/20 pb-2 mb-6">
-              <Settings2 className="text-primary" size={20} />
-              <h4 className="text-sm font-bold uppercase tracking-wider">4.13 Specific Pressure on Sheave</h4>
-            </div>
-            
-            {(() => {
-              const p_groove = (T1_static + T2_static) / (data.sheaveDiameter * data.ropeDiameter);
-              const p_allow = (data.sheaveHardness * 10) / (1 + 2 * data.speed);
-              const isPressureOk = p_groove < p_allow;
-
-              return (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                  <div className={`p-6 border ${isPressureOk ? 'bg-emerald-50 border-emerald-200' : 'bg-amber-50 border-amber-200'}`}>
-                    <p className="text-[10px] font-bold uppercase mb-1">Specific Pressure (p)</p>
-                    <p className="text-2xl font-black">{formatNumber(p_groove)} <span className="text-xs font-normal opacity-50">MPa</span></p>
-                    <p className="mt-2 text-[10px] opacity-70 italic">Allowable Limit: {formatNumber(p_allow)} MPa</p>
-                    <div className="mt-4 flex items-center gap-2">
-                      {isPressureOk ? <CheckCircle2 size={16} className="text-emerald-600" /> : <AlertCircle size={16} className="text-amber-600" />}
-                      <span className={`text-xs font-bold uppercase ${isPressureOk ? 'text-emerald-700' : 'text-amber-700'}`}>
-                        {isPressureOk ? 'Pressure Compliant' : 'Wear Risk'}
-                      </span>
-                    </div>
-                  </div>
-                  
-                  <div className="space-y-4 p-6 bg-surface-container-lowest border border-outline-variant/10">
-                    <div className="space-y-1">
-                      <label className="text-[11px] font-bold text-on-surface-variant uppercase">Brinell Hardness (HB)</label>
-                      <input 
-                        type="number"
-                        value={data.sheaveHardness}
-                        onChange={(e) => onChange({ sheaveHardness: safeNumber(e.target.value) })}
-                        className="w-full bg-surface-container-low border border-outline-variant/20 rounded-sm px-3 py-2 text-sm outline-none"
-                      />
-                    </div>
-                  </div>
-                </div>
-              );
-            })()}
           </div>
         </div>
 
         <div className="space-y-6">
-          <div className="bg-slate-900 text-white p-6 rounded-sm">
-            <h3 className="text-xs font-bold uppercase tracking-widest text-indigo-300 mb-4">Technical Observations</h3>
-            <div className="space-y-4 text-[11px] leading-relaxed opacity-80">
-              {ratio > expMuAlpha && <p className="text-error font-bold">⚠️ TRACTION FAILURE: The T1/T2 ratio exceeds the sheave traction capacity.</p>}
-              {DdRatio < 40 && <p className="text-amber-400 font-bold">⚠️ LOW D/d RATIO: The ratio ({formatNumber(DdRatio)}) is below the normative minimum of 40.</p>}
-              {margin < 1.1 && margin > 1 && <p className="text-amber-400">⚠️ REDUCED MARGIN: Traction margin below 1.1. Risk of slippage in adverse conditions.</p>}
-              {data.numRopes === 0 && <p className="text-error">⚠️ ERROR: Number of ropes cannot be zero.</p>}
-              <p>• Calculation assumes semi-circular groove with undercut.</p>
-              <p>• Suspension rope mass not included in this simplified version.</p>
+          <div className="bg-surface-container-low p-6 border border-outline-variant/10">
+            <h4 className="text-xs font-bold uppercase tracking-widest mb-6 flex items-center gap-2">
+              <Settings2 size={14} />
+              Traction Parameters
+            </h4>
+            <div className="space-y-4">
+              <div className="space-y-1">
+                <label className="text-[10px] font-bold uppercase opacity-60">Groove Type</label>
+                <select 
+                  value={data.grooveType}
+                  onChange={(e) => onChange({ grooveType: e.target.value as any })}
+                  className="w-full bg-surface-container-lowest border border-outline-variant/20 rounded px-3 py-2 text-sm outline-none focus:border-primary transition-colors"
+                >
+                  <option value="V">V-Groove</option>
+                  <option value="semi-circular">Semi-Circular Undercut</option>
+                  <option value="U">U-Groove</option>
+                </select>
+              </div>
+              <LiftField label="Acceleration" name="acceleration" unit="m/s²" data={data} onChange={onChange} />
+              <LiftField label="Deceleration" name="deceleration" unit="m/s²" data={data} onChange={onChange} />
+              <LiftField label="Wrap Angle" name="wrapAngle" unit="deg" data={data} onChange={onChange} />
+              <LiftField label="Groove Angle (γ)" name="grooveAngle" unit="deg" data={data} onChange={onChange} />
+              <LiftField label="Undercut Angle (β)" name="undercutAngle" unit="deg" data={data} onChange={onChange} />
+              <LiftField label="Sheave Hardness" name="sheaveHardness" unit="HB" data={data} onChange={onChange} />
             </div>
           </div>
         </div>
       </div>
 
       {/* Dedicated Engineering Notes Section */}
-      <div className="bg-surface-container-low p-8 border border-outline-variant/10 rounded-sm">
+      <div className="space-y-6">
+        <CollapsibleSection title="ISO 8100-2:2026 Traction Formula Details" icon={Info}>
+          <div className="space-y-4 text-sm text-on-surface-variant leading-relaxed">
+            <p>
+              <strong>Clause 4.11.2:</strong> The traction verification ensures that the friction between the traction sheave and the suspension means is sufficient to prevent slipping during normal operation, emergency braking, and stalling.
+            </p>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-4">
+              <div className="p-4 bg-surface-container-low rounded border border-outline-variant/10">
+                <h5 className="font-bold text-primary mb-2 uppercase text-[10px]">Friction Coefficient (f)</h5>
+                <p className="text-xs mb-2">The friction coefficient $f$ depends on the groove shape and the material properties. For V-grooves:</p>
+                <InlineMath math="f = \mu \cdot \frac{4}{\sin(\gamma/2)}" />
+                <p className="text-[10px] mt-2 opacity-70">Where $\mu$ is the basic friction coefficient and $\gamma$ is the groove angle.</p>
+              </div>
+              <div className="p-4 bg-surface-container-low rounded border border-outline-variant/10">
+                <h5 className="font-bold text-primary mb-2 uppercase text-[10px]">Wrap Angle (α)</h5>
+                <p className="text-xs mb-2">The angle of wrap $\alpha$ is the contact arc between the rope and the sheave, expressed in radians.</p>
+                <InlineMath math="\alpha_{rad} = \alpha_{deg} \cdot \frac{\pi}{180}" />
+              </div>
+            </div>
+          </div>
+        </CollapsibleSection>
+
+        <div className="bg-surface-container-low p-8 border border-outline-variant/10 rounded-sm">
         <h3 className="text-sm font-bold uppercase tracking-widest text-primary mb-6 flex items-center gap-3">
           <FileText size={18} className="text-primary" />
           Engineering Notes & Design Considerations
@@ -491,7 +665,8 @@ const TractionModule = ({ data, onChange }: { data: ProjectData, onChange: (newD
         </div>
       </div>
     </div>
-  );
+  </div>
+);
 };
 
 const RopesModule = ({ data, onChange }: { data: ProjectData, onChange: (newData: Partial<ProjectData>) => void }) => {
@@ -557,124 +732,107 @@ const RopesModule = ({ data, onChange }: { data: ProjectData, onChange: (newData
           </div>
         </div>
 
-        <div className="mt-8 grid grid-cols-1 lg:grid-cols-2 gap-8">
-          <div className="space-y-6">
-            <div className="space-y-4 p-6 bg-surface-container-lowest border border-outline-variant/10">
-              <h4 className="text-xs font-bold uppercase tracking-widest text-primary border-b border-primary/20 pb-2">Suspension Configuration</h4>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-1">
-                  <label className="text-[11px] font-bold text-on-surface-variant uppercase">Breaking Load (Fmin)</label>
-                  <input 
-                    type="number"
-                    value={data.ropeBreakingLoad}
-                    onChange={(e) => onChange({ ropeBreakingLoad: safeNumber(e.target.value) })}
-                    className="w-full bg-surface-container-low border border-outline-variant/20 rounded-sm px-3 py-2 text-sm focus:ring-1 focus:ring-primary outline-none"
-                  />
+        <div className="mt-8 space-y-6">
+          <CollapsibleSection title="ISO 8100-2:2026 Ropes & Suspension Formula Details" icon={Info}>
+            <div className="space-y-4 text-sm text-on-surface-variant leading-relaxed">
+              <p>
+                <strong>Clause 4.12:</strong> The safety factor of the suspension ropes must be verified based on the number of equivalent bends and the ratio between the sheave and rope diameters.
+              </p>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-4">
+                <div className="p-4 bg-surface-container-low rounded border border-outline-variant/10">
+                  <h5 className="font-bold text-primary mb-2 uppercase text-[10px]">Required Safety Factor ($S_f$)</h5>
+                  <p className="text-xs mb-2">The minimum required safety factor is calculated using the following normative formula:</p>
+                  <InlineMath math="S_f = 10^{2.6834 - \frac{\log(N_{equiv} / 2.6834 \cdot 10^6)}{\log(D/d)}}" />
+                  <p className="text-[10px] mt-2 opacity-70">Where $N_{equiv}$ is the number of equivalent bends and $D/d$ is the diameter ratio.</p>
                 </div>
-                <div className="space-y-1">
-                  <label className="text-[11px] font-bold text-on-surface-variant uppercase">Number of Simple Pulleys (Nps)</label>
-                  <input 
-                    type="number"
-                    value={data.numSimpleBends}
-                    onChange={(e) => onChange({ numSimpleBends: safeNumber(e.target.value) })}
-                    className="w-full bg-surface-container-low border border-outline-variant/20 rounded-sm px-3 py-2 text-sm focus:ring-1 focus:ring-primary outline-none"
-                  />
-                </div>
-                <div className="space-y-1">
-                  <label className="text-[11px] font-bold text-on-surface-variant uppercase">Number of Reverse Pulleys (Npr)</label>
-                  <input 
-                    type="number"
-                    value={data.numReverseBends}
-                    onChange={(e) => onChange({ numReverseBends: safeNumber(e.target.value) })}
-                    className="w-full bg-surface-container-low border border-outline-variant/20 rounded-sm px-3 py-2 text-sm focus:ring-1 focus:ring-primary outline-none"
-                  />
-                </div>
-                <div className="p-3 bg-primary/5 border border-primary/10 rounded-sm flex flex-col justify-center">
-                  <p className="text-[10px] font-bold text-primary uppercase">Calculated N_equiv</p>
-                  <p className="text-lg font-black">{formatNumber(N_equiv, 1)}</p>
+                <div className="p-4 bg-surface-container-low rounded border border-outline-variant/10">
+                  <h5 className="font-bold text-primary mb-2 uppercase text-[10px]">Equivalent Bends ($N_{equiv}$)</h5>
+                  <p className="text-xs mb-2">Calculated by summing simple bends and penalizing reverse bends:</p>
+                  <InlineMath math="N_{equiv} = N_{ps} + 4 \cdot N_{pr}" />
+                  <p className="text-[10px] mt-2 opacity-70">$N_{ps}$: Simple pulleys, $N_{pr}$: Reverse pulleys.</p>
                 </div>
               </div>
             </div>
-            
-            <div className="p-4 bg-surface-container-lowest border border-outline-variant/10">
-              <h4 className="text-xs font-bold uppercase mb-2">Formulas (ISO 8100-2:2026)</h4>
-              <div className="font-mono text-[10px] space-y-1 opacity-70">
-                <p>• Sf = 10^(2.6834 - log(N_equiv / 2.6834e6) / log(D/d)) [Formula 36]</p>
-                <p>• N_equiv = N_ps + 4 · N_pr</p>
-              </div>
-            </div>
-          </div>
+          </CollapsibleSection>
 
-          <div className="space-y-6">
-            <div className="p-6 bg-surface-container-lowest border border-outline-variant/10">
-              <h4 className="text-xs font-bold uppercase mb-4 text-tertiary flex items-center gap-2">
-                <History size={14} />
-                Lifetime Estimation (Placeholder)
-              </h4>
-              <div className="space-y-4">
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-1">
-                    <label className="text-[11px] font-bold text-on-surface-variant uppercase">Rope Type</label>
-                    <select 
-                      value={data.ropeType}
-                      onChange={(e) => onChange({ ropeType: e.target.value })}
-                      className="w-full bg-surface-container-low border border-outline-variant/20 rounded-sm px-3 py-2 text-sm focus:ring-1 focus:ring-primary outline-none"
-                    >
-                      <option value="Steel Wire">Steel (Standard)</option>
-                      <option value="Coated">Coated (Synthetic)</option>
-                      <option value="High Performance">Alta Performance</option>
-                    </select>
-                  </div>
-                  <div className="space-y-1">
-                    <label className="text-[11px] font-bold text-on-surface-variant uppercase">Cycles/Year</label>
-                    <input 
-                      type="number"
-                      value={data.loadCycles}
-                      onChange={(e) => onChange({ loadCycles: safeNumber(e.target.value) })}
-                      className="w-full bg-surface-container-low border border-outline-variant/20 rounded-sm px-3 py-2 text-sm focus:ring-1 focus:ring-primary outline-none"
-                    />
-                  </div>
-                  <div className="space-y-1">
-                    <label className="text-[11px] font-bold text-on-surface-variant uppercase">Number of Floors (Stops)</label>
-                    <input 
-                      type="number"
-                      value={data.stops}
-                      onChange={(e) => onChange({ stops: safeNumber(e.target.value) })}
-                      className="w-full bg-surface-container-low border border-outline-variant/20 rounded-sm px-3 py-2 text-sm focus:ring-1 focus:ring-primary outline-none"
-                    />
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+            <div className="space-y-6">
+              <div className="space-y-4 p-6 bg-surface-container-lowest border border-outline-variant/10">
+                <h4 className="text-xs font-bold uppercase tracking-widest text-primary border-b border-primary/20 pb-2">Suspension Configuration</h4>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <LiftField label="Breaking Load (Fmin)" name="ropeBreakingLoad" unit="N" data={data} onChange={onChange} min={1000} required />
+                  <LiftField label="Simple Pulleys (Nps)" name="numSimpleBends" data={data} onChange={onChange} min={0} required />
+                  <LiftField label="Reverse Pulleys (Npr)" name="numReverseBends" data={data} onChange={onChange} min={0} required />
+                  <div className="p-3 bg-primary/5 border border-primary/10 rounded-sm flex flex-col justify-center">
+                    <p className="text-[10px] font-bold text-primary uppercase">Calculated N_equiv</p>
+                    <p className="text-lg font-black">{formatNumber(N_equiv, 1)}</p>
                   </div>
                 </div>
-                <div className="p-4 bg-tertiary/5 border border-tertiary/10 rounded-sm">
-                  <div className="flex justify-between items-end">
-                    <div>
-                      <p className="text-[10px] font-bold text-tertiary uppercase">Estimated Lifetime</p>
-                      <p className="text-2xl font-black text-tertiary">{formatNumber(lifetime_est, 0)} <span className="text-xs font-normal opacity-60">Cycles</span></p>
-                    </div>
-                    <div className="text-right">
-                      <p className="text-[10px] font-bold text-on-surface-variant uppercase opacity-50">Years (Est.)</p>
-                      <p className="text-lg font-bold opacity-60">{data.loadCycles > 0 ? formatNumber(lifetime_est / data.loadCycles, 1) : '-'}</p>
-                    </div>
-                  </div>
+              </div>
+              
+              <div className="p-4 bg-surface-container-lowest border border-outline-variant/10">
+                <h4 className="text-xs font-bold uppercase mb-2">Formulas (ISO 8100-2:2026)</h4>
+                <div className="font-mono text-[10px] space-y-1 opacity-70">
+                  <p>• Sf = 10^(2.6834 - log(N_equiv / 2.6834e6) / log(D/d)) [Formula 36]</p>
+                  <p>• N_equiv = N_ps + 4 · N_pr</p>
                 </div>
-                <p className="text-[9px] text-on-surface-variant opacity-50 italic">
-                  *Calculation based on simplified bending fatigue models (Feyrer). Requires validation with manufacturer data.
-                </p>
               </div>
             </div>
-            
-            <div className="p-6 bg-slate-900 text-white rounded-sm">
-              <h4 className="text-xs font-bold uppercase tracking-widest text-indigo-300 mb-4 flex items-center gap-2">
-                <AlertTriangle size={14} />
-                Discard Criteria (4.14)
-              </h4>
-              <ul className="text-[10px] space-y-2 opacity-80">
-                <li>• Reduction of nominal diameter &gt; 6%</li>
-                <li>• Severe corrosion or visible deformation</li>
-                <li>• Number of broken wires exceeds ISO 4344 limit</li>
-                <li className="pt-2 border-t border-white/10 text-indigo-200 font-bold italic">
-                  Ready for integration with IoT monitoring sensors.
-                </li>
-              </ul>
+
+            <div className="space-y-6">
+              <div className="p-6 bg-surface-container-lowest border border-outline-variant/10">
+                <h4 className="text-xs font-bold uppercase mb-4 text-tertiary flex items-center gap-2">
+                  <History size={14} />
+                  Lifetime Estimation (Placeholder)
+                </h4>
+                <div className="space-y-4">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-1">
+                      <label className="text-[11px] font-bold text-on-surface-variant uppercase">Rope Type</label>
+                      <select 
+                        value={data.ropeType}
+                        onChange={(e) => onChange({ ropeType: e.target.value })}
+                        className="w-full bg-surface-container-low border border-outline-variant/20 rounded-sm px-3 py-2 text-sm focus:ring-1 focus:ring-primary outline-none"
+                      >
+                        <option value="Steel Wire">Steel (Standard)</option>
+                        <option value="Coated">Coated (Synthetic)</option>
+                        <option value="High Performance">Alta Performance</option>
+                      </select>
+                    </div>
+                    <LiftField label="Cycles/Year" name="loadCycles" data={data} onChange={onChange} min={1000} required />
+                  </div>
+                  <div className="p-4 bg-tertiary/5 border border-tertiary/10 rounded-sm">
+                    <div className="flex justify-between items-end">
+                      <div>
+                        <p className="text-[10px] font-bold text-tertiary uppercase">Estimated Lifetime</p>
+                        <p className="text-2xl font-black text-tertiary">{formatNumber(lifetime_est, 0)} <span className="text-xs font-normal opacity-60">Cycles</span></p>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-[10px] font-bold text-on-surface-variant uppercase opacity-50">Years (Est.)</p>
+                        <p className="text-lg font-bold opacity-60">{data.loadCycles > 0 ? formatNumber(lifetime_est / data.loadCycles, 1) : '-'}</p>
+                      </div>
+                    </div>
+                  </div>
+                  <p className="text-[9px] text-on-surface-variant opacity-50 italic">
+                    *Calculation based on simplified bending fatigue models (Feyrer). Requires validation with manufacturer data.
+                  </p>
+                </div>
+              </div>
+              
+              <div className="p-6 bg-slate-900 text-white rounded-sm">
+                <h4 className="text-xs font-bold uppercase tracking-widest text-indigo-300 mb-4 flex items-center gap-2">
+                  <AlertTriangle size={14} />
+                  Discard Criteria (4.14)
+                </h4>
+                <ul className="text-[10px] space-y-2 opacity-80">
+                  <li>• Reduction of nominal diameter &gt; 6%</li>
+                  <li>• Severe corrosion or visible deformation</li>
+                  <li>• Number of broken wires exceeds ISO 4344 limit</li>
+                  <li className="pt-2 border-t border-white/10 text-indigo-200 font-bold italic">
+                    Ready for integration with IoT monitoring sensors.
+                  </li>
+                </ul>
+              </div>
             </div>
           </div>
         </div>
@@ -818,7 +976,29 @@ const GuideRailsModule = ({ data, onChange }: { data: ProjectData, onChange: (ne
           </div>
         </div>
 
-        <div className="mt-8 grid grid-cols-1 lg:grid-cols-2 gap-8">
+        <div className="mt-8 space-y-6">
+          <CollapsibleSection title="ISO 8100-2:2026 Guide Rail Formula Details" icon={Info}>
+            <div className="space-y-4 text-sm text-on-surface-variant leading-relaxed">
+              <p>
+                <strong>Clause 4.10:</strong> Guide rails must be verified for bending, buckling, and deflection under various load cases (safety gear operation, normal travel, loading).
+              </p>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-4">
+                <div className="p-4 bg-surface-container-low rounded border border-outline-variant/10">
+                  <h5 className="font-bold text-primary mb-2 uppercase text-[10px]">Bending Stress ($\sigma_m$)</h5>
+                  <p className="text-xs mb-2">Calculated based on the horizontal force $F_h$ and bracket distance $l$:</p>
+                  <InlineMath math="\sigma_m = \frac{M_m}{W} = \frac{3 \cdot F_h \cdot l}{16 \cdot W}" />
+                  <p className="text-[10px] mt-2 opacity-70">Where $M_m$ is the bending moment and $W$ is the section modulus.</p>
+                </div>
+                <div className="p-4 bg-surface-container-low rounded border border-outline-variant/10">
+                  <h5 className="font-bold text-primary mb-2 uppercase text-[10px]">Buckling Stress ($\sigma_k$)</h5>
+                  <p className="text-xs mb-2">Verified using the Omega method ($\omega$) for the vertical force $F_v$:</p>
+                  <InlineMath math="\sigma_k = \frac{F_v \cdot \omega}{A}" />
+                  <p className="text-[10px] mt-2 opacity-70">Where $A$ is the cross-sectional area and $\omega$ is the buckling factor.</p>
+                </div>
+              </div>
+            </div>
+          </CollapsibleSection>
+
           <div className="p-6 bg-surface-container-lowest border border-outline-variant/10">
             <h4 className="text-xs font-bold uppercase mb-4 text-primary flex items-center gap-2">
               <Settings2 size={14} />
@@ -975,11 +1155,35 @@ const HydraulicModule = ({ data }: { data: ProjectData }) => {
           </div>
         </div>
 
-        <div className="mt-8 p-4 bg-primary/5 border border-primary/10 rounded-sm">
-          <h4 className="text-xs font-bold uppercase mb-2">Applied Formulas (ISO 8100-2)</h4>
-          <div className="font-mono text-[10px] space-y-1 opacity-70">
-            <p>• Cylinder Thickness: e ≥ (2.3 · 1.7 · p / Rp0.2) · (Di / 2) + e0 [Formula 38]</p>
-            <p>• Buckling: Euler Verification (λ = {formatNumber(lambda, 1)})</p>
+        <div className="space-y-6 mt-8">
+          <CollapsibleSection title="ISO 8100-2:2026 Hydraulic Formula Details" icon={Info}>
+            <div className="space-y-4 text-sm text-on-surface-variant leading-relaxed">
+              <p>
+                <strong>Clause 4.15:</strong> Hydraulic components must be verified for internal pressure and buckling stability.
+              </p>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-4">
+                <div className="p-4 bg-surface-container-low rounded border border-outline-variant/10">
+                  <h5 className="font-bold text-primary mb-2 uppercase text-[10px]">Cylinder Wall Thickness (e)</h5>
+                  <p className="text-xs mb-2">The minimum wall thickness $e$ must withstand the maximum pressure $p$:</p>
+                  <InlineMath math="e \ge \left(\frac{2.3 \cdot 1.7 \cdot p}{R_{p0.2}}\right) \cdot \frac{D_i}{2} + e_0" />
+                  <p className="text-[10px] mt-2 opacity-70">Where $D_i$ is the internal diameter and $e_0$ is the corrosion allowance.</p>
+                </div>
+                <div className="p-4 bg-surface-container-low rounded border border-outline-variant/10">
+                  <h5 className="font-bold text-primary mb-2 uppercase text-[10px]">Ram Buckling (Euler)</h5>
+                  <p className="text-xs mb-2">The critical buckling load $F_k$ is calculated using Euler's formula:</p>
+                  <InlineMath math="F_k = \frac{\pi^2 \cdot E \cdot I}{l^2}" />
+                  <p className="text-[10px] mt-2 opacity-70">Where $l$ is the buckling length and $I$ is the second moment of area.</p>
+                </div>
+              </div>
+            </div>
+          </CollapsibleSection>
+
+          <div className="bg-primary/5 border border-primary/10 rounded-sm p-4">
+            <h4 className="text-xs font-bold uppercase mb-2">Applied Formulas (ISO 8100-2)</h4>
+            <div className="font-mono text-[10px] space-y-1 opacity-70">
+              <p>• Cylinder Thickness: e ≥ (2.3 · 1.7 · p / Rp0.2) · (Di / 2) + e0 [Formula 38]</p>
+              <p>• Buckling: Euler Verification (λ = {formatNumber(lambda, 1)})</p>
+            </div>
           </div>
         </div>
         {data.type === 'hydraulic' && <RuptureValveModule data={data} onChange={() => {}} />}
@@ -1190,57 +1394,129 @@ const ComponentLibraryModule = () => {
 };
 
 const CalculationMemoryModule = ({ data }: { data: ProjectData }) => {
+  const r = parseInt(data.suspension.split(':')[0]);
+  const T1 = ((data.carMass + data.ratedLoad) / r) * (9.81 + data.acceleration);
+  const T2 = ((data.carMass + 0.5 * data.ratedLoad) / r) * (9.81 - data.acceleration);
+  const tractionRatio = T2 !== 0 ? T1 / T2 : 0;
+  
+  const N_equiv_p = data.Kp * (data.numSimpleBends + 4 * data.numReverseBends);
+  const N_equiv = data.N_equiv_t + N_equiv_p;
+  
+  const ST = data.N_lift * data.C_R * data.travel * r;
+
   return (
-    <div className="space-y-8 max-w-4xl mx-auto bg-white p-12 shadow-sm border border-outline-variant/10 font-serif">
-      <div className="text-center border-b-2 border-on-surface pb-8 mb-8">
-        <h2 className="text-2xl font-black uppercase tracking-tighter">Calculation Report</h2>
-        <p className="text-sm italic">Project Alpha-7 | ISO 8100-2:2026 Compliance Report</p>
+    <div id="calculation-memory-report" className="space-y-8 max-w-5xl mx-auto bg-white p-12 shadow-sm border border-outline-variant/10 font-serif text-slate-900">
+      <div className="text-center border-b-2 border-slate-900 pb-8 mb-8">
+        <h2 className="text-3xl font-black uppercase tracking-tighter">Technical Calculation Report</h2>
+        <p className="text-sm italic mt-2">Project Alpha-7 | ISO 8100-2:2026 Engineering Compliance</p>
       </div>
 
-      <section className="space-y-4">
-        <h3 className="text-lg font-bold border-b border-on-surface/20 pb-1">1. Calculation Basis</h3>
-        <p className="text-sm leading-relaxed">
-          This document presents the preliminary engineering results for the traction and suspension system, 
-          calculated according to the requirements of ISO 8100-2:2026.
-        </p>
+      <section className="space-y-6">
+        <h3 className="text-xl font-bold border-b border-slate-200 pb-2">1. Traction System Analysis (Clause 4.11)</h3>
+        <div className="space-y-4">
+          <p className="text-sm leading-relaxed">
+            The traction verification is performed according to the Euler formula for friction drives. 
+            The static and dynamic loads on the traction sheave are calculated as follows:
+          </p>
+          <div className="bg-slate-50 p-6 rounded border border-slate-100 flex flex-col items-center gap-4">
+            <BlockMath math={`T_1 = \\frac{(P + Q)}{r} \\cdot (g_n + a) = \\frac{(${data.carMass} + ${data.ratedLoad})}{${r}} \\cdot (9.81 + ${data.acceleration}) = ${formatNumber(T1)} \\text{ N}`} />
+            <BlockMath math={`T_2 = \\frac{(P + 0.5Q)}{r} \\cdot (g_n - a) = \\frac{(${data.carMass} + 500)}{${r}} \\cdot (9.81 - ${data.acceleration}) = ${formatNumber(T2)} \\text{ N}`} />
+            <BlockMath math={`\\text{Ratio } T_1/T_2 = ${formatNumber(tractionRatio)}`} />
+          </div>
+          <p className="text-sm leading-relaxed">
+            The traction condition must satisfy the following criteria for loading, emergency braking, and stalling:
+          </p>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="bg-slate-50 p-4 rounded border border-slate-100">
+              <p className="text-[10px] font-bold uppercase mb-2">4.11.2.1 Loading</p>
+              <InlineMath math="\frac{T_1}{T_2} \le e^{f_{load}\alpha}" />
+            </div>
+            <div className="bg-slate-50 p-4 rounded border border-slate-100">
+              <p className="text-[10px] font-bold uppercase mb-2">4.11.2.2 Braking</p>
+              <InlineMath math="\frac{T_1}{T_2} \le e^{f_{brake}\alpha}" />
+            </div>
+            <div className="bg-slate-50 p-4 rounded border border-slate-100">
+              <p className="text-[10px] font-bold uppercase mb-2">4.11.2.3 Stalling</p>
+              <InlineMath math="\frac{T_1}{T_2} \ge e^{f_{stall}\alpha}" />
+            </div>
+          </div>
+        </div>
       </section>
 
-      <section className="space-y-4">
-        <h3 className="text-lg font-bold border-b border-on-surface/20 pb-1">2. Adopted Hypotheses</h3>
-        <ul className="text-sm space-y-1 list-disc list-inside">
-          <li>Traction calculation based on semi-circular groove with undercut (β={data.undercutAngle}º).</li>
-          <li>Dynamic friction coefficient calculated for rated speed of {data.speed} m/s.</li>
-          <li>Suspension ratio {data.suspension} with efficiency of {data.efficiency * 100}%.</li>
-        </ul>
+      <section className="space-y-6">
+        <h3 className="text-xl font-bold border-b border-slate-200 pb-2">2. Suspension Means Verification (Clause 4.12)</h3>
+        <div className="space-y-4">
+          <p className="text-sm leading-relaxed">
+            {'The equivalent number of pulleys $N_{equiv}$ is calculated to determine the required safety factor:'}
+          </p>
+          <div className="bg-slate-50 p-6 rounded border border-slate-100 flex flex-col items-center gap-4">
+            <BlockMath math={`N_{equiv} = N_{equiv(t)} + N_{equiv(p)} = ${data.N_equiv_t} + ${formatNumber(N_equiv_p)} = ${formatNumber(N_equiv)}`} />
+            <BlockMath math={`N_{equiv(p)} = K_p \\cdot (N_{ps} + 4N_{pr}) = ${data.Kp} \\cdot (${data.numSimpleBends} + 4 \\cdot ${data.numReverseBends}) = ${formatNumber(N_equiv_p)}`} />
+          </div>
+          <p className="text-sm leading-relaxed">
+            The minimum required safety factor according to Formula (36) is:
+          </p>
+          <div className="bg-slate-50 p-6 rounded border border-slate-100 flex flex-col items-center gap-4">
+            <BlockMath math="S_{f,req} = 10^{2.6834 - \frac{\log(N_{equiv} / 2.6834 \cdot 10^6)}{\log(D/d)}}" />
+          </div>
+          <p className="text-sm leading-relaxed">
+            Total number of trips $S_T$ (Clause 4.12.3):
+          </p>
+          <div className="bg-slate-50 p-6 rounded border border-slate-100 flex flex-col items-center gap-4">
+            <BlockMath math={`S_T = N_{lift} \\cdot C_R \\cdot H \\cdot r = ${data.N_lift} \\cdot ${data.C_R} \\cdot ${data.travel} \\cdot ${r} = ${formatNumber(ST, 0)}`} />
+          </div>
+        </div>
       </section>
 
-      <section className="space-y-4">
-        <h3 className="text-lg font-bold border-b border-on-surface/20 pb-1">3. Main Results</h3>
-        <div className="grid grid-cols-2 gap-x-8 gap-y-4 text-sm">
-          <div className="font-bold">Traction (T1/T2):</div>
-          <div>{formatNumber(Math.exp(0.1 * degToRad(data.wrapAngle)))} (Static Limit)</div>
-          
-          <div className="font-bold">Rope Safety Factor:</div>
-          <div>{formatNumber(data.ropeBreakingLoad / (((data.carMass + data.ratedLoad) * 9.81) / (parseInt(data.suspension.split(':')[0]) * data.numRopes)))}</div>
-          
-          <div className="font-bold">Upright Stress (Sling):</div>
-          <div>{formatNumber((2 * (data.carMass + data.ratedLoad) * 9.81) / (2 * data.uprightArea))} N/mm²</div>
- 
-          <div className="font-bold">Sheave Pressure:</div>
-          <div>{formatNumber(((data.carMass + data.ratedLoad + data.cwtMass) * 9.81 / parseInt(data.suspension.split(':')[0])) / (data.sheaveDiameter * data.ropeDiameter))} MPa</div>
-          
-          <div className="font-bold">Safety Gear Retardation:</div>
-          <div>{formatNumber(((data.safetyGearBrakingForce / (data.carMass + data.ratedLoad)) - 9.81) / 9.81)} gn</div>
- 
-          <div className="font-bold">Cylinder Thickness (Hyd.):</div>
-          <div>{data.cylinderWallThickness} mm (Actual)</div>
+      <section className="space-y-6">
+        <h3 className="text-xl font-bold border-b border-slate-200 pb-2">3. Guide Rails Analysis (Clause 4.10)</h3>
+        <div className="space-y-4">
+          <p className="text-sm leading-relaxed">
+            Bending and buckling stresses are verified for the selected profile:
+          </p>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="bg-slate-50 p-6 rounded border border-slate-100 flex flex-col items-center gap-4">
+              <p className="text-[10px] font-bold uppercase">4.10.2 Bending</p>
+              <BlockMath math="\sigma_m = \frac{M_m}{W}" />
+            </div>
+            <div className="bg-slate-50 p-6 rounded border border-slate-100 flex flex-col items-center gap-4">
+              <p className="text-[10px] font-bold uppercase">4.10.3 Buckling</p>
+              <BlockMath math="\sigma_k = \frac{(F_v + F_{aux}) \cdot \omega}{A}" />
+            </div>
+          </div>
+          <p className="text-sm leading-relaxed">
+            Combined stress verification (Clause 4.10.4):
+          </p>
+          <div className="bg-slate-50 p-6 rounded border border-slate-100 flex flex-col items-center gap-4">
+            <BlockMath math="\sigma = \sigma_k + 0.9\sigma_m \le \sigma_{perm}" />
+          </div>
+          <p className="text-sm leading-relaxed">
+            Deflection verification (Clause 4.10.6):
+          </p>
+          <div className="bg-slate-50 p-6 rounded border border-slate-100 flex flex-col items-center gap-4">
+            <BlockMath math={`\\delta_x = 0.7 \\cdot \\frac{F_x l^3}{48 E I_y} + \\delta_{str-x}`} />
+            <BlockMath math={`\\delta_y = 0.7 \\cdot \\frac{F_y l^3}{48 E I_x} + \\delta_{str-y}`} />
+          </div>
+        </div>
+      </section>
+
+      <section className="space-y-6">
+        <h3 className="text-xl font-bold border-b border-slate-200 pb-2">4. Hydraulic Systems (Clause 4.15)</h3>
+        <div className="space-y-4">
+          <p className="text-sm leading-relaxed">
+            Cylinder wall thickness and ram buckling are verified:
+          </p>
+          <div className="bg-slate-50 p-6 rounded border border-slate-100 flex flex-col items-center gap-4">
+            <BlockMath math="e_{wall} \ge \frac{2.3 \cdot 1.7 \cdot p}{R_{p0.2}} \cdot \frac{D_i}{2} + e_0" />
+            <BlockMath math="F_s \le \frac{\pi^2 E J}{2l^2}" />
+          </div>
         </div>
       </section>
 
       {data.tractionNotes && (
         <section className="space-y-4">
-          <h3 className="text-lg font-bold border-b border-on-surface/20 pb-1">4. Engineering Notes</h3>
-          <p className="text-sm leading-relaxed whitespace-pre-wrap italic text-on-surface-variant">
+          <h3 className="text-xl font-bold border-b border-slate-200 pb-2">5. Engineering Observations</h3>
+          <p className="text-sm leading-relaxed whitespace-pre-wrap italic text-slate-600 bg-amber-50 p-6 rounded border border-amber-100">
             {data.tractionNotes}
           </p>
         </section>
@@ -1328,6 +1604,101 @@ const DoorLockingModule = () => {
                   <h4 className="text-sm font-bold">{c.label}</h4>
                 </div>
                 <p className="text-[11px] text-on-surface-variant opacity-70 italic">{c.info}</p>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const FormulaLibraryModule = () => {
+  const formulas = [
+    { key: "guide_bending_9", section: "4.10.2", latex: "\\sigma_m = \\frac{M_m}{W}" },
+    { key: "guide_buckling_11", section: "4.10.3", latex: "\\sigma_k = \\frac{(F_v + F_{aux}) \\cdot \\omega}{A}" },
+    { key: "guide_combined_15", section: "4.10.4", latex: "\\sigma = \\sigma_x + \\sigma_y \\le \\sigma_{perm}" },
+    { key: "guide_combined_16", section: "4.10.4", latex: "\\sigma = \\sigma_m + \\frac{F_v + F_{aux}}{A} \\le \\sigma_{perm}" },
+    { key: "guide_combined_17", section: "4.10.4", latex: "\\sigma = \\sigma_k + 0.9\\sigma_m \\le \\sigma_{perm}" },
+    { key: "guide_deflection_20", section: "4.10.6", latex: "\\delta_x = 0.7 \\cdot \\frac{F_x l^3}{48 E I_y} + \\delta_{str-x}" },
+    { key: "guide_deflection_21", section: "4.10.6", latex: "\\delta_y = 0.7 \\cdot \\frac{F_y l^3}{48 E I_x} + \\delta_{str-y}" },
+    { key: "traction_22", section: "4.11.2.1", latex: "\\frac{T_1}{T_2} \\le e^{f_{load}\\alpha}" },
+    { key: "traction_23", section: "4.11.2.2", latex: "\\frac{T_1}{T_2} \\le e^{f_{brake}\\alpha}" },
+    { key: "traction_24", section: "4.11.2.3", latex: "\\frac{T_1}{T_2} \\ge e^{f_{stall}\\alpha}" },
+    { key: "nequiv_33", section: "4.12.2", latex: "N_{equiv} = N_{equiv(t)} + N_{equiv(p)}" },
+    { key: "nequiv_34", section: "4.12.2", latex: "N_{equiv(p)} = K_p \\cdot (N_{ps} + 4N_{pr})" },
+    { key: "safety_37", section: "4.12.3", latex: "S_T = N_{lift} \\cdot C_R \\cdot H \\cdot r" },
+    { key: "friction_28", section: "4.13.6", latex: "\\mu = \\frac{0.1}{1 + v/10}" },
+    { key: "hydraulic_38", section: "4.15.1", latex: "e_{wall} \\ge \\frac{2.3\\cdot1.7\\cdot p}{R_{p0.2}}\\cdot\\frac{D_i}{2} + e_0" },
+    { key: "jack_54", section: "4.15.2", latex: "F_s \\le \\frac{\\pi^2 E J}{2l^2}" }
+  ];
+
+  return (
+    <div className="space-y-6">
+      <div className="bg-surface-container-low p-8 border-t-2 border-primary">
+        <h3 className="text-xl font-bold mb-8">ISO 8100-2 Formula Library</h3>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {formulas.map(f => (
+            <div key={f.key} className="p-6 bg-slate-900 text-white rounded-xl border border-white/5 flex flex-col items-center justify-center gap-4">
+              <span className="text-[10px] font-bold uppercase text-primary self-start">{f.section}</span>
+              <div className="py-4">
+                <BlockMath math={f.latex} />
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const ClearanceValidationModule = ({ data }: { data: ProjectData }) => {
+  const checks = [
+    { key: "well-car-facing-clearance", clause: "4.2.5.3.1", value: data.wellToCarWall, limit: 0.12, op: "<=", unit: "m", note: "Well wall to car sill/frame/door edge" },
+    { key: "sill-horizontal-gap", clause: "4.3.4.1", value: data.sillGap, limit: 0.035, op: "<=", unit: "m", note: "Car sill to landing sill gap" },
+    { key: "door-panel-gap", clause: "4.3.4.2", value: data.doorPanelGap, limit: 0.10, op: "<=", unit: "m", note: "Door panel clearance" },
+    { key: "pit-refuge-height", clause: "4.2.5.8.2(a)", value: data.pitRefugeHeight, limit: 0.50, op: ">=", unit: "m", note: "Pit/platform to lowest car parts" },
+    { key: "pit-obstacle-clearance", clause: "4.2.5.8.2(b)", value: data.pitObstacleClearance, limit: 0.30, op: ">=", unit: "m", note: "Pit fixed parts to lowest car parts" },
+    { key: "pit-hazard-vertical", clause: "4.2.3.3(d)2", value: data.pitFreeVerticalHazard, limit: 2.00, op: ">=", unit: "m", note: "Free vertical distance in pit hazardous zone" },
+    { key: "car-counterweight-distance", clause: "4.2.5.5.3", value: data.carToCwtDistance, limit: 0.05, op: ">=", unit: "m", note: "Car and associated parts to counterweight" },
+    { key: "headroom-general", clause: "4.2.5.7.2(a)", value: data.headroomGeneral, limit: 0.50, op: ">=", unit: "m", note: "General headroom above car roof fixed parts" },
+    { key: "headroom-guideshoe-zone", clause: "4.2.5.7.2(b)", value: data.headroomGuideShoeZone, limit: 0.10, op: ">=", unit: "m", note: "Guide shoes/suspension terminations zone" },
+    { key: "balustrade-vertical", clause: "4.2.5.7.2(c)1", value: data.balustradeVertical, limit: 0.30, op: ">=", unit: "m", note: "Vertical above balustrade zone" },
+    { key: "toeboard-outside", clause: "4.2.5.7.2(d)2", value: data.toeBoardOutside, limit: 0.10, op: ">=", unit: "m", note: "Outside toe board vertical clearance" },
+    { key: "ram-head-ceiling", clause: "4.2.5.7.4", value: data.ramHeadClearance, limit: 0.10, op: ">=", unit: "m", note: "Ceiling to ram-head assembly" },
+    { key: "cwt-screen-bottom", clause: "4.2.5.5.1(c)", value: data.cwtScreenBottomFromPit, limit: 0.30, op: "<=", unit: "m", note: "Lowest part of CWT screen from pit floor" },
+    { key: "cwt-screen-height", clause: "4.2.5.5.1(b)", value: data.cwtScreenHeight, limit: 2.00, op: ">=", unit: "m", note: "CWT screen minimum extension height" }
+  ];
+
+  const results = checks.map((c) => {
+    const pass = c.op === "<=" ? c.value <= c.limit : c.value >= c.limit;
+    return { ...c, pass };
+  });
+
+  const passCount = results.filter(r => r.pass).length;
+  const allPass = passCount === results.length;
+
+  return (
+    <div className="space-y-8">
+      <div className="bg-surface-container-low p-8 border-t-2 border-primary">
+        <div className="flex items-center justify-between mb-8">
+          <h3 className="text-xl font-bold">ISO 8100-1 Shaft Clearance Validation</h3>
+          <span className={`text-[10px] font-bold px-3 py-1 rounded-full uppercase ${allPass ? 'bg-emerald-100 text-emerald-700' : 'bg-error-container/20 text-error'}`}>
+            {allPass ? 'PASS' : 'ATTENTION'} {passCount}/{results.length}
+          </span>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {results.map(r => (
+            <div key={r.key} className={`p-4 border flex items-center justify-between ${r.pass ? 'bg-surface-container-lowest border-outline-variant/10' : 'bg-error-container/10 border-error/20'}`}>
+              <div className="space-y-1">
+                <p className="text-[10px] font-bold text-primary uppercase">{r.clause}</p>
+                <p className="text-xs font-medium">{r.note}</p>
+              </div>
+              <div className="text-right">
+                <p className={`text-sm font-black ${r.pass ? 'text-emerald-600' : 'text-error'}`}>
+                  {r.value.toFixed(3)} {r.unit} {r.op} {r.limit.toFixed(3)} {r.unit}
+                </p>
               </div>
             </div>
           ))}
@@ -1485,8 +1856,8 @@ const SafetyComponentsModule = ({ data, onChange }: { data: ProjectData, onChang
                       </div>
                       <span className="text-xs font-medium">Verification of clearances and alignment (max 6mm between door panels).</span>
                     </div>
-                  </div>
-                </div>
+                  );
+                })()}
               </div>
             </div>
           </section>
@@ -1658,11 +2029,34 @@ const SafetyComponentsModule = ({ data, onChange }: { data: ProjectData, onChang
                   </div>
                 </div>
 
-                <div className="p-6 bg-surface-container-lowest border border-outline-variant/10 rounded-sm">
-                  <h5 className="text-[10px] font-bold uppercase text-primary mb-4 flex items-center gap-2">
-                    <CheckSquare size={12} />
-                    Verification Checklist (4.4)
-                  </h5>
+                <div className="space-y-6 mt-4">
+                  <CollapsibleSection title="ISO 8100-2:2026 OSG Formula Details" icon={Info}>
+                    <div className="space-y-4 text-sm text-on-surface-variant leading-relaxed">
+                      <p>
+                        <strong>Clause 4.4:</strong> The overspeed governor (OSG) must trip at a speed $v_t$ that ensures the safety gear is activated before the car reaches a dangerous speed.
+                      </p>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-4">
+                        <div className="p-4 bg-surface-container-low rounded border border-outline-variant/10">
+                          <h5 className="font-bold text-primary mb-2 uppercase text-[10px]">Tripping Speed ($v_t$)</h5>
+                          <p className="text-xs mb-2">The tripping speed must satisfy:</p>
+                          <InlineMath math="v_t \ge 1.15 \cdot v" />
+                          <p className="text-[10px] mt-2 opacity-70">Where $v$ is the rated speed. Maximum limits depend on the type of safety gear.</p>
+                        </div>
+                        <div className="p-4 bg-surface-container-low rounded border border-outline-variant/10">
+                          <h5 className="font-bold text-primary mb-2 uppercase text-[10px]">Tensile Force ($F_t$)</h5>
+                          <p className="text-xs mb-2">The force produced by the OSG when tripped must be:</p>
+                          <InlineMath math="F_t \ge 300\text{ N} \text{ or } 2 \cdot F_{trip}" />
+                          <p className="text-[10px] mt-2 opacity-70">Where $F_{trip}$ is the force required to activate the safety gear.</p>
+                        </div>
+                      </div>
+                    </div>
+                  </CollapsibleSection>
+
+                  <div className="p-6 bg-surface-container-lowest border border-outline-variant/10 rounded-sm">
+                    <h5 className="text-[10px] font-bold uppercase text-primary mb-4 flex items-center gap-2">
+                      <CheckSquare size={12} />
+                      Verification Checklist (4.4)
+                    </h5>
                   <div className="space-y-3">
                     <div className="flex items-center gap-3">
                       <div className={`w-5 h-5 rounded flex items-center justify-center border ${isTrippingOk ? 'bg-emerald-600 border-emerald-600' : 'border-outline-variant'}`}>
@@ -1700,7 +2094,8 @@ const SafetyComponentsModule = ({ data, onChange }: { data: ProjectData, onChang
                 </div>
               </div>
             </div>
-          </section>
+          </div>
+        </section>
 
           {/* 4.3 Verification of Safety Gear */}
           <section className="space-y-6">
@@ -1743,12 +2138,12 @@ const SafetyComponentsModule = ({ data, onChange }: { data: ProjectData, onChang
                     return (
                       <div className="space-y-6">
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                          <div className={`p-4 border ${isMassOk ? 'bg-emerald-50 border-emerald-200' : 'bg-error-container/10 border-error/20'}`}>
+                          <div className={`p-4 border ${isMassOk ? 'bg-emerald-50 border-emerald-200' : 'bg-error-container bg-opacity-10 border-error border-opacity-20'}`}>
                             <p className="text-[10px] font-bold uppercase mb-1">Total Mass (P+Q)</p>
                             <p className="text-xl font-black">{formatNumber(totalMass)} kg</p>
                             <p className="text-[10px] opacity-50">Limit: {data.safetyGearMaxMass} kg</p>
                           </div>
-                          <div className={`p-4 border ${isRetardationOk ? 'bg-emerald-50 border-emerald-200' : 'bg-amber-50 border-amber-200'}`}>
+                          <div className={`p-4 border ${isRetardationOk ? 'bg-emerald-50 border-emerald-200' : 'bg-amber-50 bg-opacity-10 border-amber border-opacity-20'}`}>
                             <div className="flex items-center justify-between mb-3">
                               <p className="text-[10px] font-bold uppercase tracking-wider">Resultant Retardation (gn)</p>
                               <div className="flex items-center gap-2">
@@ -1758,8 +2153,10 @@ const SafetyComponentsModule = ({ data, onChange }: { data: ProjectData, onChang
                                 </span>
                               </div>
                             </div>
+                          </div>
+                        </div>
 
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-4">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-4">
                               <div className="space-y-2">
                                 <div className="flex items-baseline gap-2">
                                   <p className="text-3xl font-black">{formatNumber(retardationG)} gn</p>
@@ -1824,13 +2221,35 @@ const SafetyComponentsModule = ({ data, onChange }: { data: ProjectData, onChang
                               <span>1.2+</span>
                             </div>
                           </div>
-                        </div>
 
-                        <div className="p-6 bg-surface-container-lowest border border-outline-variant/10 rounded-sm">
-                          <h5 className="text-[10px] font-bold uppercase text-primary mb-4 flex items-center gap-2">
-                            <CheckSquare size={12} />
-                            Verification Checklist (ISO 8100-2)
-                          </h5>
+                          <div className="space-y-6 mt-6">
+                          <CollapsibleSection title="ISO 8100-2:2026 Safety Gear Formula Details" icon={Info}>
+                            <div className="space-y-4 text-sm text-on-surface-variant leading-relaxed">
+                              <p>
+                                <strong>Clause 4.3:</strong> Progressive safety gear must decelerate the car with an average retardation between $0.2g$ and $1.0g$ for the most unfavorable case.
+                              </p>
+                              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-4">
+                                <div className="p-4 bg-surface-container-low rounded border border-outline-variant/10">
+                                  <h5 className="font-bold text-primary mb-2 uppercase text-[10px]">Average Retardation ($a$)</h5>
+                                  <p className="text-xs mb-2">The retardation is calculated from the braking force $F_b$ and the total mass $P+Q$:</p>
+                                  <InlineMath math="a = \frac{F_b}{P+Q} - g" />
+                                  <p className="text-[10px] mt-2 opacity-70">Where $g = 9.81 \text{ m/s}^2$. The result is often expressed in $g_n$ units.</p>
+                                </div>
+                                <div className="p-4 bg-surface-container-low rounded border border-outline-variant/10">
+                                  <h5 className="font-bold text-primary mb-2 uppercase text-[10px]">Permissible Range</h5>
+                                  <p className="text-xs mb-2">The normative limits for safe deceleration are:</p>
+                                  <InlineMath math="0.2g \le a \le 1.0g" />
+                                  <p className="text-[10px] mt-2 opacity-70">Values below $0.2g$ may fail to stop the car; above $1.0g$ may cause passenger injury.</p>
+                                </div>
+                              </div>
+                            </div>
+                          </CollapsibleSection>
+
+                          <div className="p-6 bg-surface-container-lowest border border-outline-variant/10 rounded-sm">
+                            <h5 className="text-[10px] font-bold uppercase text-primary mb-4 flex items-center gap-2">
+                              <CheckSquare size={12} />
+                              Verification Checklist (ISO 8100-2)
+                            </h5>
                           <div className="space-y-3">
                             <div className="flex items-center gap-3">
                               <div className={`w-5 h-5 rounded flex items-center justify-center border ${isMassOk ? 'bg-emerald-600 border-emerald-600' : 'border-outline-variant'}`}>
@@ -1860,10 +2279,10 @@ const SafetyComponentsModule = ({ data, onChange }: { data: ProjectData, onChang
                         </div>
                       </div>
                     );
-                })()}
+                  })()}
+                </div>
               </div>
-            </div>
-          </section>
+            </section>
 
           {/* 4.5 Verification of Buffers */}
           <section className="space-y-6">
@@ -2080,11 +2499,34 @@ const SafetyComponentsModule = ({ data, onChange }: { data: ProjectData, onChang
                         </div>
                       </div>
 
-                      <div className="p-6 bg-surface-container-lowest border border-outline-variant/10 rounded-sm">
-                        <h5 className="text-[10px] font-bold uppercase text-primary mb-4 flex items-center gap-2">
-                          <CheckSquare size={12} />
-                          Buffer Verification Checklist (4.5)
-                        </h5>
+                      <div className="space-y-6 mt-6">
+                        <CollapsibleSection title="ISO 8100-2:2026 Buffer Formula Details" icon={Info}>
+                          <div className="space-y-4 text-sm text-on-surface-variant leading-relaxed">
+                            <p>
+                              <strong>Clause 4.5:</strong> Buffers must be capable of absorbing the kinetic energy of the car or counterweight at the moment of impact.
+                            </p>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-4">
+                              <div className="p-4 bg-surface-container-low rounded border border-outline-variant/10">
+                                <h5 className="font-bold text-primary mb-2 uppercase text-[10px]">Minimum Stroke ($h$)</h5>
+                                <p className="text-xs mb-2">For energy accumulation buffers with linear characteristics:</p>
+                                <InlineMath math="h \ge 0.135 \cdot v^2" />
+                                <p className="text-[10px] mt-2 opacity-70">Where $v$ is the rated speed. For non-linear, the factor is $0.067$.</p>
+                              </div>
+                              <div className="p-4 bg-surface-container-low rounded border border-outline-variant/10">
+                                <h5 className="font-bold text-primary mb-2 uppercase text-[10px]">Impact Energy ($E$)</h5>
+                                <p className="text-xs mb-2">The total energy to be dissipated includes kinetic and potential energy:</p>
+                                <InlineMath math="E = \frac{1}{2} \cdot m \cdot v^2 + m \cdot g \cdot h" />
+                                <p className="text-[10px] mt-2 opacity-70">Where $m$ is the impact mass and $h$ is the buffer stroke.</p>
+                              </div>
+                            </div>
+                          </div>
+                        </CollapsibleSection>
+
+                        <div className="p-6 bg-surface-container-lowest border border-outline-variant/10 rounded-sm">
+                          <h5 className="text-[10px] font-bold uppercase text-primary mb-4 flex items-center gap-2">
+                            <CheckSquare size={12} />
+                            Buffer Verification Checklist (4.5)
+                          </h5>
                         <div className="space-y-3">
                           <div className="flex items-center gap-3">
                             <div className={`w-5 h-5 rounded flex items-center justify-center border ${isStrokeOk ? 'bg-emerald-600 border-emerald-600' : 'border-outline-variant'}`}>
@@ -2387,11 +2829,104 @@ const SafetyComponentsModule = ({ data, onChange }: { data: ProjectData, onChang
           </section>
         </div>
       </div>
+    );
+  };
+
+// --- Main App ---
+
+const PDFExportModule = ({ data }: { data: ProjectData }) => {
+  const [isGenerating, setIsGenerating] = React.useState(false);
+
+  const exportPDF = async () => {
+    setIsGenerating(true);
+    try {
+      const element = document.getElementById('calculation-memory-report');
+      if (!element) {
+        console.error('Report element not found');
+        return;
+      }
+
+      const canvas = await html2canvas(element, {
+        scale: 2,
+        useCORS: true,
+        logging: false,
+        backgroundColor: '#ffffff'
+      });
+      
+      const imgData = canvas.toDataURL('image/png');
+      const pdf = new jsPDF('p', 'mm', 'a4');
+      const imgProps = pdf.getImageProperties(imgData);
+      const pdfWidth = pdf.internal.pageSize.getWidth();
+      const pdfHeight = (imgProps.height * pdfWidth) / imgProps.width;
+      
+      // Handle multi-page if height exceeds A4
+      const pageHeight = pdf.internal.pageSize.getHeight();
+      let heightLeft = pdfHeight;
+      let position = 0;
+
+      pdf.addImage(imgData, 'PNG', 0, position, pdfWidth, pdfHeight);
+      heightLeft -= pageHeight;
+
+      while (heightLeft >= 0) {
+        position = heightLeft - pdfHeight;
+        pdf.addPage();
+        pdf.addImage(imgData, 'PNG', 0, position, pdfWidth, pdfHeight);
+        heightLeft -= pageHeight;
+      }
+
+      pdf.save(`LiftCalc_Report_${new Date().toISOString().split('T')[0]}.pdf`);
+    } catch (error) {
+      console.error('PDF Export failed:', error);
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+
+  return (
+    <div className="space-y-8 max-w-4xl mx-auto">
+      <div className="bg-surface-container-low p-8 rounded-sm border border-outline-variant/10 text-center">
+        <div className="w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-6">
+          <FileText size={32} className="text-primary" />
+        </div>
+        <h2 className="text-2xl font-black uppercase tracking-tighter mb-2">Technical Report Generator</h2>
+        <p className="text-on-surface-variant mb-8 max-w-md mx-auto">
+          Generate a comprehensive PDF report containing all engineering parameters, ISO 8100-2 calculations, and compliance verifications.
+        </p>
+        
+        <button 
+          onClick={exportPDF}
+          disabled={isGenerating}
+          className="px-8 py-4 bg-primary text-white font-black uppercase tracking-[0.2em] rounded-sm hover:opacity-90 transition-all shadow-lg flex items-center gap-3 mx-auto disabled:opacity-50"
+        >
+          {isGenerating ? (
+            <>
+              <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+              Generating...
+            </>
+          ) : (
+            <>
+              <FileText size={18} />
+              Export PDF Report
+            </>
+          )}
+        </button>
+      </div>
+
+      <div className="bg-amber-50 border border-amber-200 p-6 rounded-sm flex gap-4">
+        <Info className="text-amber-600 shrink-0" size={20} />
+        <div className="text-sm text-amber-800">
+          <p className="font-bold mb-1">Export Instructions</p>
+          <p>The report is generated from the "Calculation Memory" module. Ensure all data is correctly entered before exporting. The process may take a few seconds depending on the complexity of the data.</p>
+        </div>
+      </div>
+
+      {/* Hidden container for rendering the report for capture */}
+      <div className="fixed left-[-9999px] top-0 w-[1200px] bg-white">
+        <CalculationMemoryModule data={data} />
+      </div>
     </div>
   );
 };
-
-// --- Main App ---
 
 const ValidationModal = ({ isOpen, onClose, results }: { isOpen: boolean, onClose: () => void, results: { type: 'error' | 'warning' | 'success', msg: string }[] }) => {
   if (!isOpen) return null;
@@ -2546,7 +3081,46 @@ export default function App() {
     ucmpType: 'brake',
     ucmpDetectionDist: 150,
     ruptureValveFlow: 120,
-    ruptureValvePressure: 6.0
+    ruptureValvePressure: 6.0,
+    // New Traction & Belt Variables
+    grooveType: 'semi-circular',
+    undercutWidth: 90,
+    ropeAngleOfWrap: 180,
+    acceleration: 0.5,
+    deceleration: 0.5,
+    ropeSpecificPressure: 1.2,
+    beltWidth: 30,
+    beltThickness: 3,
+    numBelts: 4,
+    beltTensileStrength: 40000,
+    // New Clearances (ISO 8100-1)
+    pitDepth: 1500,
+    headroomHeight: 3800,
+    carToWallClearance: 120,
+    carToCounterweightClearance: 50,
+    carToLandingSillClearance: 35,
+    // Additional Variables from HTML Engine
+    Faux: 4000,
+    delta_str_x: 0.6,
+    delta_str_y: 0.6,
+    N_equiv_t: 5,
+    Kp: 5.06,
+    N_lift: 120000,
+    C_R: 1.0,
+    wellToCarWall: 0.11,
+    sillGap: 0.03,
+    doorPanelGap: 0.08,
+    pitRefugeHeight: 0.55,
+    pitObstacleClearance: 0.32,
+    pitFreeVerticalHazard: 2.05,
+    carToCwtDistance: 0.06,
+    headroomGeneral: 0.52,
+    headroomGuideShoeZone: 0.12,
+    balustradeVertical: 0.32,
+    toeBoardOutside: 0.12,
+    ramHeadClearance: 0.12,
+    cwtScreenBottomFromPit: 0.28,
+    cwtScreenHeight: 2.1
   });
 
   const handleDataChange = (newData: Partial<ProjectData>) => {
@@ -2593,6 +3167,8 @@ export default function App() {
     { id: 'hydraulic', label: 'Hydraulic', icon: Droplets, status: 'implemented' },
     { id: 'safety', label: 'Safety Components', icon: ShieldCheck, status: 'implemented' },
     { id: 'acop-ucmp', label: 'ACOP / UCMP', icon: ShieldAlert, status: 'implemented' },
+    { id: 'clearances', label: 'Shaft Clearances', icon: Ruler, status: 'implemented' },
+    { id: 'formulas', label: 'Formula Library', icon: Calculator, status: 'implemented' },
     { id: 'shaft', label: '3D Shaft', icon: Box, status: 'implemented' },
     { id: 'memory', label: 'Calculation Memory', icon: History, status: 'implemented' },
     { id: 'export', label: 'PDF Export', icon: FileText, status: 'implemented' },
@@ -2611,8 +3187,11 @@ export default function App() {
       case 'hydraulic': return <HydraulicModule data={projectData} />;
       case 'safety': return <SafetyComponentsModule data={projectData} onChange={handleDataChange} />;
       case 'acop-ucmp': return <ACOP_UCMP_Module data={projectData} onChange={handleDataChange} />;
+      case 'clearances': return <ClearanceValidationModule data={projectData} />;
+      case 'formulas': return <FormulaLibraryModule />;
       case 'library': return <ComponentLibraryModule />;
       case 'memory': return <CalculationMemoryModule data={projectData} />;
+      case 'export': return <PDFExportModule data={projectData} />;
       case 'checks': return <RuntimeChecksModule />;
       case 'shaft': return (
         <div className="space-y-6">
@@ -2623,6 +3202,11 @@ export default function App() {
               depth={projectData.shaftDepth}
               height={projectData.shaftHeight}
               carPos={projectData.carPositionPercent / 100}
+              wellToCarWall={projectData.wellToCarWall}
+              sillGap={projectData.sillGap}
+              pitRefugeHeight={projectData.pitRefugeHeight}
+              carToCwtDistance={projectData.carToCwtDistance}
+              headroomGeneral={projectData.headroomGeneral}
             />
             <div className="mt-6 p-4 bg-surface-container-lowest border border-outline-variant/10 rounded-sm">
               <h4 className="text-[10px] font-bold uppercase text-primary mb-2">Simulation Controls</h4>

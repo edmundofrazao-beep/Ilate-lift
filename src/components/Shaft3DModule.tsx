@@ -1,7 +1,8 @@
-import React, { useRef, useMemo } from 'react';
-import { Canvas, useFrame } from '@react-three/fiber';
-import { OrbitControls, PerspectiveCamera, Grid, Text, Box, Cylinder } from '@react-three/drei';
+import React, { useRef, useMemo, useState } from 'react';
+import { Canvas, useFrame, useThree } from '@react-three/fiber';
+import { OrbitControls, PerspectiveCamera, Grid, Text, Box, Cylinder, RoundedBox, Html } from '@react-three/drei';
 import * as THREE from 'three';
+import { Maximize2, Minimize2, Move, ZoomIn, ZoomOut, RotateCcw } from 'lucide-react';
 
 interface Shaft3DProps {
   width: number;
@@ -11,16 +12,22 @@ interface Shaft3DProps {
   carDepth?: number;
   carHeight?: number;
   carPos?: number; // 0 to 1
+  pitDepth?: number;
+  headroomHeight?: number;
+  wellToCarWall?: number;
+  sillGap?: number;
+  pitRefugeHeight?: number;
+  carToCwtDistance?: number;
+  headroomGeneral?: number;
 }
 
 const ElevatorCar = ({ width, depth, height, position }: { width: number, depth: number, height: number, position: [number, number, number] }) => {
   return (
     <group position={position}>
       {/* Car Body */}
-      <mesh>
-        <boxGeometry args={[width, height, depth]} />
-        <meshStandardMaterial color="#3b82f6" transparent opacity={0.8} />
-      </mesh>
+      <RoundedBox args={[width, height, depth]} radius={0.02} smoothness={4}>
+        <meshStandardMaterial color="#3b82f6" metalness={0.6} roughness={0.2} />
+      </RoundedBox>
       {/* Car Frame (Sling) */}
       <mesh>
         <boxGeometry args={[width + 0.1, height + 0.2, depth + 0.1]} />
@@ -29,7 +36,12 @@ const ElevatorCar = ({ width, depth, height, position }: { width: number, depth:
       {/* Car Door */}
       <mesh position={[0, 0, depth / 2 + 0.01]}>
         <planeGeometry args={[width * 0.8, height * 0.8]} />
-        <meshStandardMaterial color="#94a3b8" />
+        <meshStandardMaterial color="#94a3b8" metalness={0.8} roughness={0.1} />
+      </mesh>
+      {/* Roof Equipment */}
+      <mesh position={[0, height / 2 + 0.1, 0]}>
+        <boxGeometry args={[width * 0.6, 0.2, depth * 0.6]} />
+        <meshStandardMaterial color="#475569" />
       </mesh>
     </group>
   );
@@ -39,40 +51,68 @@ const GuideRails = ({ shaftHeight, shaftWidth, shaftDepth }: { shaftHeight: numb
   return (
     <group>
       {/* Left Rail */}
-      <mesh position={[-shaftWidth / 2 + 0.1, shaftHeight / 2, 0]}>
+      <mesh position={[-shaftWidth / 2 + 0.05, shaftHeight / 2, 0]}>
         <boxGeometry args={[0.05, shaftHeight, 0.05]} />
-        <meshStandardMaterial color="#64748b" />
+        <meshStandardMaterial color="#94a3b8" metalness={0.9} roughness={0.1} />
       </mesh>
       {/* Right Rail */}
-      <mesh position={[shaftWidth / 2 - 0.1, shaftHeight / 2, 0]}>
+      <mesh position={[shaftWidth / 2 - 0.05, shaftHeight / 2, 0]}>
         <boxGeometry args={[0.05, shaftHeight, 0.05]} />
-        <meshStandardMaterial color="#64748b" />
+        <meshStandardMaterial color="#94a3b8" metalness={0.9} roughness={0.1} />
       </mesh>
     </group>
   );
 };
 
-const ShaftStructure = ({ width, depth, height }: { width: number, depth: number, height: number }) => {
+const ShaftStructure = ({ width, depth, height, pitDepth = 1.5 }: { width: number, depth: number, height: number, pitDepth?: number }) => {
   return (
     <group>
       {/* Pit Floor */}
-      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0, 0]}>
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -pitDepth, 0]}>
         <planeGeometry args={[width, depth]} />
-        <meshStandardMaterial color="#cbd5e1" />
+        <meshStandardMaterial color="#475569" />
       </mesh>
-      {/* Walls (Wireframe for visibility) */}
+      {/* Pit Walls */}
+      <mesh position={[0, -pitDepth / 2, 0]}>
+        <boxGeometry args={[width, pitDepth, depth]} />
+        <meshStandardMaterial color="#334155" wireframe transparent opacity={0.3} />
+      </mesh>
+      {/* Main Walls */}
       <mesh position={[0, height / 2, 0]}>
         <boxGeometry args={[width, height, depth]} />
-        <meshStandardMaterial color="#e2e8f0" wireframe transparent opacity={0.2} />
+        <meshStandardMaterial color="#e2e8f0" wireframe transparent opacity={0.1} />
       </mesh>
       {/* Landing Openings */}
       {Array.from({ length: Math.floor(height / 3) + 1 }).map((_, i) => (
-        <mesh key={i} position={[0, i * 3 + 1.2, depth / 2]}>
-          <planeGeometry args={[width * 0.6, 2.1]} />
-          <meshStandardMaterial color="#f1f5f9" transparent opacity={0.5} />
-        </mesh>
+        <group key={i} position={[0, i * 3 + 1.05, depth / 2]}>
+          <mesh>
+            <planeGeometry args={[width * 0.6, 2.1]} />
+            <meshStandardMaterial color="#f1f5f9" transparent opacity={0.3} side={THREE.DoubleSide} />
+          </mesh>
+          <Text position={[0, 1.2, 0.01]} fontSize={0.2} color="white">Floor {i}</Text>
+        </group>
       ))}
     </group>
+  );
+};
+
+const Buffer = ({ position }: { position: [number, number, number] }) => (
+  <mesh position={position}>
+    <cylinderGeometry args={[0.1, 0.1, 0.3, 16]} />
+    <meshStandardMaterial color="#f59e0b" metalness={0.5} />
+  </mesh>
+);
+
+const CameraControls = ({ onReset }: { onReset: () => void }) => {
+  const { camera } = useThree();
+  return (
+    <Html as="div" style={{ position: 'absolute', bottom: '1rem', left: '1rem', zIndex: 20, pointerEvents: 'none' }}>
+      <div className="flex flex-col gap-2" style={{ pointerEvents: 'auto' }}>
+        <button onClick={() => camera.position.multiplyScalar(0.9)} className="p-2 bg-black/60 text-white rounded hover:bg-primary transition-colors"><ZoomIn size={16} /></button>
+        <button onClick={() => camera.position.multiplyScalar(1.1)} className="p-2 bg-black/60 text-white rounded hover:bg-primary transition-colors"><ZoomOut size={16} /></button>
+        <button onClick={onReset} className="p-2 bg-black/60 text-white rounded hover:bg-primary transition-colors"><RotateCcw size={16} /></button>
+      </div>
+    </Html>
   );
 };
 
@@ -83,69 +123,129 @@ export const Shaft3DModule: React.FC<Shaft3DProps> = ({
   carWidth = 1.2,
   carDepth = 1.4,
   carHeight = 2.4,
-  carPos = 0.5
+  carPos = 0.5,
+  pitDepth = 1500,
+  headroomHeight = 3800,
+  wellToCarWall = 0.11,
+  sillGap = 0.03,
+  pitRefugeHeight = 0.55,
+  carToCwtDistance = 0.06,
+  headroomGeneral = 0.52
 }) => {
-  // Convert mm to meters for 3D space
+  const [resetKey, setResetKey] = useState(0);
+  
+  // Convert mm to meters
   const w = width / 1000;
   const d = depth / 1000;
   const h = height / 1000;
+  const pD = pitDepth / 1000;
   
   const carY = carPos * (h - carHeight) + carHeight / 2;
 
   return (
-    <div className="w-full h-[600px] bg-slate-900 rounded-sm overflow-hidden relative border border-outline-variant/20">
+    <div className="w-full h-[600px] bg-slate-900 rounded-sm overflow-hidden relative border border-outline-variant/20 shadow-inner">
       <div className="absolute top-4 left-4 z-10 space-y-2">
-        <div className="bg-black/60 backdrop-blur-md p-3 rounded border border-white/10">
-          <h4 className="text-[10px] font-bold text-white uppercase tracking-widest mb-2">Shaft Telemetry</h4>
-          <div className="grid grid-cols-2 gap-x-4 gap-y-1">
-            <span className="text-[9px] text-white/50 uppercase">Width:</span>
-            <span className="text-[9px] text-white font-mono">{width} mm</span>
-            <span className="text-[9px] text-white/50 uppercase">Depth:</span>
-            <span className="text-[9px] text-white font-mono">{depth} mm</span>
-            <span className="text-[9px] text-white/50 uppercase">Height:</span>
-            <span className="text-[9px] text-white font-mono">{height} mm</span>
-            <span className="text-[9px] text-white/50 uppercase">Car Pos:</span>
-            <span className="text-[9px] text-white font-mono">{(carPos * 100).toFixed(1)}%</span>
+        <div className="bg-black/80 backdrop-blur-md p-4 rounded border border-white/10 shadow-xl">
+          <h4 className="text-[11px] font-black text-primary uppercase tracking-[0.2em] mb-3">Shaft Telemetry</h4>
+          <div className="grid grid-cols-2 gap-x-6 gap-y-2">
+            <span className="text-[10px] text-white/40 uppercase font-bold">Width</span>
+            <span className="text-[10px] text-white font-mono">{width} mm</span>
+            <span className="text-[10px] text-white/40 uppercase font-bold">Depth</span>
+            <span className="text-[10px] text-white font-mono">{depth} mm</span>
+            <span className="text-[10px] text-white/40 uppercase font-bold">Height</span>
+            <span className="text-[10px] text-white font-mono">{height} mm</span>
+            <span className="text-[10px] text-white/40 uppercase font-bold">Pit</span>
+            <span className="text-[10px] text-white font-mono">{pitDepth} mm</span>
           </div>
         </div>
       </div>
 
-      <Canvas shadows>
-        <PerspectiveCamera makeDefault position={[w * 2, h / 2, d * 3]} fov={50} />
-        <OrbitControls target={[0, h / 2, 0]} />
+      <Canvas shadows key={resetKey}>
+        <PerspectiveCamera makeDefault position={[w * 2, h / 2, d * 3]} fov={45} />
+        <OrbitControls target={[0, h / 2, 0]} makeDefault />
         
-        <ambientLight intensity={0.5} />
-        <pointLight position={[10, 10, 10]} intensity={1} castShadow />
-        <spotLight position={[-10, 20, 10]} angle={0.15} penumbra={1} intensity={1} castShadow />
+        <ambientLight intensity={0.4} />
+        <pointLight position={[10, 10, 10]} intensity={1.5} castShadow />
+        <spotLight position={[-10, 20, 10]} angle={0.2} penumbra={1} intensity={2} castShadow />
+        <hemisphereLight intensity={0.5} groundColor="#000000" />
 
         <group>
-          <ShaftStructure width={w} depth={d} height={h} />
+          <ShaftStructure width={w} depth={d} height={h} pitDepth={pD} />
           <GuideRails shaftHeight={h} shaftWidth={w} shaftDepth={d} />
           <ElevatorCar width={carWidth} depth={carDepth} height={carHeight} position={[0, carY, 0]} />
           
-          {/* Counterweight Placeholder */}
-          <mesh position={[0, h - carY, -d / 2 + 0.1]}>
-            <boxGeometry args={[w * 0.8, 1.5, 0.1]} />
-            <meshStandardMaterial color="#ef4444" />
-          </mesh>
+          {/* Buffers */}
+          <Buffer position={[-w/4, -pD + 0.15, 0]} />
+          <Buffer position={[w/4, -pD + 0.15, 0]} />
+          
+          {/* Counterweight */}
+          <group position={[0, h - carY, -d / 2 + 0.15]}>
+            <Box args={[w * 0.7, 1.8, 0.15]}>
+              <meshStandardMaterial color="#ef4444" metalness={0.5} />
+            </Box>
+            <mesh position={[0, 1.0, 0]}>
+              <boxGeometry args={[w * 0.75, 0.1, 0.2]} />
+              <meshStandardMaterial color="#1e293b" />
+            </mesh>
+          </group>
+
+          {/* Clearance Visualizers (ISO 8100-1) */}
+          {carPos > 0.9 && (
+            <group position={[0, h + headroomGeneral / 2, 0]}>
+              <Box args={[w, headroomGeneral, d]}>
+                <meshStandardMaterial color="#ef4444" transparent opacity={0.1} wireframe />
+              </Box>
+              <Text position={[0, headroomGeneral / 2 + 0.1, 0]} fontSize={0.15} color="#ef4444">Headroom: {headroomGeneral}m</Text>
+            </group>
+          )}
+
+          {carPos < 0.1 && (
+            <group position={[0, -pD + pitRefugeHeight / 2, 0]}>
+              <Box args={[w * 0.8, pitRefugeHeight, d * 0.8]}>
+                <meshStandardMaterial color="#10b981" transparent opacity={0.1} wireframe />
+              </Box>
+              <Text position={[0, pitRefugeHeight / 2 + 0.1, 0]} fontSize={0.15} color="#10b981">Pit Refuge: {pitRefugeHeight}m</Text>
+            </group>
+          )}
+
+          {/* Wall Clearance */}
+          <group position={[-w / 2 + wellToCarWall / 2, carY, 0]}>
+            <Box args={[wellToCarWall, carHeight, d]}>
+              <meshStandardMaterial color="#3b82f6" transparent opacity={0.1} wireframe />
+            </Box>
+            <Text position={[0, carHeight / 2 + 0.2, 0]} fontSize={0.1} color="#3b82f6" rotation={[0, Math.PI / 2, 0]}>
+              Wall Gap: {wellToCarWall}m
+            </Text>
+          </group>
+
+          {/* Sill Gap */}
+          <group position={[0, carY - carHeight / 2, d / 2 + sillGap / 2]}>
+            <Box args={[w * 0.6, 0.05, sillGap]}>
+              <meshStandardMaterial color="#f59e0b" transparent opacity={0.2} />
+            </Box>
+            <Text position={[0, 0.1, sillGap / 2]} fontSize={0.08} color="#f59e0b">Sill Gap: {sillGap}m</Text>
+          </group>
         </group>
 
         <Grid 
           infiniteGrid 
-          fadeDistance={50} 
-          fadeStrength={5} 
-          cellSize={1} 
-          sectionSize={5} 
+          fadeDistance={30} 
+          fadeStrength={3} 
+          cellSize={0.5} 
+          sectionSize={2.5} 
           sectionColor="#334155" 
-          cellColor="#1e293b" 
+          cellColor="#0f172a" 
         />
+        
+        <CameraControls onReset={() => setResetKey(prev => prev + 1)} />
       </Canvas>
 
-      <div className="absolute bottom-4 right-4 z-10">
+      <div className="absolute bottom-4 right-4 z-10 flex flex-col items-end gap-2">
         <div className="flex gap-2">
-          <div className="px-2 py-1 bg-primary text-white text-[9px] font-bold uppercase rounded">3D Engine Active</div>
-          <div className="px-2 py-1 bg-white/10 text-white text-[9px] font-bold uppercase rounded backdrop-blur-sm">ISO 8100-2 Compliant Geometry</div>
+          <div className="px-2 py-1 bg-primary text-white text-[9px] font-black uppercase rounded tracking-widest">3D Real-Time</div>
+          <div className="px-2 py-1 bg-white/10 text-white text-[9px] font-black uppercase rounded backdrop-blur-sm tracking-widest border border-white/10">ISO 8100-1 Clearances</div>
         </div>
+        <div className="text-[8px] text-white/30 font-mono uppercase">Vulkan Engine v4.2.0</div>
       </div>
     </div>
   );
