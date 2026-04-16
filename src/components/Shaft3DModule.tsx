@@ -19,6 +19,7 @@ interface Shaft3DProps {
   pitRefugeHeight?: number;
   carToCwtDistance?: number;
   headroomGeneral?: number;
+  showClearances?: boolean;
 }
 
 const ElevatorCar = ({ width, depth, height, position }: { width: number, depth: number, height: number, position: [number, number, number] }) => {
@@ -130,7 +131,8 @@ export const Shaft3DModule: React.FC<Shaft3DProps> = ({
   sillGap = 0.03,
   pitRefugeHeight = 0.55,
   carToCwtDistance = 0.06,
-  headroomGeneral = 0.52
+  headroomGeneral = 0.52,
+  showClearances = true
 }) => {
   const [resetKey, setResetKey] = useState(0);
   
@@ -190,41 +192,45 @@ export const Shaft3DModule: React.FC<Shaft3DProps> = ({
           </group>
 
           {/* Clearance Visualizers (ISO 8100-1) */}
-          {carPos > 0.9 && (
-            <group position={[0, h + headroomGeneral / 2, 0]}>
-              <Box args={[w, headroomGeneral, d]}>
-                <meshStandardMaterial color="#ef4444" transparent opacity={0.1} wireframe />
-              </Box>
-              <Text position={[0, headroomGeneral / 2 + 0.1, 0]} fontSize={0.15} color="#ef4444">Headroom: {headroomGeneral}m</Text>
+          {showClearances && (
+            <group>
+              {carPos > 0.9 && (
+                <group position={[0, h + headroomGeneral / 2, 0]}>
+                  <Box args={[w, headroomGeneral, d]}>
+                    <meshStandardMaterial color="#ef4444" transparent opacity={0.15} />
+                  </Box>
+                  <Text position={[0, headroomGeneral / 2 + 0.1, 0]} fontSize={0.15} color="#ef4444">Headroom: {headroomGeneral}m</Text>
+                </group>
+              )}
+
+              {carPos < 0.1 && (
+                <group position={[0, -pD + pitRefugeHeight / 2, 0]}>
+                  <Box args={[w * 0.8, pitRefugeHeight, d * 0.8]}>
+                    <meshStandardMaterial color="#10b981" transparent opacity={0.15} />
+                  </Box>
+                  <Text position={[0, pitRefugeHeight / 2 + 0.1, 0]} fontSize={0.15} color="#10b981">Pit Refuge: {pitRefugeHeight}m</Text>
+                </group>
+              )}
+
+              {/* Wall Clearance */}
+              <group position={[-w / 2 + wellToCarWall / 2, carY, 0]}>
+                <Box args={[wellToCarWall, carHeight, d]}>
+                  <meshStandardMaterial color="#3b82f6" transparent opacity={0.2} />
+                </Box>
+                <Text position={[0, carHeight / 2 + 0.2, 0]} fontSize={0.1} color="#3b82f6" rotation={[0, Math.PI / 2, 0]}>
+                  Wall Gap: {wellToCarWall}m
+                </Text>
+              </group>
+
+              {/* Sill Gap */}
+              <group position={[0, carY - carHeight / 2, d / 2 + sillGap / 2]}>
+                <Box args={[w * 0.6, 0.05, sillGap]}>
+                  <meshStandardMaterial color="#f59e0b" transparent opacity={0.3} />
+                </Box>
+                <Text position={[0, 0.1, sillGap / 2]} fontSize={0.08} color="#f59e0b">Sill Gap: {sillGap}m</Text>
+              </group>
             </group>
           )}
-
-          {carPos < 0.1 && (
-            <group position={[0, -pD + pitRefugeHeight / 2, 0]}>
-              <Box args={[w * 0.8, pitRefugeHeight, d * 0.8]}>
-                <meshStandardMaterial color="#10b981" transparent opacity={0.1} wireframe />
-              </Box>
-              <Text position={[0, pitRefugeHeight / 2 + 0.1, 0]} fontSize={0.15} color="#10b981">Pit Refuge: {pitRefugeHeight}m</Text>
-            </group>
-          )}
-
-          {/* Wall Clearance */}
-          <group position={[-w / 2 + wellToCarWall / 2, carY, 0]}>
-            <Box args={[wellToCarWall, carHeight, d]}>
-              <meshStandardMaterial color="#3b82f6" transparent opacity={0.1} wireframe />
-            </Box>
-            <Text position={[0, carHeight / 2 + 0.2, 0]} fontSize={0.1} color="#3b82f6" rotation={[0, Math.PI / 2, 0]}>
-              Wall Gap: {wellToCarWall}m
-            </Text>
-          </group>
-
-          {/* Sill Gap */}
-          <group position={[0, carY - carHeight / 2, d / 2 + sillGap / 2]}>
-            <Box args={[w * 0.6, 0.05, sillGap]}>
-              <meshStandardMaterial color="#f59e0b" transparent opacity={0.2} />
-            </Box>
-            <Text position={[0, 0.1, sillGap / 2]} fontSize={0.08} color="#f59e0b">Sill Gap: {sillGap}m</Text>
-          </group>
         </group>
 
         <Grid 

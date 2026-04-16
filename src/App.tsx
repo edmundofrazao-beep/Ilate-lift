@@ -87,6 +87,8 @@ interface ProjectData {
   // Safety Gear Advanced
   safetyGearMaxMass: number; // P+Q max (kg)
   safetyGearBrakingForce: number; // Fb (N)
+  safetyGearCertifiedSpeed: number; // m/s
+  safetyGearRailCondition: 'dry' | 'oiled' | 'machined';
   // Hydraulic Advanced
   ramDiameter: number; // d (mm)
   cylinderWallThickness: number; // e (mm)
@@ -150,6 +152,7 @@ interface ProjectData {
   carToWallClearance: number; // mm
   carToCounterweightClearance: number; // mm
   carToLandingSillClearance: number; // mm
+  showClearances: boolean;
   // Additional Variables from HTML Engine
   Faux: number; // N
   delta_str_x: number; // mm
@@ -743,13 +746,13 @@ const RopesModule = ({ data, onChange }: { data: ProjectData, onChange: (newData
                   <h5 className="font-bold text-primary mb-2 uppercase text-[10px]">Required Safety Factor ($S_f$)</h5>
                   <p className="text-xs mb-2">The minimum required safety factor is calculated using the following normative formula:</p>
                   <InlineMath math="S_f = 10^{2.6834 - \frac{\log(N_{equiv} / 2.6834 \cdot 10^6)}{\log(D/d)}}" />
-                  <p className="text-[10px] mt-2 opacity-70">Where $N_{equiv}$ is the number of equivalent bends and $D/d$ is the diameter ratio.</p>
+                  <p className="text-[10px] mt-2 opacity-70">{"Where $N_{equiv}$ is the number of equivalent bends and $D/d$ is the diameter ratio."}</p>
                 </div>
                 <div className="p-4 bg-surface-container-low rounded border border-outline-variant/10">
-                  <h5 className="font-bold text-primary mb-2 uppercase text-[10px]">Equivalent Bends ($N_{equiv}$)</h5>
+                  <h5 className="font-bold text-primary mb-2 uppercase text-[10px]">{"Equivalent Bends ($N_{equiv}$)"}</h5>
                   <p className="text-xs mb-2">Calculated by summing simple bends and penalizing reverse bends:</p>
                   <InlineMath math="N_{equiv} = N_{ps} + 4 \cdot N_{pr}" />
-                  <p className="text-[10px] mt-2 opacity-70">$N_{ps}$: Simple pulleys, $N_{pr}$: Reverse pulleys.</p>
+                  <p className="text-[10px] mt-2 opacity-70">{"$N_{ps}$: Simple pulleys, $N_{pr}$: Reverse pulleys."}</p>
                 </div>
               </div>
             </div>
@@ -1751,12 +1754,60 @@ const SafetyComponentsModule = ({ data, onChange }: { data: ProjectData, onChang
   const osgSafetyFactor = data.osgTensileForce > 0 ? data.osgBreakingLoad / data.osgTensileForce : 0;
   const isOsgSfOk = osgSafetyFactor >= 8;
 
+  // 4.3 Safety Gear Logic
+  const g = 9.81;
+  const totalMass = data.carMass + data.ratedLoad;
+  const isMassOk = totalMass <= data.safetyGearMaxMass;
+  const retardationG = data.safetyGearBrakingForce > 0 ? (data.safetyGearBrakingForce / totalMass - g) / g : 0;
+  const isRetardationOk = retardationG >= 0.2 && retardationG <= 1.0;
+
+  // 4.5 Buffer Logic
+  const impactMass = bufferTarget === 'car' ? (data.carMass + data.ratedLoad) : data.cwtMass;
+  const Ek = 0.5 * impactMass * data.speed * data.speed;
+  const h_m = data.bufferStroke / 1000;
+  const Ep = impactMass * g * h_m;
+  const Etotal = Ek + Ep;
+  const nonLinearFactor = data.bufferIsLinear ? 1.0 : 0.8;
+  const Ecap = 2 * impactMass * g * h_m * nonLinearFactor;
+  let h_min = 0;
+  if (data.bufferType === 'energy-accumulation') {
+    h_min = (data.bufferIsLinear ? 0.135 : 0.067) * data.speed * data.speed * 1000;
+  } else {
+    h_min = (data.speed * data.speed / (2 * g * 0.5)) * 1000;
+  }
+  const isStrokeOk = data.bufferStroke >= h_min;
+  const isBufferMassOk = impactMass >= data.bufferMinMass && impactMass <= data.bufferMaxMass;
+  const isEnergyOk = data.bufferType === 'energy-dissipation' ? Etotal <= Ecap : true;
+  const a_avg = h_m > 0 ? (data.speed * data.speed) / (2 * h_m * g) : 0;
+  const F_buffer = impactMass * (a_avg + g);
+  const strokeUtilization = h_m > 0 ? (h_min / (data.bufferStroke)) * 100 : 0;
+
+  // 4.18 SIL Logic
+  const lambdaD = data.failureRate * (data.dangerousFraction / 100);
+  const pfh = lambdaD * (1 - (data.diagnosticCoverage / 100));
+  const silLimits = {
+    3: { min: 1e-8, max: 1e-7 },
+    2: { min: 1e-7, max: 1e-6 },
+    1: { min: 1e-6, max: 1e-5 }
+  };
+  const currentLimit = silLimits[data.silLevel as keyof typeof silLimits] || silLimits[1];
+  const isPfhOk = pfh <= currentLimit.max;
+  const minDc = data.silLevel === 3 ? 90 : (data.silLevel === 2 ? 60 : 0);
+  const isDcOk = data.diagnosticCoverage >= minDc;
+
+  // 4.7 ACOP Logic
+  const acopMaxTripping = data.speed <= 1.0 ? 1.15 * data.speed + 0.25 : 1.15 * data.speed;
+  const isAcopOk = data.acopTrippingSpeed > data.speed && data.acopTrippingSpeed <= acopMaxTripping;
+
+  // 4.8 UCMP Logic
+  const isUcmpOk = data.ucmpDetectionDist > 0 && data.ucmpDetectionDist <= 1200;
+
   return (
     <div className="space-y-8">
       <div className="bg-surface-container-low p-8 border-t-2 border-primary">
         <div className="flex items-center justify-between mb-8">
           <h3 className="text-xl font-bold">Safety Components Verification</h3>
-          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700 uppercase">Implemented (4.2, 4.3, 4.4, 4.5, 4.18)</span>
+          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700 uppercase">Implemented (4.2, 4.3, 4.4, 4.5, 4.7, 4.8, 4.18)</span>
         </div>
 
         <div className="space-y-12">
@@ -1856,11 +1907,11 @@ const SafetyComponentsModule = ({ data, onChange }: { data: ProjectData, onChang
                       </div>
                       <span className="text-xs font-medium">Verification of clearances and alignment (max 6mm between door panels).</span>
                     </div>
-                  );
-                })()}
+                  </div>
+                </div>
               </div>
             </div>
-          </section>
+        </section>
 
           {/* 4.4 Overspeed Governor */}
           <section className="space-y-6">
@@ -2046,7 +2097,7 @@ const SafetyComponentsModule = ({ data, onChange }: { data: ProjectData, onChang
                           <h5 className="font-bold text-primary mb-2 uppercase text-[10px]">Tensile Force ($F_t$)</h5>
                           <p className="text-xs mb-2">The force produced by the OSG when tripped must be:</p>
                           <InlineMath math="F_t \ge 300\text{ N} \text{ or } 2 \cdot F_{trip}" />
-                          <p className="text-[10px] mt-2 opacity-70">Where $F_{trip}$ is the force required to activate the safety gear.</p>
+                          <p className="text-[10px] mt-2 opacity-70">{"Where $F_{trip}$ is the force required to activate the safety gear."}</p>
                         </div>
                       </div>
                     </div>
@@ -2125,18 +2176,32 @@ const SafetyComponentsModule = ({ data, onChange }: { data: ProjectData, onChang
                       className="w-full bg-surface-container-low border border-outline-variant/20 rounded-sm px-3 py-2 text-sm outline-none"
                     />
                   </div>
+                  <div className="space-y-1">
+                    <label className="text-[11px] font-bold text-on-surface-variant uppercase">Certified Speed [m/s]</label>
+                    <input 
+                      type="number"
+                      value={data.safetyGearCertifiedSpeed}
+                      onChange={(e) => onChange({ safetyGearCertifiedSpeed: safeNumber(e.target.value) })}
+                      className="w-full bg-surface-container-low border border-outline-variant/20 rounded-sm px-3 py-2 text-sm outline-none"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[11px] font-bold text-on-surface-variant uppercase">Rail Surface Condition</label>
+                    <select 
+                      value={data.safetyGearRailCondition}
+                      onChange={(e) => onChange({ safetyGearRailCondition: e.target.value as any })}
+                      className="w-full bg-surface-container-low border border-outline-variant/20 rounded-sm px-3 py-2 text-sm outline-none"
+                    >
+                      <option value="dry">Dry / Machined</option>
+                      <option value="oiled">Oiled</option>
+                      <option value="machined">Special Machined</option>
+                    </select>
+                  </div>
                 </div>
               </div>
               <div className="lg:col-span-2 space-y-4">
-                {(() => {
-                  const g = 9.81;
-                  const totalMass = data.carMass + data.ratedLoad;
-                  const isMassOk = totalMass <= data.safetyGearMaxMass;
-                  const retardationG = data.safetyGearBrakingForce > 0 ? (data.safetyGearBrakingForce / totalMass - g) / g : 0;
-                  const isRetardationOk = retardationG >= 0.2 && retardationG <= 1.0;
-
-                    return (
-                      <div className="space-y-6">
+                <>
+                  <div className="space-y-6">
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                           <div className={`p-4 border ${isMassOk ? 'bg-emerald-50 border-emerald-200' : 'bg-error-container bg-opacity-10 border-error border-opacity-20'}`}>
                             <p className="text-[10px] font-bold uppercase mb-1">Total Mass (P+Q)</p>
@@ -2233,7 +2298,7 @@ const SafetyComponentsModule = ({ data, onChange }: { data: ProjectData, onChang
                                   <h5 className="font-bold text-primary mb-2 uppercase text-[10px]">Average Retardation ($a$)</h5>
                                   <p className="text-xs mb-2">The retardation is calculated from the braking force $F_b$ and the total mass $P+Q$:</p>
                                   <InlineMath math="a = \frac{F_b}{P+Q} - g" />
-                                  <p className="text-[10px] mt-2 opacity-70">Where $g = 9.81 \text{ m/s}^2$. The result is often expressed in $g_n$ units.</p>
+                                  <p className="text-[10px] mt-2 opacity-70">{"Where $g = 9.81 \\text{ m/s}^2$. The result is often expressed in $g_n$ units."}</p>
                                 </div>
                                 <div className="p-4 bg-surface-container-low rounded border border-outline-variant/10">
                                   <h5 className="font-bold text-primary mb-2 uppercase text-[10px]">Permissible Range</h5>
@@ -2278,8 +2343,7 @@ const SafetyComponentsModule = ({ data, onChange }: { data: ProjectData, onChang
                           </div>
                         </div>
                       </div>
-                    );
-                  })()}
+                    </>
                 </div>
               </div>
             </section>
@@ -2370,50 +2434,7 @@ const SafetyComponentsModule = ({ data, onChange }: { data: ProjectData, onChang
                 </div>
               </div>
               <div className="lg:col-span-2">
-                {(() => {
-                  const g = 9.81;
-                  const v = data.speed;
-                  const impactMass = bufferTarget === 'car' ? (data.carMass + data.ratedLoad) : data.cwtMass;
-                  
-                  // Kinetic Energy (J)
-                  const Ek = 0.5 * impactMass * v * v;
-                  const h_m = data.bufferStroke / 1000;
-                  const Ep = impactMass * g * h_m;
-                  const Etotal = Ek + Ep;
-                  
-                  // Absorption Capacity (J) at 1.0gn average deceleration limit
-                  // Work = F * h = m * (a + g) * h. At a = 1.0gn, Work = 2 * m * g * h
-                  // For non-linear dissipation, we apply a placeholder efficiency factor (0.8)
-                  // representing a more complex force-stroke integration.
-                  const nonLinearFactor = data.bufferIsLinear ? 1.0 : 0.8;
-                  const Ecap = 2 * impactMass * g * h_m * nonLinearFactor;
-                  
-                  // Minimum Stroke (mm)
-                  // Accumulation Linear: 0.135 * v^2
-                  // Accumulation Non-linear: 0.067 * v^2
-                  // Dissipation: 0.067 * v^2 (reduced) or v^2 / (2 * g * 0.5)
-                  let h_min = 0;
-                  if (data.bufferType === 'energy-accumulation') {
-                    h_min = (data.bufferIsLinear ? 0.135 : 0.067) * v * v * 1000;
-                  } else {
-                    h_min = (v * v / (2 * g * 0.5)) * 1000; // Standard dissipation (0.5gn avg)
-                  }
-                  
-                  const isStrokeOk = data.bufferStroke >= h_min;
-                  const isMassOk = impactMass >= data.bufferMinMass && impactMass <= data.bufferMaxMass;
-                  const isEnergyOk = data.bufferType === 'energy-dissipation' ? Etotal <= Ecap : true;
-                  
-                  // Average Deceleration (gn)
-                  const a_avg = h_m > 0 ? (v * v) / (2 * h_m * g) : 0;
-                  
-                  // Deceleration Force (N)
-                  const F_buffer = impactMass * (a_avg + g);
-                  
-                  const utilization = h_min > 0 ? (data.bufferStroke / h_min) * 100 : 0;
-                  const strokeUtilization = h_m > 0 ? (h_min / (data.bufferStroke)) * 100 : 0;
-
-                  return (
-                    <div className="space-y-6">
+                <div className="space-y-6">
                       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                         <div className={`p-6 border ${isStrokeOk ? 'bg-emerald-50 border-emerald-200' : 'bg-error-container/10 border-error/20'}`}>
                           <p className="text-[10px] font-bold uppercase mb-1">Stroke Utilization</p>
@@ -2565,8 +2586,153 @@ const SafetyComponentsModule = ({ data, onChange }: { data: ProjectData, onChang
                         </div>
                       </div>
                     </div>
-                  );
-                })()}
+                  </div>
+                </div>
+              </div>
+            </section>
+
+          {/* 4.7 Ascending Car Overspeed Protection (ACOP) */}
+          <section className="space-y-6">
+            <div className="flex items-center gap-4 border-b border-outline-variant/20 pb-2">
+              <ShieldCheck className="text-primary" size={20} />
+              <h4 className="text-sm font-bold uppercase tracking-wider">4.7 Ascending Car Overspeed Protection (ACOP)</h4>
+            </div>
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+              <div className="space-y-4 p-6 bg-surface-container-lowest border border-outline-variant/10">
+                <h5 className="text-[10px] font-bold uppercase text-primary mb-4">ACOP Parameters</h5>
+                <div className="space-y-4">
+                  <div className="space-y-1">
+                    <label className="text-[11px] font-bold text-on-surface-variant uppercase">Means of Protection</label>
+                    <select 
+                      value={data.acopType}
+                      onChange={(e) => onChange({ acopType: e.target.value as any })}
+                      className="w-full bg-surface-container-low border border-outline-variant/20 rounded-sm px-3 py-2 text-sm outline-none"
+                    >
+                      <option value="governor">Overspeed Governor</option>
+                      <option value="rope-brake">Rope Brake</option>
+                      <option value="safety-gear">Safety Gear (Bi-directional)</option>
+                    </select>
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[11px] font-bold text-on-surface-variant uppercase">Tripping Speed (vt_acop)</label>
+                    <div className="relative">
+                      <input 
+                        type="number"
+                        value={data.acopTrippingSpeed}
+                        onChange={(e) => onChange({ acopTrippingSpeed: safeNumber(e.target.value) })}
+                        className="w-full bg-surface-container-low border border-outline-variant/20 rounded-sm px-3 py-2 text-sm outline-none"
+                      />
+                      <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] font-bold opacity-50">m/s</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div className="lg:col-span-2 space-y-4">
+                <div className={`p-6 border ${isAcopOk ? 'bg-emerald-50 border-emerald-200' : 'bg-error-container/10 border-error/20'}`}>
+                  <p className="text-[10px] font-bold uppercase mb-1">ACOP Tripping Speed Verification</p>
+                  <p className="text-2xl font-black">{formatNumber(data.acopTrippingSpeed)} m/s</p>
+                  <p className="text-[10px] opacity-50">Limit: {formatNumber(acopMaxTripping)} m/s (ISO 8100-2:2026)</p>
+                  <div className="mt-4 p-4 bg-white/50 rounded border border-black/5">
+                    <h5 className="text-[10px] font-bold uppercase text-primary mb-2">Normative Limit (Clause 4.7)</h5>
+                    <p className="text-xs leading-relaxed">
+                      For rated speeds <InlineMath math="v \le 1.0\text{ m/s}" />, <InlineMath math="v_{t\_acop} \le 1.15v + 0.25\text{ m/s}" />.<br/>
+                      For rated speeds <InlineMath math="v > 1.0\text{ m/s}" />, <InlineMath math="v_{t\_acop} \le 1.15v" />.
+                    </p>
+                  </div>
+                </div>
+                <div className="p-6 bg-surface-container-lowest border border-outline-variant/10 rounded-sm">
+                  <h5 className="text-[10px] font-bold uppercase text-primary mb-4 flex items-center gap-2">
+                    <CheckSquare size={12} />
+                    ACOP Checklist (4.7)
+                  </h5>
+                  <div className="space-y-3">
+                    <div className="flex items-center gap-3">
+                      <div className={`w-5 h-5 rounded flex items-center justify-center border ${isAcopOk ? 'bg-emerald-600 border-emerald-600' : 'border-outline-variant'}`}>
+                        {isAcopOk && <CheckSquare size={14} className="text-white" />}
+                      </div>
+                      <span className="text-xs font-medium">Tripping speed does not exceed normative limits ({formatNumber(acopMaxTripping)} m/s).</span>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <div className="w-5 h-5 rounded flex items-center justify-center border border-outline-variant">
+                        {/* Manual check */}
+                      </div>
+                      <span className="text-xs font-medium">Braking element acts on the car, counterweight, or rope system.</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          {/* 4.8 Unintended Car Movement Protection (UCMP) */}
+          <section className="space-y-6">
+            <div className="flex items-center gap-4 border-b border-outline-variant/20 pb-2">
+              <ShieldCheck className="text-primary" size={20} />
+              <h4 className="text-sm font-bold uppercase tracking-wider">4.8 Unintended Car Movement Protection (UCMP)</h4>
+            </div>
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+              <div className="space-y-4 p-6 bg-surface-container-lowest border border-outline-variant/10">
+                <h5 className="text-[10px] font-bold uppercase text-primary mb-4">UCMP Parameters</h5>
+                <div className="space-y-4">
+                  <div className="space-y-1">
+                    <label className="text-[11px] font-bold text-on-surface-variant uppercase">Stopping Element</label>
+                    <select 
+                      value={data.ucmpType}
+                      onChange={(e) => onChange({ ucmpType: e.target.value as any })}
+                      className="w-full bg-surface-container-low border border-outline-variant/20 rounded-sm px-3 py-2 text-sm outline-none"
+                    >
+                      <option value="brake">Machine Brake</option>
+                      <option value="safety-gear">Safety Gear</option>
+                      <option value="valve">Hydraulic Valve</option>
+                    </select>
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[11px] font-bold text-on-surface-variant uppercase">Detection Distance (s)</label>
+                    <div className="relative">
+                      <input 
+                        type="number"
+                        value={data.ucmpDetectionDist}
+                        onChange={(e) => onChange({ ucmpDetectionDist: safeNumber(e.target.value) })}
+                        className="w-full bg-surface-container-low border border-outline-variant/20 rounded-sm px-3 py-2 text-sm outline-none"
+                      />
+                      <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] font-bold opacity-50">mm</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div className="lg:col-span-2 space-y-4">
+                <div className={`p-6 border ${isUcmpOk ? 'bg-emerald-50 border-emerald-200' : 'bg-error-container/10 border-error/20'}`}>
+                  <p className="text-[10px] font-bold uppercase mb-1">UCMP Stopping Distance Verification</p>
+                  <p className="text-2xl font-black">{formatNumber(data.ucmpDetectionDist)} mm</p>
+                  <p className="text-[10px] opacity-50">Max Permissible Movement: 1200 mm (ISO 8100-1:2026)</p>
+                  <div className="mt-4 p-4 bg-white/50 rounded border border-black/5">
+                    <h5 className="text-[10px] font-bold uppercase text-primary mb-2">Normative Requirement (Clause 4.8)</h5>
+                    <p className="text-xs leading-relaxed">
+                      The car shall stop within a distance of <InlineMath math="1.20\text{ m}" /> from the landing level. 
+                      The detection distance <InlineMath math="s" /> plus the braking distance must not exceed this limit.
+                    </p>
+                  </div>
+                </div>
+                <div className="p-6 bg-surface-container-lowest border border-outline-variant/10 rounded-sm">
+                  <h5 className="text-[10px] font-bold uppercase text-primary mb-4 flex items-center gap-2">
+                    <CheckSquare size={12} />
+                    UCMP Checklist (4.8)
+                  </h5>
+                  <div className="space-y-3">
+                    <div className="flex items-center gap-3">
+                      <div className={`w-5 h-5 rounded flex items-center justify-center border ${isUcmpOk ? 'bg-emerald-600 border-emerald-600' : 'border-outline-variant'}`}>
+                        {isUcmpOk && <CheckSquare size={14} className="text-white" />}
+                      </div>
+                      <span className="text-xs font-medium">Car stops within 1.20m from the landing level.</span>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <div className="w-5 h-5 rounded flex items-center justify-center border border-outline-variant">
+                        {/* Manual check */}
+                      </div>
+                      <span className="text-xs font-medium">Detection zone does not exceed 250mm from landing.</span>
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
           </section>
@@ -2637,6 +2803,19 @@ const SafetyComponentsModule = ({ data, onChange }: { data: ProjectData, onChang
                       <span className="text-[9px] font-bold opacity-50 uppercase">Headroom</span>
                     </div>
                   </div>
+
+                  <div className="flex items-center justify-between p-3 bg-surface-container-low rounded border border-outline-variant/10">
+                    <div className="flex items-center gap-2">
+                      <Maximize2 size={14} className="text-primary" />
+                      <span className="text-[10px] font-bold uppercase tracking-wider">Show Clearances</span>
+                    </div>
+                    <button 
+                      onClick={() => onChange({ showClearances: !data.showClearances })}
+                      className={`w-10 h-5 rounded-full relative transition-colors ${data.showClearances ? 'bg-primary' : 'bg-outline-variant/30'}`}
+                    >
+                      <div className={`absolute top-1 w-3 h-3 bg-white rounded-full transition-all ${data.showClearances ? 'left-6' : 'left-1'}`} />
+                    </button>
+                  </div>
                 </div>
               </div>
 
@@ -2646,6 +2825,7 @@ const SafetyComponentsModule = ({ data, onChange }: { data: ProjectData, onChang
                   depth={data.shaftDepth}
                   height={data.shaftHeight}
                   carPos={data.carPositionPercent / 100}
+                  showClearances={data.showClearances}
                 />
               </div>
             </div>
@@ -2743,94 +2923,70 @@ const SafetyComponentsModule = ({ data, onChange }: { data: ProjectData, onChang
                 </div>
               </div>
               <div className="lg:col-span-2 space-y-4">
-                {(() => {
-                  // PFH Calculation (IEC 61508)
-                  // λD = λ * DangerousFraction
-                  // λDU = λD * (1 - DC)
-                  // For high demand mode, PFH ≈ λDU
-                  const lambdaD = data.failureRate * (data.dangerousFraction / 100);
-                  const pfh = lambdaD * (1 - (data.diagnosticCoverage / 100));
-                  
-                  // SIL PFH Limits (High Demand / Continuous Mode)
-                  const silLimits = {
-                    3: { min: 1e-8, max: 1e-7 },
-                    2: { min: 1e-7, max: 1e-6 },
-                    1: { min: 1e-6, max: 1e-5 }
-                  };
-                  
-                  const currentLimit = silLimits[data.silLevel as keyof typeof silLimits];
-                  const isPfhOk = pfh <= currentLimit.max;
-                  
-                  // DC Requirements (Simplified)
-                  const minDc = data.silLevel === 3 ? 90 : (data.silLevel === 2 ? 60 : 0);
-                  const isDcOk = data.diagnosticCoverage >= minDc;
-
-                  return (
-                    <div className="space-y-6">
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div className={`p-6 border ${isPfhOk ? 'bg-emerald-50 border-emerald-200' : 'bg-error-container/10 border-error/20'}`}>
-                          <p className="text-[10px] font-bold uppercase mb-1">Calculated PFH</p>
-                          <p className="text-2xl font-black">{pfh.toExponential(3)}</p>
-                          <p className="text-[10px] opacity-50 italic mt-1">
-                            Limit for SIL {data.silLevel}: ≤ {currentLimit.max.toExponential(0)}
-                          </p>
-                        </div>
-                        <div className={`p-6 border ${isPfhOk && isDcOk ? 'bg-emerald-50 border-emerald-200' : 'bg-error-container/10 border-error/20'}`}>
-                          <p className="text-[10px] font-bold uppercase mb-1">Status</p>
-                          <div className="flex items-center gap-2">
-                            {(isPfhOk && isDcOk) ? (
-                              <CheckCircle2 className="text-emerald-600" size={24} />
-                            ) : (
-                              <ShieldAlert className="text-error" size={24} />
-                            )}
-                            <p className="text-xl font-black">{(isPfhOk && isDcOk) ? 'COMPLIANT' : 'NON-COMPLIANT'}</p>
-                          </div>
-                          <p className="text-[10px] opacity-50 mt-1">Based on IEC 61508 High Demand Mode</p>
-                        </div>
+                <div className="space-y-6">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className={`p-6 border ${isPfhOk ? 'bg-emerald-50 border-emerald-200' : 'bg-error-container/10 border-error/20'}`}>
+                      <p className="text-[10px] font-bold uppercase mb-1">Calculated PFH</p>
+                      <p className="text-2xl font-black">{pfh.toExponential(3)}</p>
+                      <p className="text-[10px] opacity-50 italic mt-1">
+                        Limit for SIL {data.silLevel}: ≤ {currentLimit.max.toExponential(0)}
+                      </p>
+                    </div>
+                    <div className={`p-6 border ${isPfhOk && isDcOk ? 'bg-emerald-50 border-emerald-200' : 'bg-error-container/10 border-error/20'}`}>
+                      <p className="text-[10px] font-bold uppercase mb-1">Status</p>
+                      <div className="flex items-center gap-2">
+                        {(isPfhOk && isDcOk) ? (
+                          <CheckCircle2 className="text-emerald-600" size={24} />
+                        ) : (
+                          <ShieldAlert className="text-error" size={24} />
+                        )}
+                        <p className="text-xl font-black">{(isPfhOk && isDcOk) ? 'COMPLIANT' : 'NON-COMPLIANT'}</p>
                       </div>
+                      <p className="text-[10px] opacity-50 mt-1">Based on IEC 61508 High Demand Mode</p>
+                    </div>
+                  </div>
 
-                      <div className="p-6 bg-surface-container-lowest border border-outline-variant/10 rounded-sm">
-                        <h5 className="text-[10px] font-bold uppercase text-primary mb-4 flex items-center gap-2">
-                          <CheckSquare size={12} />
-                          SIL Verification Checklist
-                        </h5>
-                        <div className="space-y-3">
-                          <div className="flex items-center gap-3">
-                            <div className={`w-5 h-5 rounded flex items-center justify-center border ${isPfhOk ? 'bg-emerald-600 border-emerald-600' : 'border-outline-variant'}`}>
-                              {isPfhOk && <CheckSquare size={14} className="text-white" />}
-                            </div>
-                            <span className="text-xs font-medium">PFH value ({pfh.toExponential(2)}) within the range for SIL {data.silLevel}.</span>
-                          </div>
-                          <div className="flex items-center gap-3">
-                            <div className={`w-5 h-5 rounded flex items-center justify-center border ${isDcOk ? 'bg-emerald-600 border-emerald-600' : 'border-outline-variant'}`}>
-                              {isDcOk && <CheckSquare size={14} className="text-white" />}
-                            </div>
-                            <span className="text-xs font-medium">Diagnostic Coverage ({data.diagnosticCoverage}%) meets minimum for SIL {data.silLevel} (≥{minDc}%).</span>
-                          </div>
-                          <div className="flex items-center gap-3">
-                            <div className={`w-5 h-5 rounded flex items-center justify-center border ${data.faultTolerance >= (data.silLevel - 1) ? 'bg-emerald-600 border-emerald-600' : 'border-outline-variant'}`}>
-                              {data.faultTolerance >= (data.silLevel - 1) && <CheckSquare size={14} className="text-white" />}
-                            </div>
-                            <span className="text-xs font-medium">Hardware Fault Tolerance (HFT={data.faultTolerance}) compatible with SIL {data.silLevel}.</span>
-                          </div>
-                          <div className="flex items-center gap-3">
-                            <div className={`w-5 h-5 rounded flex items-center justify-center border ${data.safetyIntegrity ? 'bg-emerald-600 border-emerald-600' : 'border-outline-variant'}`}>
-                              {data.safetyIntegrity && <CheckSquare size={14} className="text-white" />}
-                            </div>
-                            <span className="text-xs font-medium">Safety Integrity documentation and λD ({lambdaD.toExponential(2)}) verified.</span>
-                          </div>
+                  <div className="p-6 bg-surface-container-lowest border border-outline-variant/10 rounded-sm">
+                    <h5 className="text-[10px] font-bold uppercase text-primary mb-4 flex items-center gap-2">
+                      <CheckSquare size={12} />
+                      SIL Verification Checklist
+                    </h5>
+                    <div className="space-y-3">
+                      <div className="flex items-center gap-3">
+                        <div className={`w-5 h-5 rounded flex items-center justify-center border ${isPfhOk ? 'bg-emerald-600 border-emerald-600' : 'border-outline-variant'}`}>
+                          {isPfhOk && <CheckSquare size={14} className="text-white" />}
                         </div>
+                        <span className="text-xs font-medium">PFH value ({pfh.toExponential(2)}) within the range for SIL {data.silLevel}.</span>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <div className={`w-5 h-5 rounded flex items-center justify-center border ${isDcOk ? 'bg-emerald-600 border-emerald-600' : 'border-outline-variant'}`}>
+                          {isDcOk && <CheckSquare size={14} className="text-white" />}
+                        </div>
+                        <span className="text-xs font-medium">Diagnostic Coverage ({data.diagnosticCoverage}%) meets minimum for SIL {data.silLevel} (≥{minDc}%).</span>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <div className={`w-5 h-5 rounded flex items-center justify-center border ${data.faultTolerance >= (data.silLevel - 1) ? 'bg-emerald-600 border-emerald-600' : 'border-outline-variant'}`}>
+                          {data.faultTolerance >= (data.silLevel - 1) && <CheckSquare size={14} className="text-white" />}
+                        </div>
+                        <span className="text-xs font-medium">Hardware Fault Tolerance (HFT={data.faultTolerance}) compatible with SIL {data.silLevel}.</span>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <div className={`w-5 h-5 rounded flex items-center justify-center border ${data.safetyIntegrity ? 'bg-emerald-600 border-emerald-600' : 'border-outline-variant'}`}>
+                          {data.safetyIntegrity && <CheckSquare size={14} className="text-white" />}
+                        </div>
+                        <span className="text-xs font-medium">Safety Integrity documentation and λD ({lambdaD.toExponential(2)}) verified.</span>
                       </div>
                     </div>
-                  );
-                })()}
+                  </div>
+                </div>
               </div>
             </div>
           </section>
         </div>
       </div>
-    );
-  };
+    </div>
+  );
+};
 
 // --- Main App ---
 
@@ -2850,7 +3006,29 @@ const PDFExportModule = ({ data }: { data: ProjectData }) => {
         scale: 2,
         useCORS: true,
         logging: false,
-        backgroundColor: '#ffffff'
+        backgroundColor: '#ffffff',
+        onclone: (clonedDoc) => {
+          // html2canvas fails on oklch/oklab colors which are default in Tailwind v4
+          // We need to replace them in the cloned document before rendering
+          const elements = clonedDoc.getElementsByTagName('*');
+          for (let i = 0; i < elements.length; i++) {
+            const el = elements[i] as HTMLElement;
+            const style = window.getComputedStyle(el);
+            
+            // Check common color properties
+            ['color', 'backgroundColor', 'borderColor', 'borderTopColor', 'borderRightColor', 'borderBottomColor', 'borderLeftColor', 'fill', 'stroke'].forEach(prop => {
+              const val = style.getPropertyValue(prop);
+              if (val.includes('oklch') || val.includes('oklab')) {
+                // Fallback to a safe color or transparent
+                if (prop === 'color' || prop === 'fill' || prop === 'stroke') {
+                  el.style.setProperty(prop, '#000000', 'important');
+                } else {
+                  el.style.setProperty(prop, 'transparent', 'important');
+                }
+              }
+            });
+          }
+        }
       });
       
       const imgData = canvas.toDataURL('image/png');
@@ -3044,6 +3222,8 @@ export default function App() {
     ropeBreakingLoad: 45000,
     safetyGearMaxMass: 2500,
     safetyGearBrakingForce: 35000,
+    safetyGearCertifiedSpeed: 1.5,
+    safetyGearRailCondition: 'dry',
     ramDiameter: 100,
     cylinderWallThickness: 5,
     ramLength: 5000,
@@ -3099,6 +3279,7 @@ export default function App() {
     carToWallClearance: 120,
     carToCounterweightClearance: 50,
     carToLandingSillClearance: 35,
+    showClearances: true,
     // Additional Variables from HTML Engine
     Faux: 4000,
     delta_str_x: 0.6,
