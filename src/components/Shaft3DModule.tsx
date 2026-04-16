@@ -194,21 +194,27 @@ export const Shaft3DModule: React.FC<Shaft3DProps> = ({
           {/* Clearance Visualizers (ISO 8100-1) */}
           {showClearances && (
             <group>
-              {carPos > 0.9 && (
+              {/* Headroom Zone - Visible when car is high */}
+              {carPos > 0.8 && (
                 <group position={[0, h + headroomGeneral / 2, 0]}>
                   <Box args={[w, headroomGeneral, d]}>
-                    <meshStandardMaterial color="#ef4444" transparent opacity={0.15} />
+                    <meshStandardMaterial color="#ef4444" transparent opacity={0.2} />
                   </Box>
-                  <Text position={[0, headroomGeneral / 2 + 0.1, 0]} fontSize={0.15} color="#ef4444">Headroom: {headroomGeneral}m</Text>
+                  <Text position={[0, headroomGeneral / 2 + 0.1, 0]} fontSize={0.15} color="#ef4444" font="/fonts/Inter-Bold.woff">
+                    Headroom: {(headroomGeneral * 1000).toFixed(0)}mm
+                  </Text>
                 </group>
               )}
 
-              {carPos < 0.1 && (
+              {/* Pit Refuge Zone - Visible when car is low */}
+              {carPos < 0.2 && (
                 <group position={[0, -pD + pitRefugeHeight / 2, 0]}>
                   <Box args={[w * 0.8, pitRefugeHeight, d * 0.8]}>
-                    <meshStandardMaterial color="#10b981" transparent opacity={0.15} />
+                    <meshStandardMaterial color="#10b981" transparent opacity={0.2} />
                   </Box>
-                  <Text position={[0, pitRefugeHeight / 2 + 0.1, 0]} fontSize={0.15} color="#10b981">Pit Refuge: {pitRefugeHeight}m</Text>
+                  <Text position={[0, pitRefugeHeight / 2 + 0.1, 0]} fontSize={0.15} color="#10b981" font="/fonts/Inter-Bold.woff">
+                    Pit Refuge: {(pitRefugeHeight * 1000).toFixed(0)}mm
+                  </Text>
                 </group>
               )}
 
@@ -218,16 +224,28 @@ export const Shaft3DModule: React.FC<Shaft3DProps> = ({
                   <meshStandardMaterial color="#3b82f6" transparent opacity={0.2} />
                 </Box>
                 <Text position={[0, carHeight / 2 + 0.2, 0]} fontSize={0.1} color="#3b82f6" rotation={[0, Math.PI / 2, 0]}>
-                  Wall Gap: {wellToCarWall}m
+                  Wall Gap: {(wellToCarWall * 1000).toFixed(0)}mm
                 </Text>
               </group>
 
               {/* Sill Gap */}
               <group position={[0, carY - carHeight / 2, d / 2 + sillGap / 2]}>
                 <Box args={[w * 0.6, 0.05, sillGap]}>
-                  <meshStandardMaterial color="#f59e0b" transparent opacity={0.3} />
+                  <meshStandardMaterial color="#f59e0b" transparent opacity={0.4} />
                 </Box>
-                <Text position={[0, 0.1, sillGap / 2]} fontSize={0.08} color="#f59e0b">Sill Gap: {sillGap}m</Text>
+                <Text position={[0, 0.15, sillGap / 2]} fontSize={0.08} color="#f59e0b" font="/fonts/Inter-Bold.woff">
+                  Sill Gap: {(sillGap * 1000).toFixed(0)}mm
+                </Text>
+              </group>
+
+              {/* Car to Counterweight Clearance */}
+              <group position={[0, carY, -d / 2 + 0.3 + carToCwtDistance / 2]}>
+                <Box args={[w * 0.7, carHeight, carToCwtDistance]}>
+                  <meshStandardMaterial color="#8b5cf6" transparent opacity={0.2} />
+                </Box>
+                <Text position={[0, carHeight / 2 + 0.1, 0]} fontSize={0.1} color="#8b5cf6">
+                  Car-CWT Gap: {(carToCwtDistance * 1000).toFixed(0)}mm
+                </Text>
               </group>
             </group>
           )}

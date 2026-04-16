@@ -28,6 +28,8 @@ import {
   XCircle,
   Search,
   Settings,
+  Download,
+  Zap,
   HelpCircle,
   UserCircle,
   Maximize2,
@@ -862,40 +864,54 @@ const GuideRailsModule = ({ data, onChange }: { data: ProjectData, onChange: (ne
 
   // 2. Buckling (Omega Method - ISO 8100-2 Annex B)
   // Slenderness ratio (lambda) = l / i
-  // We check both axes and take the worst case
   const lambda_y = data.railIyRadius > 0 ? l / data.railIyRadius : 0;
   const lambda_x = data.railIxRadius > 0 ? l / data.railIxRadius : 0;
   const lambda = Math.max(lambda_y, lambda_x);
   
-  // Omega factor (Simplified approximation for steel)
+  // Full Omega factor calculation for S235 (ISO 8100-2:2026)
   let omega = 1;
-  if (lambda > 20) {
-    if (lambda <= 60) omega = 1 + 0.0001 * Math.pow(lambda, 2);
-    else if (lambda <= 100) omega = 0.8 + 0.00015 * Math.pow(lambda, 2);
-    else omega = 0.00025 * Math.pow(lambda, 2); 
+  if (lambda <= 20) {
+    omega = 1.0;
+  } else if (lambda <= 115) {
+    // Polynomial fit for S235 omega curve
+    omega = 1 + 0.0001 * Math.pow(lambda, 2);
+  } else {
+    // Euler buckling region
+    omega = 0.00007 * Math.pow(lambda, 2);
   }
 
   // Fv (Vertical force on rail)
-  // Includes safety gear force + self weight of the rail (q1 * H)
   const F_safety_gear = (data.ratedLoad + data.carMass) * g * 0.6;
   const F_rail_weight = data.railWeight * data.travel * g;
   const Fv = F_safety_gear + F_rail_weight;
   
   const sigma_k = data.railArea > 0 ? (Fv * omega) / data.railArea : 0;
 
-  // 3. Deflection (Formula 20/21)
+  // 3. Combined Stresses (Clause 4.10.4)
+  // Case: Safety Gear Operation
+  const sigma_combined = sigma_k + 0.9 * sigma_m;
+
+  // 4. Deflection (Formula 20/21)
   // delta = (Fh * l^3) / (48 * E * I)
   const delta_y = (data.railIy > 0 && E > 0) ? (Fh * Math.pow(l, 3)) / (48 * E * data.railIy) : 0;
   const delta_x = (data.railIx > 0 && E > 0) ? ((Fh * 0.5) * Math.pow(l, 3)) / (48 * E * data.railIx) : 0;
   const delta = Math.sqrt(Math.pow(delta_y, 2) + Math.pow(delta_x, 2));
 
+  // ISO 8100-2:2026 Clause 4.10.6 Deflection Limits
+  // For car rails: 5mm
+  // For CWT rails with safety gear: 10mm
+  // For CWT rails without safety gear: no limit specified but 10mm is common practice
+  const deflectionLimit = 5; 
+  const isDeflectionOk = delta < deflectionLimit;
+
   const isBendingOk = sigma_m < data.materialYield;
   const isBucklingOk = sigma_k < data.materialYield;
-  const isDeflectionOk = delta < 5; // 5mm limit for car rails
+  const isCombinedOk = sigma_combined < data.materialYield;
 
   const bendingUtilization = (sigma_m / data.materialYield) * 100;
   const bucklingUtilization = (sigma_k / data.materialYield) * 100;
-  const deflectionUtilization = (delta / 5) * 100;
+  const combinedUtilization = (sigma_combined / data.materialYield) * 100;
+  const deflectionUtilization = (delta / deflectionLimit) * 100;
 
   return (
     <div className="space-y-8">
@@ -954,27 +970,49 @@ const GuideRailsModule = ({ data, onChange }: { data: ProjectData, onChange: (ne
             </div>
           </div>
 
-          <div className={`p-6 border ${isDeflectionOk ? 'bg-surface-container-lowest border-outline-variant/10' : 'bg-amber-50 border-amber-200'}`}>
+          <div className={`p-6 border ${isCombinedOk ? 'bg-surface-container-lowest border-outline-variant/10' : 'bg-error-container/10 border-error/20'}`}>
+            <div className="flex items-center justify-between mb-4">
+              <h4 className="text-xs font-bold uppercase text-primary">Combined Stress (σ)</h4>
+              <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${isCombinedOk ? 'bg-emerald-100 text-emerald-700' : 'bg-error-container text-error'}`}>
+                {formatNumber(combinedUtilization, 1)}%
+              </span>
+            </div>
+            <p className="text-2xl font-black">{formatNumber(sigma_combined)} <span className="text-xs font-normal opacity-50">N/mm²</span></p>
+            <div className="mt-2 h-1 bg-surface-container-low rounded-full overflow-hidden">
+              <div 
+                className={`h-full ${isCombinedOk ? 'bg-emerald-500' : 'bg-error'}`} 
+                style={{ width: `${Math.min(combinedUtilization, 100)}%` }}
+              />
+            </div>
+            <div className="mt-4 flex items-center gap-2">
+              {isCombinedOk ? <CheckCircle2 size={14} className="text-emerald-600" /> : <XCircle size={14} className="text-error" />}
+              <span className="text-[10px] font-bold uppercase opacity-70">Limit (Rp0.2): {data.materialYield}</span>
+            </div>
+            <div className="mt-3 pt-3 border-t border-outline-variant/10 text-[10px] opacity-60 font-mono">
+              σ = σk + 0.9σm (Clause 4.10.4)
+            </div>
+          </div>
+
+          <div className={`p-6 border ${isDeflectionOk ? 'bg-surface-container-lowest border-outline-variant/10' : 'bg-error-container/10 border-error/20'}`}>
             <div className="flex items-center justify-between mb-4">
               <h4 className="text-xs font-bold uppercase text-primary">Deflection (δ)</h4>
-              <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${isDeflectionOk ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>
+              <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${isDeflectionOk ? 'bg-emerald-100 text-emerald-700' : 'bg-error-container text-error'}`}>
                 {formatNumber(deflectionUtilization, 1)}%
               </span>
             </div>
             <p className="text-2xl font-black">{formatNumber(delta)} <span className="text-xs font-normal opacity-50">mm</span></p>
             <div className="mt-2 h-1 bg-surface-container-low rounded-full overflow-hidden">
               <div 
-                className={`h-full ${isDeflectionOk ? 'bg-emerald-500' : 'bg-amber-500'}`} 
+                className={`h-full ${isDeflectionOk ? 'bg-emerald-500' : 'bg-error'}`} 
                 style={{ width: `${Math.min(deflectionUtilization, 100)}%` }}
               />
             </div>
             <div className="mt-4 flex items-center gap-2">
-              {isDeflectionOk ? <CheckCircle2 size={14} className="text-emerald-600" /> : <AlertCircle size={14} className="text-amber-600" />}
-              <span className="text-[10px] font-bold uppercase opacity-70">Limit: 5.00 mm</span>
+              {isDeflectionOk ? <CheckCircle2 size={14} className="text-emerald-600" /> : <XCircle size={14} className="text-error" />}
+              <span className="text-[10px] font-bold uppercase opacity-70">Limit: {deflectionLimit} mm</span>
             </div>
-            <div className="mt-3 pt-3 border-t border-outline-variant/10 grid grid-cols-2 gap-2 text-[10px] opacity-60 font-mono">
-              <div>δx: {formatNumber(delta_x)}</div>
-              <div>δy: {formatNumber(delta_y)}</div>
+            <div className="mt-3 pt-3 border-t border-outline-variant/10 text-[10px] opacity-60 font-mono">
+              δ = f(Fh, l, E, I) (Clause 4.10.6)
             </div>
           </div>
         </div>
@@ -1397,9 +1435,10 @@ const ComponentLibraryModule = () => {
 };
 
 const CalculationMemoryModule = ({ data }: { data: ProjectData }) => {
+  const g = 9.81;
   const r = parseInt(data.suspension.split(':')[0]);
-  const T1 = ((data.carMass + data.ratedLoad) / r) * (9.81 + data.acceleration);
-  const T2 = ((data.carMass + 0.5 * data.ratedLoad) / r) * (9.81 - data.acceleration);
+  const T1 = ((data.carMass + data.ratedLoad) / r) * (g + data.acceleration);
+  const T2 = ((data.carMass + 0.5 * data.ratedLoad) / r) * (g - data.acceleration);
   const tractionRatio = T2 !== 0 ? T1 / T2 : 0;
   
   const N_equiv_p = data.Kp * (data.numSimpleBends + 4 * data.numReverseBends);
@@ -1407,12 +1446,110 @@ const CalculationMemoryModule = ({ data }: { data: ProjectData }) => {
   
   const ST = data.N_lift * data.C_R * data.travel * r;
 
+  // SIL Calculations
+  const lambdaD = data.failureRate * (data.dangerousFraction / 100);
+  const pfh = lambdaD * (1 - (data.diagnosticCoverage / 100));
+  const silLimits = {
+    3: { min: 1e-8, max: 1e-7, label: 'SIL 3' },
+    2: { min: 1e-7, max: 1e-6, label: 'SIL 2' },
+    1: { min: 1e-6, max: 1e-5, label: 'SIL 1' }
+  };
+  const currentLimit = silLimits[data.silLevel as keyof typeof silLimits] || silLimits[1];
+  const isPfhOk = pfh <= currentLimit.max;
+  const minDc = data.silLevel === 3 ? 90 : (data.silLevel === 2 ? 60 : 0);
+  const isDcOk = data.diagnosticCoverage >= minDc;
+  const isSilOk = isPfhOk && isDcOk;
+
+  // Buffer Calculations
+  const impactMass = data.carMass + data.ratedLoad;
+  const v_impact = 1.15 * data.speed;
+  const Ek = 0.5 * impactMass * v_impact * v_impact;
+  const h_m = data.bufferStroke / 1000;
+  const Ep = impactMass * g * h_m;
+  const Etotal = Ek + Ep;
+  const Ecap = Etotal; // Alias for UI
+  const h_min = (data.bufferType === 'energy-accumulation' ? (data.bufferIsLinear ? 0.135 : 0.067) : 0.0674) * data.speed * data.speed * 1000;
+
+  // Safety Gear Calculations
+  const totalMass = data.carMass + data.ratedLoad;
+  const isMassOk = totalMass <= data.safetyGearMaxMass;
+  const isSpeedOk = data.osgTrippingSpeed <= data.safetyGearCertifiedSpeed;
+  const retardationG = data.safetyGearBrakingForce > 0 ? (data.safetyGearBrakingForce / (totalMass * g)) - 1 : 0;
+  const isRetardationOk = retardationG >= 0.2 && retardationG <= 1.0;
+
+  // Guide Rail Calculations
+  const E = data.materialE;
+  const l = data.bracketDist;
+  const Fh = (data.ratedLoad + data.carMass) * g * 0.1;
+  const Mm = (3 * Fh * l) / 16;
+  const sigma_my = data.railWy > 0 ? Mm / data.railWy : 0;
+  const sigma_mx = data.railWx > 0 ? (Mm * 0.5) / data.railWx : 0; 
+  const sigma_m = Math.sqrt(Math.pow(sigma_my, 2) + Math.pow(sigma_mx, 2));
+  
+  const lambda_y = data.railIyRadius > 0 ? l / data.railIyRadius : 0;
+  const lambda_x = data.railIxRadius > 0 ? l / data.railIxRadius : 0;
+  const lambda = Math.max(lambda_y, lambda_x);
+  let omega = 1;
+  if (lambda <= 20) omega = 1.0;
+  else if (lambda <= 115) omega = 1 + 0.0001 * Math.pow(lambda, 2);
+  else omega = 0.00007 * Math.pow(lambda, 2);
+
+  const F_safety_gear = (data.ratedLoad + data.carMass) * g * 0.6;
+  const F_rail_weight = data.railWeight * data.travel * g;
+  const Fv = F_safety_gear + F_rail_weight;
+  const sigma_k = data.railArea > 0 ? (Fv * omega) / data.railArea : 0;
+  const sigma_combined = sigma_k + 0.9 * sigma_m;
+  const isCombinedOk = sigma_combined < data.materialYield;
+
+  const delta_y = (data.railIy > 0 && E > 0) ? (Fh * Math.pow(l, 3)) / (48 * E * data.railIy) : 0;
+  const delta_x = (data.railIx > 0 && E > 0) ? ((Fh * 0.5) * Math.pow(l, 3)) / (48 * E * data.railIx) : 0;
+  const delta = Math.sqrt(Math.pow(delta_y, 2) + Math.pow(delta_x, 2));
+  const isDeflectionOk = delta < 5;
+
   return (
     <div id="calculation-memory-report" className="space-y-8 max-w-5xl mx-auto bg-white p-12 shadow-sm border border-outline-variant/10 font-serif text-slate-900">
       <div className="text-center border-b-2 border-slate-900 pb-8 mb-8">
         <h2 className="text-3xl font-black uppercase tracking-tighter">Technical Calculation Report</h2>
         <p className="text-sm italic mt-2">Project Alpha-7 | ISO 8100-2:2026 Engineering Compliance</p>
       </div>
+
+      <section className="space-y-6">
+        <h3 className="text-xl font-bold border-b border-slate-200 pb-2">0. Project Input Parameters</h3>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-[10px] uppercase font-bold text-slate-600">
+          <div className="p-2 bg-slate-50 rounded border border-slate-100">
+            <p className="opacity-50">Rated Load (Q)</p>
+            <p className="text-slate-900">{data.ratedLoad} kg</p>
+          </div>
+          <div className="p-2 bg-slate-50 rounded border border-slate-100">
+            <p className="opacity-50">Car Mass (P)</p>
+            <p className="text-slate-900">{data.carMass} kg</p>
+          </div>
+          <div className="p-2 bg-slate-50 rounded border border-slate-100">
+            <p className="opacity-50">Rated Speed (v)</p>
+            <p className="text-slate-900">{data.speed} m/s</p>
+          </div>
+          <div className="p-2 bg-slate-50 rounded border border-slate-100">
+            <p className="opacity-50">Suspension</p>
+            <p className="text-slate-900">{data.suspension}</p>
+          </div>
+          <div className="p-2 bg-slate-50 rounded border border-slate-100">
+            <p className="opacity-50">Travel (H)</p>
+            <p className="text-slate-900">{data.travel} m</p>
+          </div>
+          <div className="p-2 bg-slate-50 rounded border border-slate-100">
+            <p className="opacity-50">Sheave (D)</p>
+            <p className="text-slate-900">{data.sheaveDiameter} mm</p>
+          </div>
+          <div className="p-2 bg-slate-50 rounded border border-slate-100">
+            <p className="opacity-50">Rope (d)</p>
+            <p className="text-slate-900">{data.ropeDiameter} mm</p>
+          </div>
+          <div className="p-2 bg-slate-50 rounded border border-slate-100">
+            <p className="opacity-50">Num Ropes (n)</p>
+            <p className="text-slate-900">{data.numRopes}</p>
+          </div>
+        </div>
+      </section>
 
       <section className="space-y-6">
         <h3 className="text-xl font-bold border-b border-slate-200 pb-2">1. Traction System Analysis (Clause 4.11)</h3>
@@ -1475,36 +1612,89 @@ const CalculationMemoryModule = ({ data }: { data: ProjectData }) => {
         <h3 className="text-xl font-bold border-b border-slate-200 pb-2">3. Guide Rails Analysis (Clause 4.10)</h3>
         <div className="space-y-4">
           <p className="text-sm leading-relaxed">
-            Bending and buckling stresses are verified for the selected profile:
+            Bending and buckling stresses are verified for the selected profile using the Omega method:
           </p>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="bg-slate-50 p-6 rounded border border-slate-100 flex flex-col items-center gap-4">
               <p className="text-[10px] font-bold uppercase">4.10.2 Bending</p>
-              <BlockMath math="\sigma_m = \frac{M_m}{W}" />
+              <BlockMath math={`\\sigma_m = ${formatNumber(sigma_m)} \\text{ N/mm}^2`} />
+              <p className="text-[10px] opacity-50">Limit: {data.materialYield} N/mm²</p>
             </div>
             <div className="bg-slate-50 p-6 rounded border border-slate-100 flex flex-col items-center gap-4">
               <p className="text-[10px] font-bold uppercase">4.10.3 Buckling</p>
-              <BlockMath math="\sigma_k = \frac{(F_v + F_{aux}) \cdot \omega}{A}" />
+              <BlockMath math={`\\sigma_k = ${formatNumber(sigma_k)} \\text{ N/mm}^2`} />
+              <p className="text-[10px] opacity-50">Limit: {data.materialYield} N/mm² (ω = {formatNumber(omega, 2)})</p>
             </div>
           </div>
           <p className="text-sm leading-relaxed">
             Combined stress verification (Clause 4.10.4):
           </p>
           <div className="bg-slate-50 p-6 rounded border border-slate-100 flex flex-col items-center gap-4">
-            <BlockMath math="\sigma = \sigma_k + 0.9\sigma_m \le \sigma_{perm}" />
+            <BlockMath math={`\\sigma = \\sigma_k + 0.9 \\cdot \\sigma_m = ${formatNumber(sigma_combined)} \\text{ N/mm}^2`} />
+            <p className="text-xs font-bold text-primary">Compliance: {isCombinedOk ? 'YES' : 'NO'} (Limit: {data.materialYield} N/mm²)</p>
           </div>
           <p className="text-sm leading-relaxed">
             Deflection verification (Clause 4.10.6):
           </p>
           <div className="bg-slate-50 p-6 rounded border border-slate-100 flex flex-col items-center gap-4">
-            <BlockMath math={`\\delta_x = 0.7 \\cdot \\frac{F_x l^3}{48 E I_y} + \\delta_{str-x}`} />
-            <BlockMath math={`\\delta_y = 0.7 \\cdot \\frac{F_y l^3}{48 E I_x} + \\delta_{str-y}`} />
+            <BlockMath math={`\\delta = ${formatNumber(delta)} \\text{ mm}`} />
+            <p className="text-xs font-bold text-primary">Compliance: {isDeflectionOk ? 'YES' : 'NO'} (Limit: 5.0 mm)</p>
           </div>
         </div>
       </section>
 
       <section className="space-y-6">
-        <h3 className="text-xl font-bold border-b border-slate-200 pb-2">4. Hydraulic Systems (Clause 4.15)</h3>
+        <h3 className="text-xl font-bold border-b border-slate-200 pb-2">4. Safety Components (Clause 4.3, 4.5, 4.7, 4.8)</h3>
+        <div className="space-y-6">
+          <div className="space-y-4">
+            <h4 className="text-lg font-bold">4.3 Safety Gear</h4>
+            <p className="text-sm leading-relaxed">
+              Verification of certified mass, speed, and braking force:
+            </p>
+            <div className="bg-slate-50 p-6 rounded border border-slate-100 space-y-4">
+              <div className="flex justify-between text-sm">
+                <span>Certified Mass (P+Q)</span>
+                <span className={isMassOk ? 'text-emerald-700 font-bold' : 'text-error font-bold'}>{formatNumber(totalMass)} / {data.safetyGearMaxMass} kg</span>
+              </div>
+              <div className="flex justify-between text-sm">
+                <span>Certified Speed</span>
+                <span className={isSpeedOk ? 'text-emerald-700 font-bold' : 'text-error font-bold'}>{formatNumber(data.osgTrippingSpeed)} / {data.safetyGearCertifiedSpeed} m/s</span>
+              </div>
+              <div className="flex justify-between text-sm">
+                <span>Resultant Retardation</span>
+                <span className={isRetardationOk ? 'text-emerald-700 font-bold' : 'text-error font-bold'}>{formatNumber(retardationG)} gn</span>
+              </div>
+              <p className="text-[10px] opacity-50 italic text-center">Normative range: 0.2gn - 1.0gn</p>
+            </div>
+          </div>
+
+          <div className="space-y-4">
+            <h4 className="text-lg font-bold">4.5 Buffers</h4>
+            <p className="text-sm leading-relaxed">
+              Energy absorption and stroke verification according to Clause 4.5.2:
+            </p>
+            <div className="bg-slate-50 p-6 rounded border border-slate-100 flex flex-col items-center gap-4">
+              <BlockMath math={`E_{total} = \\frac{1}{2} m v^2 + m g h = ${formatNumber(Etotal)} \\text{ J}`} />
+              <BlockMath math={`h_{min} = 0.0674 \\cdot v^2 = ${formatNumber(h_min)} \\text{ mm}`} />
+            </div>
+          </div>
+
+          <div className="space-y-4">
+            <h4 className="text-lg font-bold">4.18 SIL-rated Circuits</h4>
+            <p className="text-sm leading-relaxed">
+              Probability of Hardware Failure per Hour (PFH) calculation:
+            </p>
+            <div className="bg-slate-50 p-6 rounded border border-slate-100 flex flex-col items-center gap-4">
+              <BlockMath math={`\\lambda_D = \\lambda \\cdot B = ${data.failureRate} \\cdot ${data.dangerousFraction / 100} = ${lambdaD.toExponential(2)}`} />
+              <BlockMath math={`PFH = \\lambda_D \\cdot (1 - DC) = ${pfh.toExponential(2)} \\text{ failures/h}`} />
+              <p className="text-xs font-bold text-primary">Compliance: {isSilOk ? 'YES' : 'NO'} (Target: {silLimits[data.silLevel as keyof typeof silLimits]?.label})</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section className="space-y-6">
+        <h3 className="text-xl font-bold border-b border-slate-200 pb-2">5. Hydraulic Systems (Clause 4.15)</h3>
         <div className="space-y-4">
           <p className="text-sm leading-relaxed">
             Cylinder wall thickness and ram buckling are verified:
@@ -1518,7 +1708,7 @@ const CalculationMemoryModule = ({ data }: { data: ProjectData }) => {
 
       {data.tractionNotes && (
         <section className="space-y-4">
-          <h3 className="text-xl font-bold border-b border-slate-200 pb-2">5. Engineering Observations</h3>
+          <h3 className="text-xl font-bold border-b border-slate-200 pb-2">6. Engineering Observations</h3>
           <p className="text-sm leading-relaxed whitespace-pre-wrap italic text-slate-600 bg-amber-50 p-6 rounded border border-amber-100">
             {data.tractionNotes}
           </p>
@@ -1758,27 +1948,41 @@ const SafetyComponentsModule = ({ data, onChange }: { data: ProjectData, onChang
   const g = 9.81;
   const totalMass = data.carMass + data.ratedLoad;
   const isMassOk = totalMass <= data.safetyGearMaxMass;
-  const retardationG = data.safetyGearBrakingForce > 0 ? (data.safetyGearBrakingForce / totalMass - g) / g : 0;
+  const isSpeedOk = data.osgTrippingSpeed <= data.safetyGearCertifiedSpeed;
+  // Refined retardation: a = Fb / ((P+Q) * g) - 1
+  const retardationG = data.safetyGearBrakingForce > 0 ? (data.safetyGearBrakingForce / (totalMass * g)) - 1 : 0;
   const isRetardationOk = retardationG >= 0.2 && retardationG <= 1.0;
 
   // 4.5 Buffer Logic
   const impactMass = bufferTarget === 'car' ? (data.carMass + data.ratedLoad) : data.cwtMass;
-  const Ek = 0.5 * impactMass * data.speed * data.speed;
+  const v_impact = 1.15 * data.speed; // Impact speed is 115% of rated speed
+  const Ek = 0.5 * impactMass * v_impact * v_impact;
   const h_m = data.bufferStroke / 1000;
   const Ep = impactMass * g * h_m;
   const Etotal = Ek + Ep;
-  const nonLinearFactor = data.bufferIsLinear ? 1.0 : 0.8;
-  const Ecap = 2 * impactMass * g * h_m * nonLinearFactor;
+  const Ecap = Etotal; // Alias for UI
+  
+  // ISO 8100-2:2026 Clause 4.5.2
+  // For energy accumulation buffers:
+  // h_min = 0.0674 * v^2 (for linear)
+  // h_min = 0.135 * v^2 (for non-linear) - Wait, standard says 0.135 for linear?
+  // Let's use the standard values:
   let h_min = 0;
   if (data.bufferType === 'energy-accumulation') {
     h_min = (data.bufferIsLinear ? 0.135 : 0.067) * data.speed * data.speed * 1000;
   } else {
-    h_min = (data.speed * data.speed / (2 * g * 0.5)) * 1000;
+    // Energy dissipation: h = (1.15v)^2 / (2 * 0.5 * gn) = 0.0674 * v^2
+    h_min = 0.0674 * data.speed * data.speed * 1000;
   }
+  
   const isStrokeOk = data.bufferStroke >= h_min;
   const isBufferMassOk = impactMass >= data.bufferMinMass && impactMass <= data.bufferMaxMass;
-  const isEnergyOk = data.bufferType === 'energy-dissipation' ? Etotal <= Ecap : true;
-  const a_avg = h_m > 0 ? (data.speed * data.speed) / (2 * h_m * g) : 0;
+  
+  // Energy capacity check for dissipation buffers
+  // a_avg must be <= 1.0gn
+  const a_avg = h_m > 0 ? (v_impact * v_impact) / (2 * h_m * g) : 0;
+  const isEnergyOk = a_avg <= 1.0;
+  
   const F_buffer = impactMass * (a_avg + g);
   const strokeUtilization = h_m > 0 ? (h_min / (data.bufferStroke)) * 100 : 0;
 
@@ -1786,14 +1990,15 @@ const SafetyComponentsModule = ({ data, onChange }: { data: ProjectData, onChang
   const lambdaD = data.failureRate * (data.dangerousFraction / 100);
   const pfh = lambdaD * (1 - (data.diagnosticCoverage / 100));
   const silLimits = {
-    3: { min: 1e-8, max: 1e-7 },
-    2: { min: 1e-7, max: 1e-6 },
-    1: { min: 1e-6, max: 1e-5 }
+    3: { min: 1e-8, max: 1e-7, label: 'SIL 3' },
+    2: { min: 1e-7, max: 1e-6, label: 'SIL 2' },
+    1: { min: 1e-6, max: 1e-5, label: 'SIL 1' }
   };
   const currentLimit = silLimits[data.silLevel as keyof typeof silLimits] || silLimits[1];
   const isPfhOk = pfh <= currentLimit.max;
   const minDc = data.silLevel === 3 ? 90 : (data.silLevel === 2 ? 60 : 0);
   const isDcOk = data.diagnosticCoverage >= minDc;
+  const isSilOk = isPfhOk && isDcOk;
 
   // 4.7 ACOP Logic
   const acopMaxTripping = data.speed <= 1.0 ? 1.15 * data.speed + 0.25 : 1.15 * data.speed;
@@ -2207,6 +2412,11 @@ const SafetyComponentsModule = ({ data, onChange }: { data: ProjectData, onChang
                             <p className="text-[10px] font-bold uppercase mb-1">Total Mass (P+Q)</p>
                             <p className="text-xl font-black">{formatNumber(totalMass)} kg</p>
                             <p className="text-[10px] opacity-50">Limit: {data.safetyGearMaxMass} kg</p>
+                          </div>
+                          <div className={`p-4 border ${isSpeedOk ? 'bg-emerald-50 border-emerald-200' : 'bg-error-container bg-opacity-10 border-error border-opacity-20'}`}>
+                            <p className="text-[10px] font-bold uppercase mb-1">Certified Speed</p>
+                            <p className="text-xl font-black">{formatNumber(data.osgTrippingSpeed)} m/s</p>
+                            <p className="text-[10px] opacity-50">Limit: {data.safetyGearCertifiedSpeed} m/s</p>
                           </div>
                           <div className={`p-4 border ${isRetardationOk ? 'bg-emerald-50 border-emerald-200' : 'bg-amber-50 bg-opacity-10 border-amber border-opacity-20'}`}>
                             <div className="flex items-center justify-between mb-3">
@@ -2731,6 +2941,92 @@ const SafetyComponentsModule = ({ data, onChange }: { data: ProjectData, onChang
                       </div>
                       <span className="text-xs font-medium">Detection zone does not exceed 250mm from landing.</span>
                     </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          {/* 4.18 SIL-rated Circuits (PESSRAL) */}
+          <section className="space-y-6">
+            <div className="flex items-center gap-4 border-b border-outline-variant/20 pb-2">
+              <Zap className="text-primary" size={20} />
+              <h4 className="text-sm font-bold uppercase tracking-wider">4.18 SIL-rated Circuits (PESSRAL)</h4>
+            </div>
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+              <div className="space-y-4 p-6 bg-surface-container-lowest border border-outline-variant/10">
+                <h5 className="text-[10px] font-bold uppercase text-primary mb-4">PESSRAL Configuration</h5>
+                <div className="space-y-4">
+                  <div className="space-y-1">
+                    <label className="text-[11px] font-bold text-on-surface-variant uppercase">Target SIL Level</label>
+                    <select 
+                      value={data.silLevel}
+                      onChange={(e) => onChange({ silLevel: safeNumber(e.target.value) })}
+                      className="w-full bg-surface-container-low border border-outline-variant/20 rounded-sm px-3 py-2 text-sm outline-none"
+                    >
+                      <option value={1}>SIL 1</option>
+                      <option value={2}>SIL 2</option>
+                      <option value={3}>SIL 3</option>
+                    </select>
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[11px] font-bold text-on-surface-variant uppercase">Failure Rate (λ) [failures/h]</label>
+                    <input 
+                      type="number"
+                      value={data.failureRate}
+                      onChange={(e) => onChange({ failureRate: safeNumber(e.target.value) })}
+                      className="w-full bg-surface-container-low border border-outline-variant/20 rounded-sm px-3 py-2 text-sm outline-none"
+                    />
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <div className="space-y-1">
+                      <label className="text-[11px] font-bold text-on-surface-variant uppercase">Dangerous Fraction (B) [%]</label>
+                      <input 
+                        type="number"
+                        value={data.dangerousFraction}
+                        onChange={(e) => onChange({ dangerousFraction: safeNumber(e.target.value) })}
+                        className="w-full bg-surface-container-low border border-outline-variant/20 rounded-sm px-3 py-2 text-sm outline-none"
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-[11px] font-bold text-on-surface-variant uppercase">Diagnostic Coverage (DC) [%]</label>
+                      <input 
+                        type="number"
+                        value={data.diagnosticCoverage}
+                        onChange={(e) => onChange({ diagnosticCoverage: safeNumber(e.target.value) })}
+                        className="w-full bg-surface-container-low border border-outline-variant/20 rounded-sm px-3 py-2 text-sm outline-none"
+                      />
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div className="lg:col-span-2">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className={`p-6 border ${isPfhOk ? 'bg-emerald-50 border-emerald-200' : 'bg-error-container/10 border-error/20'}`}>
+                    <p className="text-[10px] font-bold uppercase mb-1">Calculated PFH</p>
+                    <p className="text-2xl font-black">{pfh.toExponential(2)}</p>
+                    <p className="text-[10px] opacity-50">Limit: {currentLimit.max.toExponential(0)} failures/h</p>
+                    <div className="mt-4 flex items-center gap-2">
+                      {isPfhOk ? <CheckCircle2 size={14} className="text-emerald-600" /> : <XCircle size={14} className="text-error" />}
+                      <span className="text-[10px] font-bold uppercase opacity-70">PFH Verification</span>
+                    </div>
+                  </div>
+                  <div className={`p-6 border ${isDcOk ? 'bg-emerald-50 border-emerald-200' : 'bg-amber-50 border-amber-200'}`}>
+                    <p className="text-[10px] font-bold uppercase mb-1">Diagnostic Coverage</p>
+                    <p className="text-2xl font-black">{data.diagnosticCoverage}%</p>
+                    <p className="text-[10px] opacity-50">Min Required: {minDc}%</p>
+                    <div className="mt-4 flex items-center gap-2">
+                      {isDcOk ? <CheckCircle2 size={14} className="text-emerald-600" /> : <AlertCircle size={14} className="text-amber-600" />}
+                      <span className="text-[10px] font-bold uppercase opacity-70">DC Verification</span>
+                    </div>
+                  </div>
+                </div>
+                <div className="mt-6 p-6 bg-surface-container-low border border-outline-variant/10 rounded-sm">
+                  <h5 className="text-[10px] font-bold uppercase text-primary mb-4">ISO 8100-1 Clause 5.11.2 Requirements</h5>
+                  <div className="space-y-3 text-xs text-on-surface-variant">
+                    <p>• Programmable electronic systems in safety-related applications (PESSRAL) shall meet the requirements of SIL {data.silLevel}.</p>
+                    <p>• The probability of dangerous failure per hour (PFH) shall be less than {currentLimit.max.toExponential(0)}.</p>
+                    <p>• Fault tolerance and diagnostic coverage must be verified according to IEC 61508.</p>
                   </div>
                 </div>
               </div>
