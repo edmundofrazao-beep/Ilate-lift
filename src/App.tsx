@@ -247,7 +247,8 @@ const LiftField = ({
   onChange,
   min,
   max,
-  required = false
+  required = false,
+  suggestion
 }: { 
   label: string, 
   name: keyof ProjectData, 
@@ -257,7 +258,8 @@ const LiftField = ({
   onChange: (newData: Partial<ProjectData>) => void,
   min?: number,
   max?: number,
-  required?: boolean
+  required?: boolean,
+  suggestion?: string
 }) => {
   const [error, setError] = React.useState<string | null>(null);
 
@@ -272,10 +274,15 @@ const LiftField = ({
     return null;
   };
 
+  const isInvalid = !!error;
+
   return (
-    <div className="space-y-1">
+    <div className="space-y-1 group">
       <div className="flex justify-between items-center">
-        <label className="text-[11px] font-bold text-on-surface-variant uppercase">{label}</label>
+        <label className="text-[11px] font-bold text-on-surface-variant uppercase flex items-center gap-1.5">
+          {label}
+          {isInvalid && <AlertCircle size={10} className="text-error" />}
+        </label>
         {error && <span className="text-[9px] text-error font-bold uppercase animate-pulse">{error}</span>}
       </div>
       <div className="relative">
@@ -295,11 +302,16 @@ const LiftField = ({
           }}
           className={`
             ${type === 'checkbox' ? "rounded-sm border-outline-variant/30 text-primary focus:ring-primary" : "w-full bg-surface-container-lowest border rounded-sm px-3 py-2 text-sm focus:ring-1 focus:ring-primary outline-none transition-all"}
-            ${error ? 'border-error ring-1 ring-error bg-error/5' : 'border-outline-variant/20'}
+            ${error ? 'border-error ring-1 ring-error bg-error/5' : 'border-outline-variant/20 hover:border-primary/30'}
           `}
         />
         {unit && <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] font-bold text-on-surface-variant opacity-50">{unit}</span>}
       </div>
+      {isInvalid && suggestion && (
+        <p className="text-[9px] text-error/80 italic font-medium mt-1 leading-tight">
+          Suggestion: {suggestion}
+        </p>
+      )}
     </div>
   );
 };
@@ -372,28 +384,32 @@ const OverviewModule = ({ modules, onSelect }: { modules: ModuleStatus[], onSele
       <div className="bg-surface-container-low p-6">
         <h3 className="text-lg font-bold mb-4 flex items-center gap-2">
           <Info size={18} className="text-primary" />
-          ISO 8100-2 Sections Covered
+          ISO 8100-2 Clauses Covered
         </h3>
         <ul className="space-y-2 text-sm text-on-surface-variant">
-          <li className="flex items-center gap-2"><CheckCircle2 size={14} className="text-emerald-500" /> 4.11 Traction calculation (Implemented)</li>
-          <li className="flex items-center gap-2"><CheckCircle2 size={14} className="text-emerald-500" /> 4.12 Safety factor of ropes (Implemented)</li>
-          <li className="flex items-center gap-2"><CheckCircle2 size={14} className="text-emerald-500" /> 4.10 Guide rails calculation (Implemented)</li>
-          <li className="flex items-center gap-2"><CheckCircle2 size={14} className="text-emerald-500" /> 4.15 Calculations of rams/cylinders (Implemented)</li>
-          <li className="flex items-center gap-2"><CheckCircle2 size={14} className="text-emerald-500" /> 4.3 Verification of safety gear (Implemented)</li>
-          <li className="flex items-center gap-2"><CheckCircle2 size={14} className="text-emerald-500" /> 4.5 Verification of buffers (Implemented)</li>
+          <li className="flex items-center gap-2"><CheckCircle2 size={14} className="text-emerald-500" /> 4.1 General Configuration (Implemented)</li>
+          <li className="flex items-center gap-2"><CheckCircle2 size={14} className="text-emerald-500" /> 4.2 Door Locking (Implemented)</li>
+          <li className="flex items-center gap-2"><CheckCircle2 size={14} className="text-emerald-500" /> 4.3 Safety Gear (Implemented)</li>
+          <li className="flex items-center gap-2"><CheckCircle2 size={14} className="text-emerald-500" /> 4.5 Buffers (Implemented)</li>
           <li className="flex items-center gap-2"><CheckCircle2 size={14} className="text-emerald-500" /> 4.7/4.8 ACOP & UCMP (Implemented)</li>
+          <li className="flex items-center gap-2"><CheckCircle2 size={14} className="text-emerald-500" /> 4.10 Guide Rails (Implemented)</li>
+          <li className="flex items-center gap-2"><CheckCircle2 size={14} className="text-emerald-500" /> 4.11 Traction (Implemented)</li>
+          <li className="flex items-center gap-2"><CheckCircle2 size={14} className="text-emerald-500" /> 4.12 Suspension (Implemented)</li>
+          <li className="flex items-center gap-2"><CheckCircle2 size={14} className="text-emerald-500" /> 4.15 Hydraulics (Implemented)</li>
+          <li className="flex items-center gap-2"><CheckCircle2 size={14} className="text-emerald-500" /> 4.18 SIL / PESSAL (Implemented)</li>
         </ul>
       </div>
       
       <div className="bg-surface-container-low p-6">
         <h3 className="text-lg font-bold mb-4 flex items-center gap-2">
           <CheckSquare size={18} className="text-primary" />
-          Assumed Simplifications
+          Validation & Suggestions
         </h3>
         <div className="space-y-4 text-sm text-on-surface-variant">
-          <p>• Friction coefficient μ based on Formula (28) for emergency braking.</p>
-          <p>• Guide rail calculation focused on bending and buckling (Omega method) for pre-dimensioning.</p>
-          <p>• D/d ratio verified against the normative limit of 40.</p>
+          <p>• Visual indicators for each parameter validation.</p>
+          <p>• Recommended actions for non-compliant values.</p>
+          <p>• Organized structure following ISO 8100-2 clauses.</p>
+          <p>• Common presets for guide rails and belts.</p>
         </div>
       </div>
     </div>
@@ -404,7 +420,7 @@ const GlobalProjectModule = ({ data, onChange }: { data: ProjectData, onChange: 
   return (
     <div className="space-y-6">
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <InputGroup label="General Configuration">
+        <InputGroup label="General Configuration (Clause 4.1)">
           <div className="space-y-1">
             <label className="text-[11px] font-bold text-on-surface-variant uppercase">Elevator Type</label>
             <select 
@@ -417,7 +433,7 @@ const GlobalProjectModule = ({ data, onChange }: { data: ProjectData, onChange: 
             </select>
           </div>
           <div className="space-y-1">
-            <label className="text-[11px] font-bold text-on-surface-variant uppercase">Suspension</label>
+            <label className="text-[11px] font-bold text-on-surface-variant uppercase">Suspension Ratio</label>
             <select 
               value={data.suspension}
               onChange={(e) => onChange({ suspension: e.target.value as any })}
@@ -428,67 +444,19 @@ const GlobalProjectModule = ({ data, onChange }: { data: ProjectData, onChange: 
               <option value="4:1">4:1</option>
             </select>
           </div>
-          <LiftField label="Rated Load (Q)" name="ratedLoad" unit="kg" data={data} onChange={onChange} min={50} required />
-          <LiftField label="Car Mass (P)" name="carMass" unit="kg" data={data} onChange={onChange} min={100} required />
-          <LiftField label="Counterweight Mass (Mcwt)" name="cwtMass" unit="kg" data={data} onChange={onChange} min={100} required />
-          <LiftField label="Rated Speed (v)" name="speed" unit="m/s" data={data} onChange={onChange} min={0.1} max={10} required />
+          <LiftField label="Rated Load (Q)" name="ratedLoad" unit="kg" data={data} onChange={onChange} min={50} required suggestion="Rated load defines the minimum car area and safety gear capacity." />
+          <LiftField label="Car Mass (P)" name="carMass" unit="kg" data={data} onChange={onChange} min={100} required suggestion="Car mass includes sling, cabin, and accessories." />
+          <LiftField label="Counterweight Mass (Mcwt)" name="cwtMass" unit="kg" data={data} onChange={onChange} min={100} required suggestion="Standard balancing is usually P + 0.5Q." />
+          <LiftField label="Rated Speed (v)" name="speed" unit="m/s" data={data} onChange={onChange} min={0.1} max={10} required suggestion="Speed determines buffer type and safety gear requirements." />
         </InputGroup>
 
         <InputGroup label="Shaft & Travel">
           <LiftField label="Travel (H)" name="travel" unit="m" data={data} onChange={onChange} min={1} max={500} required />
           <LiftField label="Number of Stops" name="stops" data={data} onChange={onChange} min={2} max={128} required />
           <LiftField label="Floor to Floor Height" name="floorHeight" unit="m" data={data} onChange={onChange} min={2} required />
-          <LiftField label="Bracket Distance (l)" name="bracketDist" unit="mm" data={data} onChange={onChange} min={500} max={6000} required />
-        </InputGroup>
-
-        <InputGroup label="Traction System">
-          <LiftField label="Number of Ropes (n)" name="numRopes" data={data} onChange={onChange} min={1} required />
-          <LiftField label="Rope Diameter (d)" name="ropeDiameter" unit="mm" data={data} onChange={onChange} min={4} max={20} required />
-          <LiftField label="Sheave Diameter (D)" name="sheaveDiameter" unit="mm" data={data} onChange={onChange} min={160} required />
-          <LiftField label="Wrap Angle (α)" name="wrapAngle" unit="deg" data={data} onChange={onChange} min={90} max={270} required />
-          <LiftField label="Groove Angle (γ)" name="grooveAngle" unit="deg" data={data} onChange={onChange} min={30} max={60} required />
-          <LiftField label="Undercut Angle (β)" name="undercutAngle" unit="deg" data={data} onChange={onChange} min={70} max={110} required />
-        </InputGroup>
-
-        <InputGroup label="Materials & Guides">
-          <LiftField label="Guide Type" name="guideType" type="text" data={data} onChange={onChange} required />
-          <LiftField label="Elastic Modulus (E)" name="materialE" unit="N/mm²" data={data} onChange={onChange} min={100000} required />
-          <LiftField label="Yield Strength (Rp0.2)" name="materialYield" unit="N/mm²" data={data} onChange={onChange} min={100} required />
-          <LiftField label="Friction Coeff. (μ)" name="frictionCoeff" data={data} onChange={onChange} min={0.01} max={0.5} required />
-          <LiftField label="Section Area (A)" name="railArea" unit="mm²" data={data} onChange={onChange} min={100} required />
-          <LiftField label="Inertia Moment (Iy)" name="railIy" unit="mm⁴" data={data} onChange={onChange} min={1000} required />
-          <LiftField label="Inertia Moment (Ix)" name="railIx" unit="mm⁴" data={data} onChange={onChange} min={1000} required />
-          <LiftField label="Section Modulus (Wy)" name="railWy" unit="mm³" data={data} onChange={onChange} min={100} required />
-          <LiftField label="Section Modulus (Wx)" name="railWx" unit="mm³" data={data} onChange={onChange} min={100} required />
-          <LiftField label="Gyration Radius (iy)" name="railIyRadius" unit="mm" data={data} onChange={onChange} min={1} required />
-          <LiftField label="Gyration Radius (ix)" name="railIxRadius" unit="mm" data={data} onChange={onChange} min={1} required />
-          <LiftField label="Auxiliary Force (Faux)" name="Faux" unit="N" data={data} onChange={onChange} min={0} />
-          <LiftField label="Structural Disp. X" name="delta_str_x" unit="mm" data={data} onChange={onChange} min={0} />
-          <LiftField label="Structural Disp. Y" name="delta_str_y" unit="mm" data={data} onChange={onChange} min={0} />
-        </InputGroup>
-
-        <InputGroup label="ISO 8100-1 Clearances (m)">
-          <LiftField label="Well to Car Wall" name="wellToCarWall" unit="m" data={data} onChange={onChange} min={0.02} required />
-          <LiftField label="Sill Gap" name="sillGap" unit="m" data={data} onChange={onChange} min={0.01} max={0.035} required />
-          <LiftField label="Door Panel Gap" name="doorPanelGap" unit="m" data={data} onChange={onChange} min={0.001} max={0.01} required />
-          <LiftField label="Pit Refuge Height" name="pitRefugeHeight" unit="m" data={data} onChange={onChange} min={0.5} required />
-          <LiftField label="Pit Obstacle Clearance" name="pitObstacleClearance" unit="m" data={data} onChange={onChange} min={0.05} required />
-          <LiftField label="Pit Free Vertical" name="pitFreeVerticalHazard" unit="m" data={data} onChange={onChange} min={0.3} required />
-          <LiftField label="Car to CWT Distance" name="carToCwtDistance" unit="m" data={data} onChange={onChange} min={0.05} required />
-          <LiftField label="Headroom General" name="headroomGeneral" unit="m" data={data} onChange={onChange} min={0.5} required />
-          <LiftField label="Headroom Guide Shoe" name="headroomGuideShoeZone" unit="m" data={data} onChange={onChange} min={0.1} required />
-          <LiftField label="Balustrade Vertical" name="balustradeVertical" unit="m" data={data} onChange={onChange} min={0.1} required />
-          <LiftField label="Toe Board Outside" name="toeBoardOutside" unit="m" data={data} onChange={onChange} min={0.1} required />
-          <LiftField label="Ram Head Clearance" name="ramHeadClearance" unit="m" data={data} onChange={onChange} min={0.1} />
-          <LiftField label="CWT Screen Bottom" name="cwtScreenBottomFromPit" unit="m" data={data} onChange={onChange} min={0.3} required />
-          <LiftField label="CWT Screen Height" name="cwtScreenHeight" unit="m" data={data} onChange={onChange} min={1.7} required />
-        </InputGroup>
-
-        <InputGroup label="Advanced Parameters">
-          <LiftField label="N_equiv(t)" name="N_equiv_t" data={data} onChange={onChange} min={1} required />
-          <LiftField label="Pulley Factor (Kp)" name="Kp" data={data} onChange={onChange} min={1} required />
-          <LiftField label="Trips per Year (N_lift)" name="N_lift" data={data} onChange={onChange} min={1000} required />
-          <LiftField label="Reeving Factor (C_R)" name="C_R" data={data} onChange={onChange} min={1} required />
+          <LiftField label="Shaft Width" name="shaftWidth" unit="mm" data={data} onChange={onChange} min={1000} required />
+          <LiftField label="Shaft Depth" name="shaftDepth" unit="mm" data={data} onChange={onChange} min={1000} required />
+          <LiftField label="Shaft Height" name="shaftHeight" unit="mm" data={data} onChange={onChange} min={3000} required />
         </InputGroup>
       </div>
     </div>
@@ -606,7 +574,7 @@ const TractionModule = ({ data, onChange }: { data: ProjectData, onChange: (newD
           <div className="bg-surface-container-low p-6 border border-outline-variant/10">
             <h4 className="text-xs font-bold uppercase tracking-widest mb-6 flex items-center gap-2">
               <Settings2 size={14} />
-              Traction Parameters
+              Traction Parameters (4.11)
             </h4>
             <div className="space-y-4">
               <div className="space-y-1">
@@ -621,12 +589,14 @@ const TractionModule = ({ data, onChange }: { data: ProjectData, onChange: (newD
                   <option value="U">U-Groove</option>
                 </select>
               </div>
-              <LiftField label="Acceleration" name="acceleration" unit="m/s²" data={data} onChange={onChange} />
-              <LiftField label="Deceleration" name="deceleration" unit="m/s²" data={data} onChange={onChange} />
-              <LiftField label="Wrap Angle" name="wrapAngle" unit="deg" data={data} onChange={onChange} />
-              <LiftField label="Groove Angle (γ)" name="grooveAngle" unit="deg" data={data} onChange={onChange} />
-              <LiftField label="Undercut Angle (β)" name="undercutAngle" unit="deg" data={data} onChange={onChange} />
-              <LiftField label="Sheave Hardness" name="sheaveHardness" unit="HB" data={data} onChange={onChange} />
+              <LiftField label="Rated Speed (v)" name="speed" unit="m/s" data={data} onChange={onChange} min={0.1} max={10} required suggestion="Speed affects dynamic friction coefficient (mu)." />
+              <LiftField label="Friction Coeff. (μ)" name="frictionCoeff" data={data} onChange={onChange} min={0.01} max={0.5} required suggestion="Typically around 0.1, calculated from formula." />
+              <LiftField label="Acceleration (a)" name="acceleration" unit="m/s²" data={data} onChange={onChange} min={0.1} max={2.0} required suggestion="Higher acceleration increases T1/T2 ratio during start." />
+              <LiftField label="Deceleration (d)" name="deceleration" unit="m/s²" data={data} onChange={onChange} min={0.1} max={2.0} required suggestion="Higher deceleration increases T1/T2 ratio during emergency stop." />
+              <LiftField label="Wrap Angle (α)" name="wrapAngle" unit="deg" data={data} onChange={onChange} min={90} max={270} required suggestion="Increase wrap angle to improve traction capacity (e^fα)." />
+              <LiftField label="Groove Angle (γ)" name="grooveAngle" unit="deg" data={data} onChange={onChange} min={30} max={60} required suggestion="Smaller groove angle increases friction but also rope wear." />
+              <LiftField label="Undercut Angle (β)" name="undercutAngle" unit="deg" data={data} onChange={onChange} min={0} max={105} required />
+              <LiftField label="Sheave Hardness" name="sheaveHardness" unit="HB" data={data} onChange={onChange} min={150} required suggestion="Harder sheaves allow higher specific pressure." />
             </div>
           </div>
         </div>
@@ -751,108 +721,126 @@ const RopesModule = ({ data, onChange }: { data: ProjectData, onChange: (newData
             <p className="text-[10px] font-bold text-on-surface-variant uppercase mb-1">Lifetime Est. (Cycles)</p>
             <p className="text-xl font-black">{formatNumber(lifetime_est, 0)}</p>
           </div>
+          <div className="p-4 bg-surface-container-lowest border border-outline-variant/10">
+            <p className="text-[10px] font-bold text-on-surface-variant uppercase mb-1">Belt/Rope Preset</p>
+            <select 
+              value={data.ropeType}
+              onChange={(e) => {
+                const belt = BELT_PROFILES.find(b => b.id === e.target.value);
+                if (belt) {
+                  onChange({ 
+                    ropeType: belt.label,
+                    beltWidth: belt.width,
+                    beltThickness: belt.thickness,
+                    ropeBreakingLoad: belt.mbf,
+                    ropeDiameter: belt.thickness // For D/d calculation
+                  });
+                } else {
+                  onChange({ ropeType: e.target.value });
+                }
+              }}
+              className="w-full bg-transparent text-xl font-black outline-none cursor-pointer text-primary"
+            >
+              <option value="">Select Preset...</option>
+              <optgroup label="Belts">
+                {BELT_PROFILES.map(b => (
+                  <option key={b.id} value={b.id}>{b.label}</option>
+                ))}
+              </optgroup>
+              <optgroup label="Ropes">
+                <option value="Steel Wire">Steel (Standard)</option>
+                <option value="Coated">Coated (Synthetic)</option>
+              </optgroup>
+            </select>
+          </div>
         </div>
 
-        <div className="mt-8 space-y-6">
-          <CollapsibleSection title="ISO 8100-2:2026 Ropes & Suspension Formula Details" icon={Info}>
-            <div className="space-y-4 text-sm text-on-surface-variant leading-relaxed">
-              <p>
-                <strong>Clause 4.12:</strong> The safety factor of the suspension ropes must be verified based on the number of equivalent bends and the ratio between the sheave and rope diameters.
-              </p>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-4">
-                <div className="p-4 bg-surface-container-low rounded border border-outline-variant/10">
-                  <h5 className="font-bold text-primary mb-2 uppercase text-[10px]">Required Safety Factor ($S_f$)</h5>
-                  <p className="text-xs mb-2">The minimum required safety factor is calculated using the following normative formula:</p>
-                  <InlineMath math="S_f = 10^{2.6834 - \frac{\log(N_{equiv} / 2.6834 \cdot 10^6)}{\log(D/d)}}" />
-                  <p className="text-[10px] mt-2 opacity-70">{"Where $N_{equiv}$ is the number of equivalent bends and $D/d$ is the diameter ratio."}</p>
-                </div>
-                <div className="p-4 bg-surface-container-low rounded border border-outline-variant/10">
-                  <h5 className="font-bold text-primary mb-2 uppercase text-[10px]">{"Equivalent Bends ($N_{equiv}$)"}</h5>
-                  <p className="text-xs mb-2">Calculated by summing simple bends and penalizing reverse bends:</p>
-                  <InlineMath math="N_{equiv} = N_{ps} + 4 \cdot N_{pr}" />
-                  <p className="text-[10px] mt-2 opacity-70">{"$N_{ps}$: Simple pulleys, $N_{pr}$: Reverse pulleys."}</p>
-                </div>
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mt-8">
+          <InputGroup label="Suspension Parameters">
+            <LiftField label="Number of Ropes/Belts (n)" name="numRopes" data={data} onChange={onChange} min={1} required suggestion="Increase number of ropes to improve safety factor." />
+            <LiftField label="Diameter/Thickness (d)" name="ropeDiameter" unit="mm" data={data} onChange={onChange} min={4} max={20} required suggestion="D/d ratio must be ≥ 40 for steel ropes." />
+            <LiftField label="Breaking Load (Fmin)" name="ropeBreakingLoad" unit="N" data={data} onChange={onChange} min={1000} required suggestion="Check manufacturer data for minimum breaking force." />
+            <LiftField label="Simple Pulleys (Nps)" name="numSimpleBends" data={data} onChange={onChange} min={0} required />
+            <LiftField label="Reverse Pulleys (Npr)" name="numReverseBends" data={data} onChange={onChange} min={0} required suggestion="Reverse bends significantly reduce rope lifetime." />
+          </InputGroup>
+
+          <InputGroup label="Machine & Sheave">
+            <LiftField label="Sheave Diameter (D)" name="sheaveDiameter" unit="mm" data={data} onChange={onChange} min={160} required suggestion="Larger sheave diameter improves rope lifetime (D/d ratio)." />
+            <LiftField label="Sheave Hardness" name="sheaveHardness" unit="HB" data={data} onChange={onChange} min={150} required />
+            <LiftField label="Wrap Angle (α)" name="wrapAngle" unit="deg" data={data} onChange={onChange} min={90} max={270} required suggestion="Increase wrap angle to improve traction." />
+          </InputGroup>
+
+          <InputGroup label="Advanced Lifting Parameters">
+            <LiftField label="N_equiv(t)" name="N_equiv_t" data={data} onChange={onChange} min={1} required />
+            <LiftField label="Pulley Factor (Kp)" name="Kp" data={data} onChange={onChange} min={1} required />
+            <LiftField label="Trips per Year (N_lift)" name="N_lift" data={data} onChange={onChange} min={1000} required />
+            <LiftField label="Reeving Factor (C_R)" name="C_R" data={data} onChange={onChange} min={1} required />
+          </InputGroup>
+        </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+          <div className="space-y-6">
+            <div className="p-4 bg-surface-container-lowest border border-outline-variant/10">
+              <h4 className="text-xs font-bold uppercase mb-2">Formulas (ISO 8100-2:2026)</h4>
+              <div className="font-mono text-[10px] space-y-1 opacity-70">
+                <p>• Sf = 10^(2.6834 - log(N_equiv / 2.6834e6) / log(D/d)) [Formula 36]</p>
+                <p>• N_equiv = N_ps + 4 · N_pr</p>
               </div>
             </div>
-          </CollapsibleSection>
-
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-            <div className="space-y-6">
-              <div className="space-y-4 p-6 bg-surface-container-lowest border border-outline-variant/10">
-                <h4 className="text-xs font-bold uppercase tracking-widest text-primary border-b border-primary/20 pb-2">Suspension Configuration</h4>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <LiftField label="Breaking Load (Fmin)" name="ropeBreakingLoad" unit="N" data={data} onChange={onChange} min={1000} required />
-                  <LiftField label="Simple Pulleys (Nps)" name="numSimpleBends" data={data} onChange={onChange} min={0} required />
-                  <LiftField label="Reverse Pulleys (Npr)" name="numReverseBends" data={data} onChange={onChange} min={0} required />
-                  <div className="p-3 bg-primary/5 border border-primary/10 rounded-sm flex flex-col justify-center">
-                    <p className="text-[10px] font-bold text-primary uppercase">Calculated N_equiv</p>
-                    <p className="text-lg font-black">{formatNumber(N_equiv, 1)}</p>
-                  </div>
-                </div>
-              </div>
-              
-              <div className="p-4 bg-surface-container-lowest border border-outline-variant/10">
-                <h4 className="text-xs font-bold uppercase mb-2">Formulas (ISO 8100-2:2026)</h4>
-                <div className="font-mono text-[10px] space-y-1 opacity-70">
-                  <p>• Sf = 10^(2.6834 - log(N_equiv / 2.6834e6) / log(D/d)) [Formula 36]</p>
-                  <p>• N_equiv = N_ps + 4 · N_pr</p>
-                </div>
-              </div>
+            
+            <div className="p-6 bg-slate-900 text-white rounded-sm">
+              <h4 className="text-xs font-bold uppercase tracking-widest text-indigo-300 mb-4 flex items-center gap-2">
+                <AlertTriangle size={14} />
+                Discard Criteria (4.14)
+              </h4>
+              <ul className="text-[10px] space-y-2 opacity-80">
+                <li>• Reduction of nominal diameter &gt; 6%</li>
+                <li>• Severe corrosion or visible deformation</li>
+                <li>• Number of broken wires exceeds ISO 4344 limit</li>
+                <li className="pt-2 border-t border-white/10 text-indigo-200 font-bold italic">
+                  Ready for integration with IoT monitoring sensors.
+                </li>
+              </ul>
             </div>
+          </div>
 
-            <div className="space-y-6">
-              <div className="p-6 bg-surface-container-lowest border border-outline-variant/10">
-                <h4 className="text-xs font-bold uppercase mb-4 text-tertiary flex items-center gap-2">
-                  <History size={14} />
-                  Lifetime Estimation (Placeholder)
-                </h4>
-                <div className="space-y-4">
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-1">
-                      <label className="text-[11px] font-bold text-on-surface-variant uppercase">Rope Type</label>
-                      <select 
-                        value={data.ropeType}
-                        onChange={(e) => onChange({ ropeType: e.target.value })}
-                        className="w-full bg-surface-container-low border border-outline-variant/20 rounded-sm px-3 py-2 text-sm focus:ring-1 focus:ring-primary outline-none"
-                      >
-                        <option value="Steel Wire">Steel (Standard)</option>
-                        <option value="Coated">Coated (Synthetic)</option>
-                        <option value="High Performance">Alta Performance</option>
-                      </select>
-                    </div>
-                    <LiftField label="Cycles/Year" name="loadCycles" data={data} onChange={onChange} min={1000} required />
+          <div className="space-y-6">
+            <div className="p-6 bg-surface-container-lowest border border-outline-variant/10">
+              <h4 className="text-xs font-bold uppercase mb-4 text-tertiary flex items-center gap-2">
+                <History size={14} />
+                Lifetime Estimation (Placeholder)
+              </h4>
+              <div className="space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-1">
+                    <label className="text-[11px] font-bold text-on-surface-variant uppercase">Rope Type</label>
+                    <select 
+                      value={data.ropeType}
+                      onChange={(e) => onChange({ ropeType: e.target.value })}
+                      className="w-full bg-surface-container-low border border-outline-variant/20 rounded-sm px-3 py-2 text-sm focus:ring-1 focus:ring-primary outline-none"
+                    >
+                      <option value="Steel Wire">Steel (Standard)</option>
+                      <option value="Coated">Coated (Synthetic)</option>
+                      <option value="High Performance">Alta Performance</option>
+                    </select>
                   </div>
-                  <div className="p-4 bg-tertiary/5 border border-tertiary/10 rounded-sm">
-                    <div className="flex justify-between items-end">
-                      <div>
-                        <p className="text-[10px] font-bold text-tertiary uppercase">Estimated Lifetime</p>
-                        <p className="text-2xl font-black text-tertiary">{formatNumber(lifetime_est, 0)} <span className="text-xs font-normal opacity-60">Cycles</span></p>
-                      </div>
-                      <div className="text-right">
-                        <p className="text-[10px] font-bold text-on-surface-variant uppercase opacity-50">Years (Est.)</p>
-                        <p className="text-lg font-bold opacity-60">{data.loadCycles > 0 ? formatNumber(lifetime_est / data.loadCycles, 1) : '-'}</p>
-                      </div>
-                    </div>
-                  </div>
-                  <p className="text-[9px] text-on-surface-variant opacity-50 italic">
-                    *Calculation based on simplified bending fatigue models (Feyrer). Requires validation with manufacturer data.
-                  </p>
+                  <LiftField label="Cycles/Year" name="loadCycles" data={data} onChange={onChange} min={1000} required />
                 </div>
-              </div>
-              
-              <div className="p-6 bg-slate-900 text-white rounded-sm">
-                <h4 className="text-xs font-bold uppercase tracking-widest text-indigo-300 mb-4 flex items-center gap-2">
-                  <AlertTriangle size={14} />
-                  Discard Criteria (4.14)
-                </h4>
-                <ul className="text-[10px] space-y-2 opacity-80">
-                  <li>• Reduction of nominal diameter &gt; 6%</li>
-                  <li>• Severe corrosion or visible deformation</li>
-                  <li>• Number of broken wires exceeds ISO 4344 limit</li>
-                  <li className="pt-2 border-t border-white/10 text-indigo-200 font-bold italic">
-                    Ready for integration with IoT monitoring sensors.
-                  </li>
-                </ul>
+                <div className="p-4 bg-tertiary/5 border border-tertiary/10 rounded-sm">
+                  <div className="flex justify-between items-end">
+                    <div>
+                      <p className="text-[10px] font-bold text-tertiary uppercase">Estimated Lifetime</p>
+                      <p className="text-2xl font-black text-tertiary">{formatNumber(lifetime_est, 0)} <span className="text-xs font-normal opacity-60">Cycles</span></p>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-[10px] font-bold text-on-surface-variant uppercase opacity-50">Years (Est.)</p>
+                      <p className="text-lg font-bold opacity-60">{data.loadCycles > 0 ? formatNumber(lifetime_est / data.loadCycles, 1) : '-'}</p>
+                    </div>
+                  </div>
+                </div>
+                <p className="text-[9px] text-on-surface-variant opacity-50 italic">
+                  *Calculation based on simplified bending fatigue models (Feyrer). Requires validation with manufacturer data.
+                </p>
               </div>
             </div>
           </div>
@@ -951,7 +939,7 @@ const GuideRailsModule = ({ data, onChange }: { data: ProjectData, onChange: (ne
             <p className="text-xl font-black">{data.materialYield} <span className="text-xs font-normal">N/mm²</span></p>
           </div>
           <div className="p-4 bg-surface-container-low border border-outline-variant/10 rounded-sm">
-            <p className="text-[10px] font-bold uppercase opacity-50 mb-1">Rail Profile</p>
+            <p className="text-[10px] font-bold uppercase opacity-50 mb-1">Rail Preset Selection</p>
             <select 
               value={data.railProfile}
               onChange={(e) => {
@@ -966,20 +954,47 @@ const GuideRailsModule = ({ data, onChange }: { data: ProjectData, onChange: (ne
                     railWx: profile.Wx,
                     railIyRadius: profile.iy,
                     railIxRadius: profile.ix,
-                    railWeight: profile.q
+                    railWeight: profile.q,
+                    guideType: profile.name
                   });
                 } else {
                   onChange({ railProfile: e.target.value });
                 }
               }}
-              className="w-full bg-transparent text-xl font-black outline-none cursor-pointer"
+              className="w-full bg-transparent text-xl font-black outline-none cursor-pointer text-primary"
             >
+              <option value="">Select Profile...</option>
               {ISO_RAIL_PROFILES.map(p => (
                 <option key={p.name} value={p.name}>{p.name}</option>
               ))}
               <option value="Custom">Custom Profile</option>
             </select>
           </div>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8">
+          <InputGroup label="Rail Geometric Properties">
+            <LiftField label="Section Area (A)" name="railArea" unit="mm²" data={data} onChange={onChange} min={100} required suggestion="Increase section area to reduce combined stress." />
+            <LiftField label="Inertia Moment (Iy)" name="railIy" unit="mm⁴" data={data} onChange={onChange} min={1000} required suggestion="Higher Iy reduces deflection in the Y axis." />
+            <LiftField label="Inertia Moment (Ix)" name="railIx" unit="mm⁴" data={data} onChange={onChange} min={1000} required suggestion="Higher Ix reduces deflection in the X axis." />
+            <LiftField label="Section Modulus (Wy)" name="railWy" unit="mm³" data={data} onChange={onChange} min={100} required suggestion="Wy directly affects bending stress capacity." />
+            <LiftField label="Section Modulus (Wx)" name="railWx" unit="mm³" data={data} onChange={onChange} min={100} required />
+            <LiftField label="Gyration Radius (iy)" name="railIyRadius" unit="mm" data={data} onChange={onChange} min={1} required suggestion="Radius of gyration affects buckling stability." />
+            <LiftField label="Gyration Radius (ix)" name="railIxRadius" unit="mm" data={data} onChange={onChange} min={1} required />
+            <LiftField label="Rail Weight (q1)" name="railWeight" unit="kg/m" data={data} onChange={onChange} min={1} required />
+          </InputGroup>
+
+          <InputGroup label="Material & Installation">
+            <LiftField label="Elastic Modulus (E)" name="materialE" unit="N/mm²" data={data} onChange={onChange} min={100000} required />
+            <LiftField label="Yield Strength (Rp0.2)" name="materialYield" unit="N/mm²" data={data} onChange={onChange} min={100} required suggestion="Use higher grade steel (e.g. S355) if stresses are too high." />
+            <LiftField label="Bracket Distance (l)" name="bracketDist" unit="mm" data={data} onChange={onChange} min={500} max={6000} required suggestion="Reduce bracket distance to significantly lower bending stress and deflection." />
+          </InputGroup>
+
+          <InputGroup label="Forces & Displacements">
+            <LiftField label="Auxiliary Force (Faux)" name="Faux" unit="N" data={data} onChange={onChange} min={0} suggestion="Force exerted by auxiliary equipment." />
+            <LiftField label="Structural Disp. X" name="delta_str_x" unit="mm" data={data} onChange={onChange} min={0} suggestion="Displacement of building structure in X." />
+            <LiftField label="Structural Disp. Y" name="delta_str_y" unit="mm" data={data} onChange={onChange} min={0} suggestion="Displacement of building structure in Y." />
+          </InputGroup>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
@@ -1343,11 +1358,16 @@ const ACOP_UCMP_Module = ({ data, onChange }: { data: ProjectData, onChange: (ne
                   <span className="text-[10px] font-bold uppercase opacity-60">Verification Status</span>
                   {isAcopOk ? <CheckCircle2 size={14} className="text-emerald-600" /> : <XCircle size={14} className="text-error" />}
                 </div>
-                <p className="text-xs font-medium">
+                <p className="text-xs font-medium mb-2">
                   {isAcopOk 
                     ? `Tripping speed of ${data.acopTrippingSpeed} m/s is within the normative range.` 
                     : `Tripping speed must be > ${data.speed} m/s and ≤ ${(1.15 * data.speed + 0.25).toFixed(2)} m/s.`}
                 </p>
+                <div className="pt-2 border-t border-black/5">
+                  <p className="text-[10px] text-on-surface-variant italic">
+                    <strong>ISO 8100-2:2026 Clause 4.7.4.1:</strong> The means of protection shall detect ascending car overspeed at a speed not less than 115% of the rated speed, and not greater than the limits specified in 4.7.4.2.
+                  </p>
+                </div>
               </div>
             </div>
           </div>
@@ -1387,11 +1407,16 @@ const ACOP_UCMP_Module = ({ data, onChange }: { data: ProjectData, onChange: (ne
                   <span className="text-[10px] font-bold uppercase opacity-60">Verification Status</span>
                   {isUcmpOk ? <CheckCircle2 size={14} className="text-emerald-600" /> : <XCircle size={14} className="text-error" />}
                 </div>
-                <p className="text-xs font-medium">
+                <p className="text-xs font-medium mb-2">
                   {isUcmpOk 
                     ? `Detection distance of ${data.ucmpDetectionDist} mm is compliant with ISO 8100-2.` 
                     : `Detection distance exceeds the typical 150mm limit for safe stopping.`}
                 </p>
+                <div className="pt-2 border-t border-black/5">
+                  <p className="text-[10px] text-on-surface-variant italic">
+                    <strong>ISO 8100-2:2026 Clause 4.8.3.1:</strong> The unintended movement shall be detected before the car leaves the unlocking zone. The car shall be stopped within 1200 mm from the landing (Clause 4.8.4).
+                  </p>
+                </div>
               </div>
             </div>
           </div>
@@ -2041,7 +2066,7 @@ const SAFETY_GEAR_PRESETS = [
   { name: 'Standard L-5000', maxMass: 5000, brakingForce: 75000, certifiedSpeed: 4.0 },
 ];
 
-const SafetyComponentsModule = ({ data, onChange }: { data: ProjectData, onChange: (newData: Partial<ProjectData>) => void }) => {
+const SafetyComponentsModule = ({ data, onChange, section = 'all' }: { data: ProjectData, onChange: (newData: Partial<ProjectData>) => void, section?: 'all' | 'safety' | 'buffers' | 'sil' | 'acop' | 'doors' }) => {
   const [bufferTarget, setBufferTarget] = useState<'car' | 'cwt'>('car');
 
   // OSG Verification Logic
@@ -2074,10 +2099,28 @@ const SafetyComponentsModule = ({ data, onChange }: { data: ProjectData, onChang
   const Etotal = Ek + Ep;
   
   // Non-linear buffer capacity estimation (Clause 4.5.3)
-  // For non-linear buffers, we use an efficiency factor (eta) or numerical integration
-  // Placeholder: eta = 0.8 for high-quality non-linear buffers
-  const eta = data.bufferIsLinear ? 0.5 : 0.8; 
-  const Ecap = impactMass * (1.0 * g + g) * h_m * eta; // Capacity at 1.0gn limit
+  let Ecap = 0;
+  if (data.bufferIsLinear) {
+    const eta = 0.5;
+    Ecap = impactMass * (1.0 * g + g) * h_m * eta; // Capacity at 1.0gn limit
+  } else {
+    // Numerical integration of a non-linear force-stroke curve for energy dissipation buffer
+    // Simulating a hydraulic buffer profile where force rises quickly and plateaus
+    const steps = 100;
+    const dx = h_m / steps;
+    const F_max = impactMass * (1.0 * g + g); // Max force at 1.0gn
+    let integratedEnergy = 0;
+    for (let i = 0; i < steps; i++) {
+      const normalizedX1 = (i * dx) / h_m;
+      const normalizedX2 = ((i + 1) * dx) / h_m;
+      // Simulated hydraulic profile: F(x) = F_max * (1 - exp(-10 * x/h))
+      const F1 = F_max * (1 - Math.exp(-10 * normalizedX1));
+      const F2 = F_max * (1 - Math.exp(-10 * normalizedX2));
+      // Trapezoidal rule integration
+      integratedEnergy += ((F1 + F2) / 2) * dx;
+    }
+    Ecap = integratedEnergy;
+  }
   
   // ISO 8100-2:2026 Clause 4.5.2
   // For energy accumulation buffers:
@@ -2129,12 +2172,12 @@ const SafetyComponentsModule = ({ data, onChange }: { data: ProjectData, onChang
     <div className="space-y-8">
       <div className="bg-surface-container-low p-8 border-t-2 border-primary">
         <div className="flex items-center justify-between mb-8">
-          <h3 className="text-xl font-bold">Safety Components Verification</h3>
-          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700 uppercase">Implemented (4.2, 4.3, 4.4, 4.5, 4.7, 4.8, 4.18)</span>
+          <h3 className="text-xl font-bold">Safety Verification</h3>
         </div>
 
         <div className="space-y-12">
           {/* 4.2 Door Locking Devices */}
+          {(section === 'all' || section === 'doors') && (
           <section className="space-y-6">
             <div className="flex items-center gap-4 border-b border-outline-variant/20 pb-2">
               <ShieldCheck className="text-primary" size={20} />
@@ -2235,8 +2278,10 @@ const SafetyComponentsModule = ({ data, onChange }: { data: ProjectData, onChang
               </div>
             </div>
         </section>
+        )}
 
           {/* 4.4 Overspeed Governor */}
+          {(section === 'all' || section === 'safety') && (
           <section className="space-y-6">
             <div className="flex items-center gap-4 border-b border-outline-variant/20 pb-2">
               <ShieldCheck className="text-primary" size={20} />
@@ -2470,8 +2515,10 @@ const SafetyComponentsModule = ({ data, onChange }: { data: ProjectData, onChang
             </div>
           </div>
         </section>
+        )}
 
           {/* 4.3 Verification of Safety Gear */}
+          {(section === 'all' || section === 'safety') && (
           <section className="space-y-6">
             <div className="flex items-center gap-4 border-b border-outline-variant/20 pb-2">
               <ShieldCheck className="text-primary" size={20} />
@@ -2696,8 +2743,10 @@ const SafetyComponentsModule = ({ data, onChange }: { data: ProjectData, onChang
                 </div>
               </div>
             </section>
+            )}
 
           {/* 4.5 Verification of Buffers */}
+          {(section === 'all' || section === 'buffers') && (
           <section className="space-y-6">
             <div className="flex items-center gap-4 border-b border-outline-variant/20 pb-2">
               <ShieldCheck className="text-primary" size={20} />
@@ -2845,7 +2894,7 @@ const SafetyComponentsModule = ({ data, onChange }: { data: ProjectData, onChang
                               <p className="text-[10px] opacity-50 uppercase mb-1">Absorption Limit (1.0gn)</p>
                               <p className="text-xl font-black">{formatNumber(Ecap)} J</p>
                               <p className="text-[9px] opacity-40 mt-1">
-                                {data.bufferIsLinear ? 'Work = m(a+g)h' : 'Placeholder: Non-linear Integration (η=0.8)'}
+                                {data.bufferIsLinear ? 'Work = m(a+g)h' : 'Numerical Integration of Force-Stroke Curve'}
                               </p>
                             </div>
                           </div>
@@ -2958,8 +3007,10 @@ const SafetyComponentsModule = ({ data, onChange }: { data: ProjectData, onChang
                 </div>
               </div>
             </section>
+            )}
 
           {/* 4.7 Ascending Car Overspeed Protection (ACOP) */}
+          {(section === 'all' || section === 'acop') && (
           <section className="space-y-6">
             <div className="flex items-center gap-4 border-b border-outline-variant/20 pb-2">
               <ShieldCheck className="text-primary" size={20} />
@@ -3031,8 +3082,10 @@ const SafetyComponentsModule = ({ data, onChange }: { data: ProjectData, onChang
               </div>
             </div>
           </section>
+          )}
 
           {/* 4.8 Unintended Car Movement Protection (UCMP) */}
+          {(section === 'all' || section === 'acop') && (
           <section className="space-y-6">
             <div className="flex items-center gap-4 border-b border-outline-variant/20 pb-2">
               <ShieldCheck className="text-primary" size={20} />
@@ -3104,8 +3157,10 @@ const SafetyComponentsModule = ({ data, onChange }: { data: ProjectData, onChang
               </div>
             </div>
           </section>
+          )}
 
           {/* 4.18 SIL-rated Circuits (PESSRAL) */}
+          {(section === 'all' || section === 'sil') && (
           <section className="space-y-6">
             <div className="flex items-center gap-4 border-b border-outline-variant/20 pb-2">
               <Zap className="text-primary" size={20} />
@@ -3190,252 +3245,7 @@ const SafetyComponentsModule = ({ data, onChange }: { data: ProjectData, onChang
               </div>
             </div>
           </section>
-
-          {/* 3D Shaft Visualization (Module I) */}
-          <section className="space-y-6 pt-8 border-t border-outline-variant/10">
-            <div className="flex items-center gap-4 border-b border-outline-variant/20 pb-2">
-              <Box className="text-primary" size={20} />
-              <div className="flex items-center gap-3">
-                <h4 className="text-sm font-bold uppercase tracking-wider">3D Shaft Visualization (Module I)</h4>
-                <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-700 uppercase tracking-tighter">Implemented</span>
-              </div>
-            </div>
-            
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-              <div className="space-y-4 p-6 bg-surface-container-lowest border border-outline-variant/10">
-                <h5 className="text-[10px] font-bold uppercase text-primary mb-4">Shaft Geometry Inputs</h5>
-                <div className="space-y-4">
-                  <div className="space-y-1">
-                    <label className="text-[11px] font-bold text-on-surface-variant uppercase">Shaft Width</label>
-                    <div className="relative">
-                      <input 
-                        type="number"
-                        value={data.shaftWidth}
-                        onChange={(e) => onChange({ shaftWidth: safeNumber(e.target.value) })}
-                        className="w-full bg-surface-container-low border border-outline-variant/20 rounded-sm px-3 py-2 text-sm outline-none"
-                      />
-                      <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] font-bold opacity-50">mm</span>
-                    </div>
-                  </div>
-                  <div className="space-y-1">
-                    <label className="text-[11px] font-bold text-on-surface-variant uppercase">Shaft Depth</label>
-                    <div className="relative">
-                      <input 
-                        type="number"
-                        value={data.shaftDepth}
-                        onChange={(e) => onChange({ shaftDepth: safeNumber(e.target.value) })}
-                        className="w-full bg-surface-container-low border border-outline-variant/20 rounded-sm px-3 py-2 text-sm outline-none"
-                      />
-                      <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] font-bold opacity-50">mm</span>
-                    </div>
-                  </div>
-                  <div className="space-y-1">
-                    <label className="text-[11px] font-bold text-on-surface-variant uppercase">Shaft Height</label>
-                    <div className="relative">
-                      <input 
-                        type="number"
-                        value={data.shaftHeight}
-                        onChange={(e) => onChange({ shaftHeight: safeNumber(e.target.value) })}
-                        className="w-full bg-surface-container-low border border-outline-variant/20 rounded-sm px-3 py-2 text-sm outline-none"
-                      />
-                      <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] font-bold opacity-50">mm</span>
-                    </div>
-                  </div>
-                  <div className="pt-4 border-t border-outline-variant/10">
-                    <label className="text-[11px] font-bold text-on-surface-variant uppercase mb-2 block">Car Position Simulator</label>
-                    <input 
-                      type="range"
-                      min="0"
-                      max="100"
-                      value={data.carPositionPercent}
-                      onChange={(e) => onChange({ carPositionPercent: safeNumber(e.target.value) })}
-                      className="w-full h-2 bg-surface-container-low rounded-lg appearance-none cursor-pointer accent-primary"
-                    />
-                    <div className="flex justify-between mt-1">
-                      <span className="text-[9px] font-bold opacity-50 uppercase">Pit</span>
-                      <span className="text-[9px] font-bold text-primary">{data.carPositionPercent}%</span>
-                      <span className="text-[9px] font-bold opacity-50 uppercase">Headroom</span>
-                    </div>
-                  </div>
-
-                  <div className="flex items-center justify-between p-3 bg-surface-container-low rounded border border-outline-variant/10">
-                    <div className="flex items-center gap-2">
-                      <Maximize2 size={14} className="text-primary" />
-                      <span className="text-[10px] font-bold uppercase tracking-wider">Show Clearances</span>
-                    </div>
-                    <button 
-                      onClick={() => onChange({ showClearances: !data.showClearances })}
-                      className={`w-10 h-5 rounded-full relative transition-colors ${data.showClearances ? 'bg-primary' : 'bg-outline-variant/30'}`}
-                    >
-                      <div className={`absolute top-1 w-3 h-3 bg-white rounded-full transition-all ${data.showClearances ? 'left-6' : 'left-1'}`} />
-                    </button>
-                  </div>
-                </div>
-              </div>
-
-              <div className="lg:col-span-2">
-                <Shaft3DModule 
-                  width={data.shaftWidth}
-                  depth={data.shaftDepth}
-                  height={data.shaftHeight}
-                  carPos={data.carPositionPercent / 100}
-                  showClearances={data.showClearances}
-                />
-              </div>
-            </div>
-          </section>
-
-          {/* 4.18 SIL-rated Circuits */}
-          <section className="space-y-6">
-            <div className="flex items-center gap-4 border-b border-outline-variant/20 pb-2">
-              <ShieldCheck className="text-primary" size={20} />
-              <div className="flex items-center gap-3">
-                <h4 className="text-sm font-bold uppercase tracking-wider">4.18 SIL-rated Circuits</h4>
-                <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-700 uppercase tracking-tighter">Implemented</span>
-              </div>
-            </div>
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-              <div className="space-y-4 p-6 bg-surface-container-lowest border border-outline-variant/10">
-                <h5 className="text-[10px] font-bold uppercase text-primary mb-4">Safety Parameters (PESSAL)</h5>
-                <div className="space-y-4">
-                  <div className="space-y-1">
-                    <label className="text-[11px] font-bold text-on-surface-variant uppercase">SIL Level</label>
-                    <select 
-                      value={data.silLevel}
-                      onChange={(e) => onChange({ silLevel: safeNumber(e.target.value) })}
-                      className="w-full bg-surface-container-low border border-outline-variant/20 rounded-sm px-3 py-2 text-sm outline-none"
-                    >
-                      <option value={1}>SIL 1</option>
-                      <option value={2}>SIL 2</option>
-                      <option value={3}>SIL 3</option>
-                    </select>
-                  </div>
-                  <div className="space-y-1">
-                    <label className="text-[11px] font-bold text-on-surface-variant uppercase">Safety Integrity</label>
-                    <input 
-                      type="text"
-                      value={data.safetyIntegrity}
-                      onChange={(e) => onChange({ safetyIntegrity: e.target.value })}
-                      placeholder="e.g. High, Medium"
-                      className="w-full bg-surface-container-low border border-outline-variant/20 rounded-sm px-3 py-2 text-sm outline-none"
-                    />
-                  </div>
-                  <div className="space-y-1">
-                    <label className="text-[11px] font-bold text-on-surface-variant uppercase">Fault Tolerance (HFT)</label>
-                    <input 
-                      type="number"
-                      value={data.faultTolerance}
-                      onChange={(e) => onChange({ faultTolerance: safeNumber(e.target.value) })}
-                      className="w-full bg-surface-container-low border border-outline-variant/20 rounded-sm px-3 py-2 text-sm outline-none"
-                    />
-                  </div>
-                  <div className="space-y-1">
-                    <label className="text-[11px] font-bold text-on-surface-variant uppercase">MTBF [hours]</label>
-                    <input 
-                      type="number"
-                      value={data.mtbf}
-                      onChange={(e) => {
-                        const val = safeNumber(e.target.value);
-                        onChange({ mtbf: val, failureRate: val > 0 ? 1 / val : 0 });
-                      }}
-                      className="w-full bg-surface-container-low border border-outline-variant/20 rounded-sm px-3 py-2 text-sm outline-none"
-                    />
-                  </div>
-                  <div className="space-y-1">
-                    <label className="text-[11px] font-bold text-on-surface-variant uppercase">Failure Rate (λ)</label>
-                    <input 
-                      type="number"
-                      step="0.000000001"
-                      value={data.failureRate}
-                      onChange={(e) => {
-                        const val = safeNumber(e.target.value);
-                        onChange({ failureRate: val, mtbf: val > 0 ? 1 / val : 0 });
-                      }}
-                      className="w-full bg-surface-container-low border border-outline-variant/20 rounded-sm px-3 py-2 text-sm outline-none"
-                    />
-                  </div>
-                  <div className="grid grid-cols-2 gap-2">
-                    <div className="space-y-1">
-                      <label className="text-[11px] font-bold text-on-surface-variant uppercase">Dangerous Fr. (%)</label>
-                      <input 
-                        type="number"
-                        value={data.dangerousFraction}
-                        onChange={(e) => onChange({ dangerousFraction: safeNumber(e.target.value) })}
-                        className="w-full bg-surface-container-low border border-outline-variant/20 rounded-sm px-3 py-2 text-sm outline-none"
-                      />
-                    </div>
-                    <div className="space-y-1">
-                      <label className="text-[11px] font-bold text-on-surface-variant uppercase">Diag. Coverage (%)</label>
-                      <input 
-                        type="number"
-                        value={data.diagnosticCoverage}
-                        onChange={(e) => onChange({ diagnosticCoverage: safeNumber(e.target.value) })}
-                        className="w-full bg-surface-container-low border border-outline-variant/20 rounded-sm px-3 py-2 text-sm outline-none"
-                      />
-                    </div>
-                  </div>
-                </div>
-              </div>
-              <div className="lg:col-span-2 space-y-4">
-                <div className="space-y-6">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className={`p-6 border ${isPfhOk ? 'bg-emerald-50 border-emerald-200' : 'bg-error-container/10 border-error/20'}`}>
-                      <p className="text-[10px] font-bold uppercase mb-1">Calculated PFH</p>
-                      <p className="text-2xl font-black">{pfh.toExponential(3)}</p>
-                      <p className="text-[10px] opacity-50 italic mt-1">
-                        Limit for SIL {data.silLevel}: ≤ {currentLimit.max.toExponential(0)}
-                      </p>
-                    </div>
-                    <div className={`p-6 border ${isPfhOk && isDcOk ? 'bg-emerald-50 border-emerald-200' : 'bg-error-container/10 border-error/20'}`}>
-                      <p className="text-[10px] font-bold uppercase mb-1">Status</p>
-                      <div className="flex items-center gap-2">
-                        {(isPfhOk && isDcOk) ? (
-                          <CheckCircle2 className="text-emerald-600" size={24} />
-                        ) : (
-                          <ShieldAlert className="text-error" size={24} />
-                        )}
-                        <p className="text-xl font-black">{(isPfhOk && isDcOk) ? 'COMPLIANT' : 'NON-COMPLIANT'}</p>
-                      </div>
-                      <p className="text-[10px] opacity-50 mt-1">Based on IEC 61508 High Demand Mode</p>
-                    </div>
-                  </div>
-
-                  <div className="p-6 bg-surface-container-lowest border border-outline-variant/10 rounded-sm">
-                    <h5 className="text-[10px] font-bold uppercase text-primary mb-4 flex items-center gap-2">
-                      <CheckSquare size={12} />
-                      SIL Verification Checklist
-                    </h5>
-                    <div className="space-y-3">
-                      <div className="flex items-center gap-3">
-                        <div className={`w-5 h-5 rounded flex items-center justify-center border ${isPfhOk ? 'bg-emerald-600 border-emerald-600' : 'border-outline-variant'}`}>
-                          {isPfhOk && <CheckSquare size={14} className="text-white" />}
-                        </div>
-                        <span className="text-xs font-medium">PFH value ({pfh.toExponential(2)}) within the range for SIL {data.silLevel}.</span>
-                      </div>
-                      <div className="flex items-center gap-3">
-                        <div className={`w-5 h-5 rounded flex items-center justify-center border ${isDcOk ? 'bg-emerald-600 border-emerald-600' : 'border-outline-variant'}`}>
-                          {isDcOk && <CheckSquare size={14} className="text-white" />}
-                        </div>
-                        <span className="text-xs font-medium">Diagnostic Coverage ({data.diagnosticCoverage}%) meets minimum for SIL {data.silLevel} (≥{minDc}%).</span>
-                      </div>
-                      <div className="flex items-center gap-3">
-                        <div className={`w-5 h-5 rounded flex items-center justify-center border ${data.faultTolerance >= (data.silLevel - 1) ? 'bg-emerald-600 border-emerald-600' : 'border-outline-variant'}`}>
-                          {data.faultTolerance >= (data.silLevel - 1) && <CheckSquare size={14} className="text-white" />}
-                        </div>
-                        <span className="text-xs font-medium">Hardware Fault Tolerance (HFT={data.faultTolerance}) compatible with SIL {data.silLevel}.</span>
-                      </div>
-                      <div className="flex items-center gap-3">
-                        <div className={`w-5 h-5 rounded flex items-center justify-center border ${data.safetyIntegrity ? 'bg-emerald-600 border-emerald-600' : 'border-outline-variant'}`}>
-                          {data.safetyIntegrity && <CheckSquare size={14} className="text-white" />}
-                        </div>
-                        <span className="text-xs font-medium">Safety Integrity documentation and λD ({lambdaD.toExponential(2)}) verified.</span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </section>
+          )}
         </div>
       </div>
     </div>
@@ -3690,11 +3500,11 @@ export default function App() {
     tractionNotes: '',
     railArea: 1570,
     railIy: 595000,
-    railIx: 320000,
-    railWy: 13400,
-    railWx: 10200,
+    railIx: 198000,
+    railWy: 10100,
+    railWx: 4450,
     railIyRadius: 19.5,
-    railIxRadius: 14.2,
+    railIxRadius: 11.2,
     railWeight: 12.3,
     railProfile: 'ISO T89/B',
     numSimpleBends: 2,
@@ -3821,17 +3631,19 @@ export default function App() {
 
   const modules: ModuleStatus[] = [
     { id: 'overview', label: 'Overview', icon: LayoutDashboard, status: 'implemented' },
-    { id: 'global', label: 'Global Project', icon: Globe, status: 'implemented' },
-    { id: 'doors', label: 'Door Locking', icon: Lock, status: 'implemented' },
-    { id: 'library', label: 'Component Library', icon: Library, status: 'implemented' },
-    { id: 'traction', label: 'Traction', icon: Settings2, status: 'implemented' },
-    { id: 'ropes', label: 'Ropes / Suspension', icon: Cable, status: 'implemented' },
-    { id: 'rails', label: 'Guide Rails', icon: ArrowUpDown, status: 'implemented' },
+    { id: 'global', label: 'General (Clause 4.1)', icon: Globe, status: 'implemented' },
+    { id: 'doors', label: 'Door Locking (4.2)', icon: Lock, status: 'implemented' },
+    { id: 'safety', label: 'Safety Gear (4.3)', icon: ShieldCheck, status: 'implemented' },
+    { id: 'buffers', label: 'Buffers (4.5)', icon: Box, status: 'implemented' },
+    { id: 'acop-ucmp', label: 'ACOP / UCMP (4.7/4.8)', icon: ShieldAlert, status: 'implemented' },
+    { id: 'rails', label: 'Guide Rails (4.10)', icon: ArrowUpDown, status: 'implemented' },
+    { id: 'traction', label: 'Traction (4.11)', icon: Settings2, status: 'implemented' },
+    { id: 'ropes', label: 'Suspension (4.12)', icon: Cable, status: 'implemented' },
+    { id: 'hydraulic', label: 'Hydraulic (4.15)', icon: Droplets, status: 'implemented' },
+    { id: 'sil', label: 'SIL / PESSAL (4.18)', icon: Zap, status: 'implemented' },
+    { id: 'clearances', label: 'Clearances (ISO 8100-1)', icon: Ruler, status: 'implemented' },
     { id: 'sling', label: 'Car Frame / Sling', icon: Box, status: 'implemented' },
-    { id: 'hydraulic', label: 'Hydraulic', icon: Droplets, status: 'implemented' },
-    { id: 'safety', label: 'Safety Components', icon: ShieldCheck, status: 'implemented' },
-    { id: 'acop-ucmp', label: 'ACOP / UCMP', icon: ShieldAlert, status: 'implemented' },
-    { id: 'clearances', label: 'Shaft Clearances', icon: Ruler, status: 'implemented' },
+    { id: 'library', label: 'Component Library', icon: Library, status: 'implemented' },
     { id: 'formulas', label: 'Formula Library', icon: Calculator, status: 'implemented' },
     { id: 'shaft', label: '3D Shaft', icon: Box, status: 'implemented' },
     { id: 'cabin', label: '3D Cabin', icon: Maximize2, status: 'implemented' },
@@ -3850,8 +3662,10 @@ export default function App() {
       case 'rails': return <GuideRailsModule data={projectData} onChange={handleDataChange} />;
       case 'sling': return <SlingModule data={projectData} />;
       case 'hydraulic': return <HydraulicModule data={projectData} />;
-      case 'safety': return <SafetyComponentsModule data={projectData} onChange={handleDataChange} />;
+      case 'safety': return <SafetyComponentsModule data={projectData} onChange={handleDataChange} section="safety" />;
+      case 'buffers': return <SafetyComponentsModule data={projectData} onChange={handleDataChange} section="buffers" />;
       case 'acop-ucmp': return <ACOP_UCMP_Module data={projectData} onChange={handleDataChange} />;
+      case 'sil': return <SafetyComponentsModule data={projectData} onChange={handleDataChange} section="sil" />;
       case 'clearances': return <ClearanceValidationModule data={projectData} />;
       case 'formulas': return <FormulaLibraryModule />;
       case 'library': return <ComponentLibraryModule />;

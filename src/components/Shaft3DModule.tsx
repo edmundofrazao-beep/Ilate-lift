@@ -1,11 +1,11 @@
-import React, { useRef, useMemo, useState, useEffect } from 'react';
+import React, { useRef, useMemo, useState, useEffect, Suspense } from 'react';
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
-import { OrbitControls, PerspectiveCamera, Grid, Text, Box, Cylinder, RoundedBox, Html, Environment } from '@react-three/drei';
+import { OrbitControls, PerspectiveCamera, Grid, Box, Cylinder, RoundedBox, Html } from '@react-three/drei';
 import * as THREE from 'three';
 import { Maximize2, Minimize2, Move, ZoomIn, ZoomOut, RotateCcw, Download } from 'lucide-react';
 import { downloadFile } from '../lib/exporters';
 // @ts-ignore
-import { OBJExporter } from 'three/examples/jsm/exporters/OBJExporter';
+import { OBJExporter } from 'three/addons/exporters/OBJExporter.js';
 
 interface Shaft3DProps {
   width: number;
@@ -93,7 +93,6 @@ const ShaftStructure = ({ width, depth, height, pitDepth = 1.5 }: { width: numbe
             <planeGeometry args={[width * 0.6, 2.1]} />
             <meshStandardMaterial color="#f1f5f9" transparent opacity={0.3} side={THREE.DoubleSide} />
           </mesh>
-          <Text position={[0, 1.2, 0.01]} fontSize={0.2} color="white">Floor {i}</Text>
         </group>
       ))}
     </group>
@@ -218,128 +217,114 @@ export const Shaft3DModule: React.FC<Shaft3DProps> = ({
       </div>
 
       <Canvas shadows key={resetKey}>
-        <SceneExporter onExport={(s) => sceneRef.current = s} />
-        <PerspectiveCamera makeDefault position={[w * 2, h / 2, d * 3]} fov={45} />
-        <OrbitControls target={[0, h / 2, 0]} makeDefault />
-        
-        <ambientLight intensity={1.5} />
-        <pointLight position={[w, h, d]} intensity={2} castShadow />
-        <pointLight position={[-w, 0, -d]} intensity={2} castShadow />
-        <directionalLight position={[10, 20, 10]} intensity={1.5} castShadow />
-        <hemisphereLight intensity={1} groundColor="#222222" />
-        <Environment preset="city" />
+        <Suspense fallback={<Html center><div className="text-white text-xs font-bold uppercase tracking-widest">Loading 3D...</div></Html>}>
+          <SceneExporter onExport={(s) => sceneRef.current = s} />
+          <PerspectiveCamera makeDefault position={[w * 2, h / 2, d * 3]} fov={45} />
+          <OrbitControls target={[0, h / 2, 0]} makeDefault />
+          
+          <ambientLight intensity={1.5} />
+          <pointLight position={[w, h, d]} intensity={2} castShadow />
+          <pointLight position={[-w, 0, -d]} intensity={2} castShadow />
+          <directionalLight position={[10, 20, 10]} intensity={1.5} castShadow />
+          <hemisphereLight intensity={1} groundColor="#222222" />
 
-        <group>
-          <ShaftStructure width={w} depth={d} height={h} pitDepth={pD} />
-          <GuideRails shaftHeight={h} shaftWidth={w} shaftDepth={d} />
-          <ElevatorCar width={carWidth} depth={carDepth} height={carHeight} position={[0, carY, 0]} />
-          
-          {/* Buffers */}
-          <Buffer position={[-w/4, -pD + 0.15, 0]} />
-          <Buffer position={[w/4, -pD + 0.15, 0]} />
-          
-          {/* Counterweight */}
-          <group position={[0, h - carY, -d / 2 + 0.15]}>
-            <Box args={[w * 0.7, 1.8, 0.15]}>
-              <meshStandardMaterial color="#ef4444" metalness={0.5} />
-            </Box>
-            <mesh position={[0, 1.0, 0]}>
-              <boxGeometry args={[w * 0.75, 0.1, 0.2]} />
-              <meshStandardMaterial color="#1e293b" />
-            </mesh>
+          <group>
+            <ShaftStructure width={w} depth={d} height={h} pitDepth={pD} />
+            <GuideRails shaftHeight={h} shaftWidth={w} shaftDepth={d} />
+            <ElevatorCar width={carWidth} depth={carDepth} height={carHeight} position={[0, carY, 0]} />
+            
+            {/* Buffers */}
+            <Buffer position={[-w/4, -pD + 0.15, 0]} />
+            <Buffer position={[w/4, -pD + 0.15, 0]} />
+            
+            {/* Counterweight */}
+            <group position={[0, h - carY, -d / 2 + 0.15]}>
+              <Box args={[w * 0.7, 1.8, 0.15]}>
+                <meshStandardMaterial color="#ef4444" metalness={0.5} />
+              </Box>
+              <mesh position={[0, 1.0, 0]}>
+                <boxGeometry args={[w * 0.75, 0.1, 0.2]} />
+                <meshStandardMaterial color="#1e293b" />
+              </mesh>
+            </group>
+
+            {/* Clearance Visualizers (ISO 8100-1) */}
+            {showClearances && (
+              <group>
+                {/* Headroom Zone - Visible when car is high */}
+                {carPos > 0.8 && (
+                  <group 
+                    position={[0, h + headroomGeneral / 2, 0]}
+                    onPointerOver={(e) => { e.stopPropagation(); setHoveredZone('headroom'); }}
+                    onPointerOut={() => setHoveredZone(null)}
+                  >
+                    <Box args={[w, headroomGeneral, d]}>
+                      <meshStandardMaterial color={hoveredZone === 'headroom' ? "#f87171" : "#ef4444"} transparent opacity={hoveredZone === 'headroom' ? 0.4 : 0.2} />
+                    </Box>
+                  </group>
+                )}
+
+                {/* Pit Refuge Zone - Visible when car is low */}
+                {carPos < 0.2 && (
+                  <group 
+                    position={[0, -pD + pitRefugeHeight / 2, 0]}
+                    onPointerOver={(e) => { e.stopPropagation(); setHoveredZone('pit'); }}
+                    onPointerOut={() => setHoveredZone(null)}
+                  >
+                    <Box args={[w * 0.8, pitRefugeHeight, d * 0.8]}>
+                      <meshStandardMaterial color={hoveredZone === 'pit' ? "#34d399" : "#10b981"} transparent opacity={hoveredZone === 'pit' ? 0.4 : 0.2} />
+                    </Box>
+                  </group>
+                )}
+
+                {/* Wall Clearance */}
+                <group 
+                  position={[-w / 2 + wellToCarWall / 2, carY, 0]}
+                  onPointerOver={(e) => { e.stopPropagation(); setHoveredZone('wall'); }}
+                  onPointerOut={() => setHoveredZone(null)}
+                >
+                  <Box args={[wellToCarWall, carHeight, d]}>
+                    <meshStandardMaterial color={hoveredZone === 'wall' ? "#60a5fa" : "#3b82f6"} transparent opacity={hoveredZone === 'wall' ? 0.4 : 0.2} />
+                  </Box>
+                </group>
+
+                {/* Sill Gap */}
+                <group 
+                  position={[0, carY - carHeight / 2, d / 2 + sillGap / 2]}
+                  onPointerOver={(e) => { e.stopPropagation(); setHoveredZone('sill'); }}
+                  onPointerOut={() => setHoveredZone(null)}
+                >
+                  <Box args={[w * 0.6, 0.05, sillGap]}>
+                    <meshStandardMaterial color={hoveredZone === 'sill' ? "#fbbf24" : "#f59e0b"} transparent opacity={hoveredZone === 'sill' ? 0.6 : 0.4} />
+                  </Box>
+                </group>
+
+                {/* Car to Counterweight Clearance */}
+                <group 
+                  position={[0, carY, -d / 2 + 0.3 + carToCwtDistance / 2]}
+                  onPointerOver={(e) => { e.stopPropagation(); setHoveredZone('cwt'); }}
+                  onPointerOut={() => setHoveredZone(null)}
+                >
+                  <Box args={[w * 0.7, carHeight, carToCwtDistance]}>
+                    <meshStandardMaterial color={hoveredZone === 'cwt' ? "#a78bfa" : "#8b5cf6"} transparent opacity={hoveredZone === 'cwt' ? 0.4 : 0.2} />
+                  </Box>
+                </group>
+              </group>
+            )}
           </group>
 
-          {/* Clearance Visualizers (ISO 8100-1) */}
-          {showClearances && (
-            <group>
-              {/* Headroom Zone - Visible when car is high */}
-              {carPos > 0.8 && (
-                <group 
-                  position={[0, h + headroomGeneral / 2, 0]}
-                  onPointerOver={(e) => { e.stopPropagation(); setHoveredZone('headroom'); }}
-                  onPointerOut={() => setHoveredZone(null)}
-                >
-                  <Box args={[w, headroomGeneral, d]}>
-                    <meshStandardMaterial color={hoveredZone === 'headroom' ? "#f87171" : "#ef4444"} transparent opacity={hoveredZone === 'headroom' ? 0.4 : 0.2} />
-                  </Box>
-                  <Text position={[0, headroomGeneral / 2 + 0.1, 0]} fontSize={0.15} color="#ef4444" font="/fonts/Inter-Bold.woff">
-                    Headroom: {(headroomGeneral * 1000).toFixed(0)}mm
-                  </Text>
-                </group>
-              )}
-
-              {/* Pit Refuge Zone - Visible when car is low */}
-              {carPos < 0.2 && (
-                <group 
-                  position={[0, -pD + pitRefugeHeight / 2, 0]}
-                  onPointerOver={(e) => { e.stopPropagation(); setHoveredZone('pit'); }}
-                  onPointerOut={() => setHoveredZone(null)}
-                >
-                  <Box args={[w * 0.8, pitRefugeHeight, d * 0.8]}>
-                    <meshStandardMaterial color={hoveredZone === 'pit' ? "#34d399" : "#10b981"} transparent opacity={hoveredZone === 'pit' ? 0.4 : 0.2} />
-                  </Box>
-                  <Text position={[0, pitRefugeHeight / 2 + 0.1, 0]} fontSize={0.15} color="#10b981" font="/fonts/Inter-Bold.woff">
-                    Pit Refuge: {(pitRefugeHeight * 1000).toFixed(0)}mm
-                  </Text>
-                </group>
-              )}
-
-              {/* Wall Clearance */}
-              <group 
-                position={[-w / 2 + wellToCarWall / 2, carY, 0]}
-                onPointerOver={(e) => { e.stopPropagation(); setHoveredZone('wall'); }}
-                onPointerOut={() => setHoveredZone(null)}
-              >
-                <Box args={[wellToCarWall, carHeight, d]}>
-                  <meshStandardMaterial color={hoveredZone === 'wall' ? "#60a5fa" : "#3b82f6"} transparent opacity={hoveredZone === 'wall' ? 0.4 : 0.2} />
-                </Box>
-                <Text position={[0, carHeight / 2 + 0.2, 0]} fontSize={0.1} color="#3b82f6" rotation={[0, Math.PI / 2, 0]}>
-                  Wall Gap: {(wellToCarWall * 1000).toFixed(0)}mm
-                </Text>
-              </group>
-
-              {/* Sill Gap */}
-              <group 
-                position={[0, carY - carHeight / 2, d / 2 + sillGap / 2]}
-                onPointerOver={(e) => { e.stopPropagation(); setHoveredZone('sill'); }}
-                onPointerOut={() => setHoveredZone(null)}
-              >
-                <Box args={[w * 0.6, 0.05, sillGap]}>
-                  <meshStandardMaterial color={hoveredZone === 'sill' ? "#fbbf24" : "#f59e0b"} transparent opacity={hoveredZone === 'sill' ? 0.6 : 0.4} />
-                </Box>
-                <Text position={[0, 0.15, sillGap / 2]} fontSize={0.08} color="#f59e0b" font="/fonts/Inter-Bold.woff">
-                  Sill Gap: {(sillGap * 1000).toFixed(0)}mm
-                </Text>
-              </group>
-
-              {/* Car to Counterweight Clearance */}
-              <group 
-                position={[0, carY, -d / 2 + 0.3 + carToCwtDistance / 2]}
-                onPointerOver={(e) => { e.stopPropagation(); setHoveredZone('cwt'); }}
-                onPointerOut={() => setHoveredZone(null)}
-              >
-                <Box args={[w * 0.7, carHeight, carToCwtDistance]}>
-                  <meshStandardMaterial color={hoveredZone === 'cwt' ? "#a78bfa" : "#8b5cf6"} transparent opacity={hoveredZone === 'cwt' ? 0.4 : 0.2} />
-                </Box>
-                <Text position={[0, carHeight / 2 + 0.1, 0]} fontSize={0.1} color="#8b5cf6">
-                  Car-CWT Gap: {(carToCwtDistance * 1000).toFixed(0)}mm
-                </Text>
-              </group>
-            </group>
-          )}
-        </group>
-
-        <Grid 
-          infiniteGrid 
-          fadeDistance={30} 
-          fadeStrength={3} 
-          cellSize={0.5} 
-          sectionSize={2.5} 
-          sectionColor="#334155" 
-          cellColor="#0f172a" 
-        />
-        
-        <CameraControls onReset={() => setResetKey(prev => prev + 1)} />
+          <Grid 
+            infiniteGrid 
+            fadeDistance={30} 
+            fadeStrength={3} 
+            cellSize={0.5} 
+            sectionSize={2.5} 
+            sectionColor="#334155" 
+            cellColor="#0f172a" 
+          />
+          
+          <CameraControls onReset={() => setResetKey(prev => prev + 1)} />
+        </Suspense>
       </Canvas>
 
       <div className="absolute bottom-4 right-4 z-10 flex flex-col items-end gap-2">

@@ -1,11 +1,11 @@
-import React, { useRef, useState, useEffect } from 'react';
+import React, { useRef, useState, useEffect, Suspense } from 'react';
 import { Canvas, useThree } from '@react-three/fiber';
-import { OrbitControls, PerspectiveCamera, RoundedBox, Text, Html, Box, Environment } from '@react-three/drei';
+import { OrbitControls, PerspectiveCamera, RoundedBox, Html, Box } from '@react-three/drei';
 import * as THREE from 'three';
 import { Accessibility, Shield, Zap, Info, Download } from 'lucide-react';
 import { downloadFile } from '../lib/exporters';
 // @ts-ignore
-import { OBJExporter } from 'three/examples/jsm/exporters/OBJExporter';
+import { OBJExporter } from 'three/addons/exporters/OBJExporter.js';
 
 interface Cabin3DProps {
   width: number;
@@ -124,104 +124,105 @@ export const Cabin3DModule: React.FC<Cabin3DProps> = ({
       </div>
 
       <Canvas shadows>
-        <SceneExporter onExport={(s) => sceneRef.current = s} />
-        <PerspectiveCamera makeDefault position={[2, 2, 3]} fov={45} />
-        <OrbitControls target={[0, 1, 0]} />
-        
-        <ambientLight intensity={1.5} />
-        <pointLight position={[2, 3, 2]} intensity={2} castShadow />
-        <spotLight position={[-2, 4, 2]} angle={0.3} penumbra={1} intensity={2} castShadow />
-        <Environment preset="city" />
+        <Suspense fallback={<Html center><div className="text-white text-xs font-bold uppercase tracking-widest">Loading 3D...</div></Html>}>
+          <SceneExporter onExport={(s) => sceneRef.current = s} />
+          <PerspectiveCamera makeDefault position={[2, 2, 3]} fov={45} />
+          <OrbitControls target={[0, 1, 0]} />
+          
+          <ambientLight intensity={1.5} />
+          <pointLight position={[2, 3, 2]} intensity={2} castShadow />
+          <spotLight position={[-2, 4, 2]} angle={0.3} penumbra={1} intensity={2} castShadow />
 
-        <group>
-          {/* Cabin Floor */}
-          <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0, 0]} receiveShadow>
-            <planeGeometry args={[width, depth]} />
-            <meshStandardMaterial color="#334155" roughness={0.8} />
-          </mesh>
-
-          {/* Cabin Walls */}
-          {/* Back Wall */}
-          <mesh position={[0, height / 2, -depth / 2]}>
-            <boxGeometry args={[width, height, 0.05]} />
-            <meshStandardMaterial color="#e2e8f0" metalness={0.1} />
-          </mesh>
-          {/* Left Wall */}
-          <mesh position={[-width / 2, height / 2, 0]} rotation={[0, Math.PI / 2, 0]}>
-            <boxGeometry args={[depth, height, 0.05]} />
-            <meshStandardMaterial color="#e2e8f0" metalness={0.1} />
-          </mesh>
-          {/* Right Wall */}
-          <mesh position={[width / 2, height / 2, 0]} rotation={[0, -Math.PI / 2, 0]}>
-            <boxGeometry args={[depth, height, 0.05]} />
-            <meshStandardMaterial color="#e2e8f0" metalness={0.1} />
-          </mesh>
-          {/* Ceiling */}
-          <mesh position={[0, height, 0]} rotation={[Math.PI / 2, 0, 0]}>
-            <planeGeometry args={[width, depth]} />
-            <meshStandardMaterial color="#f8fafc" emissive="#fff" emissiveIntensity={0.1} />
-          </mesh>
-
-          {/* Mirror (EN 81-70) */}
-          {showAccessibility && (
-            <mesh 
-              position={[0, height * 0.7, -depth / 2 + 0.03]}
-              onPointerOver={() => setHoveredFeature('Mirror')}
-              onPointerOut={() => setHoveredFeature(null)}
-            >
-              <planeGeometry args={[width * 0.8, height * 0.4]} />
-              <meshStandardMaterial color="#cbd5e1" metalness={1} roughness={0} />
+          <group>
+            {/* Cabin Floor */}
+            <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0, 0]} receiveShadow>
+              <planeGeometry args={[width, depth]} />
+              <meshStandardMaterial color="#334155" roughness={0.8} />
             </mesh>
-          )}
 
-          {/* Handrail (EN 81-70) */}
-          {showAccessibility && (
-            <Handrail 
-              position={[-width / 2 + 0.08, 0.9, 0]} 
-              width={depth * 0.8} 
-            />
-          )}
-
-          {/* Control Panel (EN 81-70) */}
-          {showAccessibility && (
-            <group
-              onPointerOver={() => setHoveredFeature('Control Panel')}
-              onPointerOut={() => setHoveredFeature(null)}
-            >
-              <ControlPanel position={[width / 2 - 0.02, 1.1, depth / 4]} />
-            </group>
-          )}
-
-          {/* IoT Gateway (ISO 8100-20) */}
-          {showCybersecurity && (
-            <mesh 
-              position={[0, height - 0.1, depth / 2 - 0.1]}
-              onPointerOver={() => setHoveredFeature('IoT Gateway')}
-              onPointerOut={() => setHoveredFeature(null)}
-            >
-              <boxGeometry args={[0.2, 0.05, 0.1]} />
-              <meshStandardMaterial color="#1e293b" />
-              <pointLight color="#0ea5e9" intensity={0.5} distance={0.5} />
+            {/* Cabin Walls */}
+            {/* Back Wall */}
+            <mesh position={[0, height / 2, -depth / 2]}>
+              <boxGeometry args={[width, height, 0.05]} />
+              <meshStandardMaterial color="#e2e8f0" metalness={0.1} />
             </mesh>
-          )}
+            {/* Left Wall */}
+            <mesh position={[-width / 2, height / 2, 0]} rotation={[0, Math.PI / 2, 0]}>
+              <boxGeometry args={[depth, height, 0.05]} />
+              <meshStandardMaterial color="#e2e8f0" metalness={0.1} />
+            </mesh>
+            {/* Right Wall */}
+            <mesh position={[width / 2, height / 2, 0]} rotation={[0, -Math.PI / 2, 0]}>
+              <boxGeometry args={[depth, height, 0.05]} />
+              <meshStandardMaterial color="#e2e8f0" metalness={0.1} />
+            </mesh>
+            {/* Ceiling */}
+            <mesh position={[0, height, 0]} rotation={[Math.PI / 2, 0, 0]}>
+              <planeGeometry args={[width, depth]} />
+              <meshStandardMaterial color="#f8fafc" emissive="#fff" emissiveIntensity={0.1} />
+            </mesh>
 
-          {/* Seismic Snags (EN 81-77) */}
-          {showSeismic && (
-            <group
-              onPointerOver={() => setHoveredFeature('Seismic Snags')}
-              onPointerOut={() => setHoveredFeature(null)}
-            >
-              <mesh position={[-width / 2 - 0.05, 0.1, 0]}>
-                <boxGeometry args={[0.1, 0.02, 0.2]} />
-                <meshStandardMaterial color="#ef4444" />
+            {/* Mirror (EN 81-70) */}
+            {showAccessibility && (
+              <mesh 
+                position={[0, height * 0.7, -depth / 2 + 0.03]}
+                onPointerOver={() => setHoveredFeature('Mirror')}
+                onPointerOut={() => setHoveredFeature(null)}
+              >
+                <planeGeometry args={[width * 0.8, height * 0.4]} />
+                <meshStandardMaterial color="#cbd5e1" metalness={1} roughness={0} />
               </mesh>
-              <mesh position={[width / 2 + 0.05, 0.1, 0]}>
-                <boxGeometry args={[0.1, 0.02, 0.2]} />
-                <meshStandardMaterial color="#ef4444" />
+            )}
+
+            {/* Handrail (EN 81-70) */}
+            {showAccessibility && (
+              <Handrail 
+                position={[-width / 2 + 0.08, 0.9, 0]} 
+                width={depth * 0.8} 
+              />
+            )}
+
+            {/* Control Panel (EN 81-70) */}
+            {showAccessibility && (
+              <group
+                onPointerOver={() => setHoveredFeature('Control Panel')}
+                onPointerOut={() => setHoveredFeature(null)}
+              >
+                <ControlPanel position={[width / 2 - 0.02, 1.1, depth / 4]} />
+              </group>
+            )}
+
+            {/* IoT Gateway (ISO 8100-20) */}
+            {showCybersecurity && (
+              <mesh 
+                position={[0, height - 0.1, depth / 2 - 0.1]}
+                onPointerOver={() => setHoveredFeature('IoT Gateway')}
+                onPointerOut={() => setHoveredFeature(null)}
+              >
+                <boxGeometry args={[0.2, 0.05, 0.1]} />
+                <meshStandardMaterial color="#1e293b" />
+                <pointLight color="#0ea5e9" intensity={0.5} distance={0.5} />
               </mesh>
-            </group>
-          )}
-        </group>
+            )}
+
+            {/* Seismic Snags (EN 81-77) */}
+            {showSeismic && (
+              <group
+                onPointerOver={() => setHoveredFeature('Seismic Snags')}
+                onPointerOut={() => setHoveredFeature(null)}
+              >
+                <mesh position={[-width / 2 - 0.05, 0.1, 0]}>
+                  <boxGeometry args={[0.1, 0.02, 0.2]} />
+                  <meshStandardMaterial color="#ef4444" />
+                </mesh>
+                <mesh position={[width / 2 + 0.05, 0.1, 0]}>
+                  <boxGeometry args={[0.1, 0.02, 0.2]} />
+                  <meshStandardMaterial color="#ef4444" />
+                </mesh>
+              </group>
+            )}
+          </group>
+        </Suspense>
       </Canvas>
 
       <div className="absolute bottom-4 right-4 z-10 flex flex-col items-end gap-2">
