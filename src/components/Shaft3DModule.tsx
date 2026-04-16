@@ -1,8 +1,11 @@
-import React, { useRef, useMemo, useState } from 'react';
+import React, { useRef, useMemo, useState, useEffect } from 'react';
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
-import { OrbitControls, PerspectiveCamera, Grid, Text, Box, Cylinder, RoundedBox, Html } from '@react-three/drei';
+import { OrbitControls, PerspectiveCamera, Grid, Text, Box, Cylinder, RoundedBox, Html, Environment } from '@react-three/drei';
 import * as THREE from 'three';
-import { Maximize2, Minimize2, Move, ZoomIn, ZoomOut, RotateCcw } from 'lucide-react';
+import { Maximize2, Minimize2, Move, ZoomIn, ZoomOut, RotateCcw, Download } from 'lucide-react';
+import { downloadFile } from '../lib/exporters';
+// @ts-ignore
+import { OBJExporter } from 'three/examples/jsm/exporters/OBJExporter';
 
 interface Shaft3DProps {
   width: number;
@@ -117,6 +120,14 @@ const CameraControls = ({ onReset }: { onReset: () => void }) => {
   );
 };
 
+const SceneExporter = ({ onExport }: { onExport: (scene: THREE.Scene) => void }) => {
+  const { scene } = useThree();
+  useEffect(() => {
+    onExport(scene);
+  }, [scene, onExport]);
+  return null;
+};
+
 export const Shaft3DModule: React.FC<Shaft3DProps> = ({ 
   width, 
   depth, 
@@ -136,6 +147,14 @@ export const Shaft3DModule: React.FC<Shaft3DProps> = ({
 }) => {
   const [resetKey, setResetKey] = useState(0);
   const [hoveredZone, setHoveredZone] = useState<string | null>(null);
+  const sceneRef = useRef<THREE.Scene | null>(null);
+  
+  const handleExport = () => {
+    if (!sceneRef.current) return;
+    const exporter = new OBJExporter();
+    const result = exporter.parse(sceneRef.current);
+    downloadFile(result, 'elevator_shaft.obj', 'text/plain');
+  };
   
   // Convert mm to meters
   const w = width / 1000;
@@ -188,16 +207,27 @@ export const Shaft3DModule: React.FC<Shaft3DProps> = ({
             </div>
           </div>
         )}
+
+        <button
+          onClick={handleExport}
+          className="bg-primary hover:bg-primary/90 text-white px-3 py-2 rounded-sm text-[10px] font-bold uppercase tracking-widest flex items-center gap-2 shadow-lg transition-all"
+        >
+          <Download size={12} />
+          Export OBJ
+        </button>
       </div>
 
       <Canvas shadows key={resetKey}>
+        <SceneExporter onExport={(s) => sceneRef.current = s} />
         <PerspectiveCamera makeDefault position={[w * 2, h / 2, d * 3]} fov={45} />
         <OrbitControls target={[0, h / 2, 0]} makeDefault />
         
-        <ambientLight intensity={0.4} />
-        <pointLight position={[10, 10, 10]} intensity={1.5} castShadow />
-        <spotLight position={[-10, 20, 10]} angle={0.2} penumbra={1} intensity={2} castShadow />
-        <hemisphereLight intensity={0.5} groundColor="#000000" />
+        <ambientLight intensity={1.5} />
+        <pointLight position={[w, h, d]} intensity={2} castShadow />
+        <pointLight position={[-w, 0, -d]} intensity={2} castShadow />
+        <directionalLight position={[10, 20, 10]} intensity={1.5} castShadow />
+        <hemisphereLight intensity={1} groundColor="#222222" />
+        <Environment preset="city" />
 
         <group>
           <ShaftStructure width={w} depth={d} height={h} pitDepth={pD} />

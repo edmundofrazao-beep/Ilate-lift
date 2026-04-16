@@ -1,8 +1,11 @@
-import React, { useRef, useState } from 'react';
-import { Canvas } from '@react-three/fiber';
-import { OrbitControls, PerspectiveCamera, RoundedBox, Text, Html, Box, Cylinder } from '@react-three/drei';
+import React, { useRef, useState, useEffect } from 'react';
+import { Canvas, useThree } from '@react-three/fiber';
+import { OrbitControls, PerspectiveCamera, RoundedBox, Text, Html, Box, Environment } from '@react-three/drei';
 import * as THREE from 'three';
-import { Accessibility, Shield, Zap, Info } from 'lucide-react';
+import { Accessibility, Shield, Zap, Info, Download } from 'lucide-react';
+import { downloadFile } from '../lib/exporters';
+// @ts-ignore
+import { OBJExporter } from 'three/examples/jsm/exporters/OBJExporter';
 
 interface Cabin3DProps {
   width: number;
@@ -51,6 +54,14 @@ const ControlPanel = ({ position }: { position: [number, number, number] }) => (
   </group>
 );
 
+const SceneExporter = ({ onExport }: { onExport: (scene: THREE.Scene) => void }) => {
+  const { scene } = useThree();
+  useEffect(() => {
+    onExport(scene);
+  }, [scene, onExport]);
+  return null;
+};
+
 export const Cabin3DModule: React.FC<Cabin3DProps> = ({
   width = 1.2,
   depth = 1.4,
@@ -60,6 +71,14 @@ export const Cabin3DModule: React.FC<Cabin3DProps> = ({
   showSeismic = true
 }) => {
   const [hoveredFeature, setHoveredFeature] = useState<string | null>(null);
+  const sceneRef = useRef<THREE.Scene | null>(null);
+
+  const handleExport = () => {
+    if (!sceneRef.current) return;
+    const exporter = new OBJExporter();
+    const result = exporter.parse(sceneRef.current);
+    downloadFile(result, 'elevator_cabin.obj', 'text/plain');
+  };
 
   return (
     <div className="w-full h-[600px] bg-slate-900 rounded-sm overflow-hidden relative border border-outline-variant/20 shadow-inner">
@@ -94,15 +113,25 @@ export const Cabin3DModule: React.FC<Cabin3DProps> = ({
             </p>
           </div>
         )}
+
+        <button
+          onClick={handleExport}
+          className="bg-primary hover:bg-primary/90 text-white px-3 py-2 rounded-sm text-[10px] font-bold uppercase tracking-widest flex items-center gap-2 shadow-lg transition-all"
+        >
+          <Download size={12} />
+          Export OBJ
+        </button>
       </div>
 
       <Canvas shadows>
+        <SceneExporter onExport={(s) => sceneRef.current = s} />
         <PerspectiveCamera makeDefault position={[2, 2, 3]} fov={45} />
         <OrbitControls target={[0, 1, 0]} />
         
-        <ambientLight intensity={0.5} />
-        <pointLight position={[2, 3, 2]} intensity={1} castShadow />
-        <spotLight position={[-2, 4, 2]} angle={0.3} penumbra={1} intensity={1.5} castShadow />
+        <ambientLight intensity={1.5} />
+        <pointLight position={[2, 3, 2]} intensity={2} castShadow />
+        <spotLight position={[-2, 4, 2]} angle={0.3} penumbra={1} intensity={2} castShadow />
+        <Environment preset="city" />
 
         <group>
           {/* Cabin Floor */}
