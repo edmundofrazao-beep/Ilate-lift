@@ -82,6 +82,7 @@ interface ProjectData {
   railIyRadius: number; // iy (mm)
   railIxRadius: number; // ix (mm)
   railWeight: number; // q1 (kg/m)
+  railProfile: string;
   // Rope Advanced Properties
   numSimpleBends: number; // Nps
   numReverseBends: number; // Npr
@@ -921,7 +922,26 @@ const GuideRailsModule = ({ data, onChange }: { data: ProjectData, onChange: (ne
           <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700 uppercase">Implemented (ISO 8100-2)</span>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
+          <div className="p-4 bg-surface-container-low border border-outline-variant/10 rounded-sm">
+            <p className="text-[10px] font-bold uppercase opacity-50 mb-1">Bracket Distance (l)</p>
+            <p className="text-xl font-black">{data.bracketDist} mm</p>
+          </div>
+          <div className="p-4 bg-surface-container-low border border-outline-variant/10 rounded-sm">
+            <p className="text-[10px] font-bold uppercase opacity-50 mb-1">Elastic Modulus (E)</p>
+            <p className="text-xl font-black">{formatNumber(data.materialE / 1000, 0)} <span className="text-xs font-normal">GPa</span></p>
+          </div>
+          <div className="p-4 bg-surface-container-low border border-outline-variant/10 rounded-sm">
+            <p className="text-[10px] font-bold uppercase opacity-50 mb-1">Yield Strength (Rp0.2)</p>
+            <p className="text-xl font-black">{data.materialYield} <span className="text-xs font-normal">N/mm²</span></p>
+          </div>
+          <div className="p-4 bg-surface-container-low border border-outline-variant/10 rounded-sm">
+            <p className="text-[10px] font-bold uppercase opacity-50 mb-1">Rail Profile</p>
+            <p className="text-xl font-black">{data.railProfile}</p>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
           <div className={`p-6 border ${isBendingOk ? 'bg-surface-container-lowest border-outline-variant/10' : 'bg-error-container/10 border-error/20'}`}>
             <div className="flex items-center justify-between mb-4">
               <h4 className="text-xs font-bold uppercase text-primary">Bending Stress (σm)</h4>
@@ -1011,8 +1031,9 @@ const GuideRailsModule = ({ data, onChange }: { data: ProjectData, onChange: (ne
               {isDeflectionOk ? <CheckCircle2 size={14} className="text-emerald-600" /> : <XCircle size={14} className="text-error" />}
               <span className="text-[10px] font-bold uppercase opacity-70">Limit: {deflectionLimit} mm</span>
             </div>
-            <div className="mt-3 pt-3 border-t border-outline-variant/10 text-[10px] opacity-60 font-mono">
-              δ = f(Fh, l, E, I) (Clause 4.10.6)
+            <div className="mt-3 pt-3 border-t border-outline-variant/10 grid grid-cols-2 gap-2 text-[10px] opacity-60 font-mono">
+              <div>δx: {formatNumber(delta_x)}</div>
+              <div>δy: {formatNumber(delta_y)}</div>
             </div>
           </div>
         </div>
@@ -1469,6 +1490,9 @@ const CalculationMemoryModule = ({ data }: { data: ProjectData }) => {
   const Etotal = Ek + Ep;
   const Ecap = Etotal; // Alias for UI
   const h_min = (data.bufferType === 'energy-accumulation' ? (data.bufferIsLinear ? 0.135 : 0.067) : 0.0674) * data.speed * data.speed * 1000;
+  const isBufferMassOk = impactMass >= data.bufferMinMass && impactMass <= data.bufferMaxMass;
+  const a_avg = h_m > 0 ? (v_impact * v_impact) / (2 * h_m * g) : 0;
+  const isEnergyOk = a_avg <= 1.0;
 
   // Safety Gear Calculations
   const totalMass = data.carMass + data.ratedLoad;
@@ -1638,7 +1662,24 @@ const CalculationMemoryModule = ({ data }: { data: ProjectData }) => {
           </p>
           <div className="bg-slate-50 p-6 rounded border border-slate-100 flex flex-col items-center gap-4">
             <BlockMath math={`\\delta = ${formatNumber(delta)} \\text{ mm}`} />
-            <p className="text-xs font-bold text-primary">Compliance: {isDeflectionOk ? 'YES' : 'NO'} (Limit: 5.0 mm)</p>
+            <div className="w-full space-y-2 mt-4">
+              <div className="flex justify-between text-xs">
+                <span>Deflection Limit</span>
+                <span className={isDeflectionOk ? 'text-emerald-700 font-bold' : 'text-error font-bold'}>{formatNumber(delta)} / 5.0 mm</span>
+              </div>
+              <div className="flex justify-between text-xs">
+                <span>Rail Profile</span>
+                <span className="font-bold">{data.railProfile}</span>
+              </div>
+              <div className="flex justify-between text-xs">
+                <span>Bracket Distance (l)</span>
+                <span className="font-bold">{data.bracketDist} mm</span>
+              </div>
+              <div className="flex justify-between text-xs">
+                <span>Elastic Modulus (E)</span>
+                <span className="font-bold">{formatNumber(data.materialE / 1000, 0)} GPa</span>
+              </div>
+            </div>
           </div>
         </div>
       </section>
@@ -1655,6 +1696,10 @@ const CalculationMemoryModule = ({ data }: { data: ProjectData }) => {
               <div className="flex justify-between text-sm">
                 <span>Certified Mass (P+Q)</span>
                 <span className={isMassOk ? 'text-emerald-700 font-bold' : 'text-error font-bold'}>{formatNumber(totalMass)} / {data.safetyGearMaxMass} kg</span>
+              </div>
+              <div className="flex justify-between text-sm">
+                <span>Braking Force (Fb)</span>
+                <span className="font-bold">{formatNumber(data.safetyGearBrakingForce)} N</span>
               </div>
               <div className="flex justify-between text-sm">
                 <span>Certified Speed</span>
@@ -1675,7 +1720,27 @@ const CalculationMemoryModule = ({ data }: { data: ProjectData }) => {
             </p>
             <div className="bg-slate-50 p-6 rounded border border-slate-100 flex flex-col items-center gap-4">
               <BlockMath math={`E_{total} = \\frac{1}{2} m v^2 + m g h = ${formatNumber(Etotal)} \\text{ J}`} />
-              <BlockMath math={`h_{min} = 0.0674 \\cdot v^2 = ${formatNumber(h_min)} \\text{ mm}`} />
+              <BlockMath math={`h_{min} = ${data.bufferType === 'energy-accumulation' ? (data.bufferIsLinear ? '0.135' : '0.067') : '0.0674'} \\cdot v^2 = ${formatNumber(h_min)} \\text{ mm}`} />
+              <div className="w-full space-y-2 mt-4">
+                <div className="flex justify-between text-xs">
+                  <span>Buffer Type</span>
+                  <span className="font-bold uppercase">{data.bufferType.replace('-', ' ')} ({data.bufferIsLinear ? 'Linear' : 'Non-Linear'})</span>
+                </div>
+                <div className="flex justify-between text-xs">
+                  <span>Stroke Compliance</span>
+                  <span className={data.bufferStroke >= h_min ? 'text-emerald-700 font-bold' : 'text-error font-bold'}>{data.bufferStroke} / {formatNumber(h_min)} mm</span>
+                </div>
+                <div className="flex justify-between text-xs">
+                  <span>Mass Compliance</span>
+                  <span className={isBufferMassOk ? 'text-emerald-700 font-bold' : 'text-error font-bold'}>{formatNumber(impactMass)} / [{data.bufferMinMass}-{data.bufferMaxMass}] kg</span>
+                </div>
+                {data.bufferType === 'energy-dissipation' && (
+                  <div className="flex justify-between text-xs">
+                    <span>Avg Deceleration</span>
+                    <span className={isEnergyOk ? 'text-emerald-700 font-bold' : 'text-error font-bold'}>{formatNumber(a_avg)} / 1.0 gn</span>
+                  </div>
+                )}
+              </div>
             </div>
           </div>
 
@@ -1985,6 +2050,7 @@ const SafetyComponentsModule = ({ data, onChange }: { data: ProjectData, onChang
   
   const F_buffer = impactMass * (a_avg + g);
   const strokeUtilization = h_m > 0 ? (h_min / (data.bufferStroke)) * 100 : 0;
+  const massUtilization = data.bufferMaxMass > data.bufferMinMass ? ((impactMass - data.bufferMinMass) / (data.bufferMaxMass - data.bufferMinMass)) * 100 : 0;
 
   // 4.18 SIL Logic
   const lambdaD = data.failureRate * (data.dangerousFraction / 100);
@@ -2647,9 +2713,16 @@ const SafetyComponentsModule = ({ data, onChange }: { data: ProjectData, onChang
                 <div className="space-y-6">
                       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                         <div className={`p-6 border ${isStrokeOk ? 'bg-emerald-50 border-emerald-200' : 'bg-error-container/10 border-error/20'}`}>
-                          <p className="text-[10px] font-bold uppercase mb-1">Stroke Utilization</p>
+                          <div className="flex items-center justify-between mb-2">
+                            <p className="text-[10px] font-bold uppercase">Stroke Utilization</p>
+                            <div className="flex items-center gap-1">
+                              <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full ${data.bufferIsLinear ? 'bg-blue-100 text-blue-700' : 'bg-purple-100 text-purple-700'}`}>
+                                {data.bufferIsLinear ? 'Linear' : 'Non-Linear'}
+                              </span>
+                            </div>
+                          </div>
                           <p className="text-2xl font-black">{formatNumber(data.bufferStroke)} mm</p>
-                          <p className="text-[10px] opacity-50">Min: {formatNumber(h_min)} mm ({formatNumber(strokeUtilization)}%)</p>
+                          <p className="text-[10px] opacity-50">Min Required: {formatNumber(h_min)} mm ({formatNumber(strokeUtilization)}%)</p>
                           <div className="mt-2 h-1 bg-surface-container-low rounded-full overflow-hidden">
                             <div 
                               className={`h-full ${isStrokeOk ? 'bg-emerald-500' : 'bg-error'}`} 
@@ -2660,12 +2733,24 @@ const SafetyComponentsModule = ({ data, onChange }: { data: ProjectData, onChang
                         <div className={`p-6 border ${a_avg <= 1.0 ? 'bg-emerald-50 border-emerald-200' : 'bg-amber-50 border-amber-200'}`}>
                           <p className="text-[10px] font-bold uppercase mb-1">Avg Deceleration</p>
                           <p className="text-2xl font-black">{formatNumber(a_avg)} gn</p>
-                          <p className="text-[10px] opacity-50">Limit: 1.0 gn</p>
+                          <p className="text-[10px] opacity-50">Limit: 1.0 gn (ISO 8100-2)</p>
+                          <div className="mt-2 h-1 bg-surface-container-low rounded-full overflow-hidden">
+                            <div 
+                              className={`h-full ${a_avg <= 1.0 ? 'bg-emerald-500' : 'bg-amber-500'}`} 
+                              style={{ width: `${Math.min(a_avg * 100, 100)}%` }}
+                            />
+                          </div>
                         </div>
-                        <div className="p-6 border bg-surface-container-low border-outline-variant/10">
-                          <p className="text-[10px] font-bold uppercase mb-1">Impact Force (Fb)</p>
-                          <p className="text-2xl font-black">{formatNumber(F_buffer)} N</p>
-                          <p className="text-[10px] opacity-50">m · (a + g)</p>
+                        <div className={`p-6 border ${isBufferMassOk ? 'bg-emerald-50 border-emerald-200' : 'bg-error-container/10 border-error/20'}`}>
+                          <p className="text-[10px] font-bold uppercase mb-1">Mass Compliance</p>
+                          <p className="text-2xl font-black">{formatNumber(impactMass)} <span className="text-xs font-normal opacity-50">kg</span></p>
+                          <p className="text-[10px] opacity-50">Range: {data.bufferMinMass} - {data.bufferMaxMass} kg</p>
+                          <div className="mt-2 h-1 bg-surface-container-low rounded-full overflow-hidden">
+                            <div 
+                              className={`h-full ${isBufferMassOk ? 'bg-emerald-500' : 'bg-error'}`} 
+                              style={{ width: `${Math.min(Math.max(massUtilization, 0), 100)}%` }}
+                            />
+                          </div>
                         </div>
                       </div>
 
@@ -2778,11 +2863,11 @@ const SafetyComponentsModule = ({ data, onChange }: { data: ProjectData, onChang
                             </div>
                           )}
                           <div className="flex items-center gap-3">
-                            <div className={`w-5 h-5 rounded flex items-center justify-center border ${isMassOk ? 'bg-emerald-600 border-emerald-600' : 'border-outline-variant'}`}>
-                              {isMassOk && <CheckSquare size={14} className="text-white" />}
+                            <div className={`w-5 h-5 rounded flex items-center justify-center border ${isBufferMassOk ? 'bg-emerald-600 border-emerald-600' : 'border-outline-variant'}`}>
+                              {isBufferMassOk && <CheckSquare size={14} className="text-white" />}
                             </div>
-                            <span className={`text-xs font-medium ${isMassOk ? 'text-on-surface' : 'text-on-surface-variant'}`}>
-                              Total impact mass is within the certified range of the component.
+                            <span className={`text-xs font-medium ${isBufferMassOk ? 'text-on-surface' : 'text-on-surface-variant'}`}>
+                              Total impact mass ({formatNumber(impactMass)}kg) is within the certified range ({data.bufferMinMass}kg - {data.bufferMaxMass}kg).
                             </span>
                           </div>
                           <div className="flex items-center gap-3">
@@ -3538,6 +3623,7 @@ export default function App() {
     railIyRadius: 19.5,
     railIxRadius: 14.2,
     railWeight: 12.3,
+    railProfile: 'ISO T89/B',
     numSimpleBends: 2,
     numReverseBends: 0,
     ropeBreakingLoad: 45000,
