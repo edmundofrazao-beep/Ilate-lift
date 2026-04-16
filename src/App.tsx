@@ -3013,18 +3013,43 @@ const PDFExportModule = ({ data }: { data: ProjectData }) => {
           const elements = clonedDoc.getElementsByTagName('*');
           for (let i = 0; i < elements.length; i++) {
             const el = elements[i] as HTMLElement;
-            const style = window.getComputedStyle(el);
             
-            // Check common color properties
-            ['color', 'backgroundColor', 'borderColor', 'borderTopColor', 'borderRightColor', 'borderBottomColor', 'borderLeftColor', 'fill', 'stroke'].forEach(prop => {
-              const val = style.getPropertyValue(prop);
-              if (val.includes('oklch') || val.includes('oklab')) {
-                // Fallback to a safe color or transparent
-                if (prop === 'color' || prop === 'fill' || prop === 'stroke') {
-                  el.style.setProperty(prop, '#000000', 'important');
-                } else {
-                  el.style.setProperty(prop, 'transparent', 'important');
+            // Check inline style attribute first as it's faster
+            const styleAttr = el.getAttribute('style');
+            if (styleAttr && (styleAttr.includes('oklch') || styleAttr.includes('oklab'))) {
+              el.setAttribute('style', styleAttr.replace(/okl(ch|ab)\([^)]+\)/g, '#000000'));
+            }
+
+            // Check computed style for values coming from stylesheets
+            const style = window.getComputedStyle(el);
+            const colorProps = [
+              'color', 
+              'background-color', 
+              'border-color', 
+              'border-top-color', 
+              'border-right-color', 
+              'border-bottom-color', 
+              'border-left-color', 
+              'fill', 
+              'stroke',
+              'stop-color',
+              'flood-color',
+              'lighting-color'
+            ];
+
+            colorProps.forEach(prop => {
+              try {
+                const val = style.getPropertyValue(prop);
+                if (val && (val.includes('oklch') || val.includes('oklab'))) {
+                  // Fallback to a safe color
+                  // For backgrounds, we might want white or transparent, but black is safer for visibility if it's a border/text
+                  const fallback = (prop === 'color' || prop === 'fill' || prop === 'stroke' || prop.includes('border')) 
+                    ? '#333333' 
+                    : 'transparent';
+                  el.style.setProperty(prop, fallback, 'important');
                 }
+              } catch (e) {
+                // Ignore errors for unsupported properties
               }
             });
           }
