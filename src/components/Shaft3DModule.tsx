@@ -135,6 +135,7 @@ export const Shaft3DModule: React.FC<Shaft3DProps> = ({
   showClearances = true
 }) => {
   const [resetKey, setResetKey] = useState(0);
+  const [hoveredZone, setHoveredZone] = useState<string | null>(null);
   
   // Convert mm to meters
   const w = width / 1000;
@@ -143,6 +144,14 @@ export const Shaft3DModule: React.FC<Shaft3DProps> = ({
   const pD = pitDepth / 1000;
   
   const carY = carPos * (h - carHeight) + carHeight / 2;
+
+  const clearanceData: Record<string, { label: string, value: number, limit: string, clause: string }> = {
+    headroom: { label: 'Headroom', value: headroomGeneral * 1000, limit: '≥ 500mm', clause: 'ISO 8100-1:2026 5.2.5.7' },
+    pit: { label: 'Pit Refuge', value: pitRefugeHeight * 1000, limit: '≥ 500mm', clause: 'ISO 8100-1:2026 5.2.5.8' },
+    wall: { label: 'Wall Gap', value: wellToCarWall * 1000, limit: '≤ 150mm', clause: 'ISO 8100-1:2026 5.2.5.2' },
+    sill: { label: 'Sill Gap', value: sillGap * 1000, limit: '≤ 35mm', clause: 'ISO 8100-1:2026 5.3.4' },
+    cwt: { label: 'Car-CWT Gap', value: carToCwtDistance * 1000, limit: '≥ 50mm', clause: 'ISO 8100-1:2026 5.2.5.2' },
+  };
 
   return (
     <div className="w-full h-[600px] bg-slate-900 rounded-sm overflow-hidden relative border border-outline-variant/20 shadow-inner">
@@ -160,6 +169,25 @@ export const Shaft3DModule: React.FC<Shaft3DProps> = ({
             <span className="text-[10px] text-white font-mono">{pitDepth} mm</span>
           </div>
         </div>
+
+        {hoveredZone && clearanceData[hoveredZone] && (
+          <div className="bg-primary/90 backdrop-blur-md p-4 rounded border border-white/20 shadow-2xl animate-in fade-in slide-in-from-left-4 duration-300">
+            <h4 className="text-[11px] font-black text-white uppercase tracking-[0.2em] mb-1">{clearanceData[hoveredZone].label}</h4>
+            <div className="space-y-1">
+              <div className="flex justify-between gap-4">
+                <span className="text-[10px] text-white/60 uppercase font-bold">Calculated</span>
+                <span className="text-[10px] text-white font-mono font-bold">{clearanceData[hoveredZone].value.toFixed(0)} mm</span>
+              </div>
+              <div className="flex justify-between gap-4">
+                <span className="text-[10px] text-white/60 uppercase font-bold">Normative Limit</span>
+                <span className="text-[10px] text-white font-mono">{clearanceData[hoveredZone].limit}</span>
+              </div>
+              <div className="pt-2 mt-2 border-t border-white/10">
+                <span className="text-[9px] text-white/40 font-mono italic">{clearanceData[hoveredZone].clause}</span>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
       <Canvas shadows key={resetKey}>
@@ -196,9 +224,13 @@ export const Shaft3DModule: React.FC<Shaft3DProps> = ({
             <group>
               {/* Headroom Zone - Visible when car is high */}
               {carPos > 0.8 && (
-                <group position={[0, h + headroomGeneral / 2, 0]}>
+                <group 
+                  position={[0, h + headroomGeneral / 2, 0]}
+                  onPointerOver={(e) => { e.stopPropagation(); setHoveredZone('headroom'); }}
+                  onPointerOut={() => setHoveredZone(null)}
+                >
                   <Box args={[w, headroomGeneral, d]}>
-                    <meshStandardMaterial color="#ef4444" transparent opacity={0.2} />
+                    <meshStandardMaterial color={hoveredZone === 'headroom' ? "#f87171" : "#ef4444"} transparent opacity={hoveredZone === 'headroom' ? 0.4 : 0.2} />
                   </Box>
                   <Text position={[0, headroomGeneral / 2 + 0.1, 0]} fontSize={0.15} color="#ef4444" font="/fonts/Inter-Bold.woff">
                     Headroom: {(headroomGeneral * 1000).toFixed(0)}mm
@@ -208,9 +240,13 @@ export const Shaft3DModule: React.FC<Shaft3DProps> = ({
 
               {/* Pit Refuge Zone - Visible when car is low */}
               {carPos < 0.2 && (
-                <group position={[0, -pD + pitRefugeHeight / 2, 0]}>
+                <group 
+                  position={[0, -pD + pitRefugeHeight / 2, 0]}
+                  onPointerOver={(e) => { e.stopPropagation(); setHoveredZone('pit'); }}
+                  onPointerOut={() => setHoveredZone(null)}
+                >
                   <Box args={[w * 0.8, pitRefugeHeight, d * 0.8]}>
-                    <meshStandardMaterial color="#10b981" transparent opacity={0.2} />
+                    <meshStandardMaterial color={hoveredZone === 'pit' ? "#34d399" : "#10b981"} transparent opacity={hoveredZone === 'pit' ? 0.4 : 0.2} />
                   </Box>
                   <Text position={[0, pitRefugeHeight / 2 + 0.1, 0]} fontSize={0.15} color="#10b981" font="/fonts/Inter-Bold.woff">
                     Pit Refuge: {(pitRefugeHeight * 1000).toFixed(0)}mm
@@ -219,9 +255,13 @@ export const Shaft3DModule: React.FC<Shaft3DProps> = ({
               )}
 
               {/* Wall Clearance */}
-              <group position={[-w / 2 + wellToCarWall / 2, carY, 0]}>
+              <group 
+                position={[-w / 2 + wellToCarWall / 2, carY, 0]}
+                onPointerOver={(e) => { e.stopPropagation(); setHoveredZone('wall'); }}
+                onPointerOut={() => setHoveredZone(null)}
+              >
                 <Box args={[wellToCarWall, carHeight, d]}>
-                  <meshStandardMaterial color="#3b82f6" transparent opacity={0.2} />
+                  <meshStandardMaterial color={hoveredZone === 'wall' ? "#60a5fa" : "#3b82f6"} transparent opacity={hoveredZone === 'wall' ? 0.4 : 0.2} />
                 </Box>
                 <Text position={[0, carHeight / 2 + 0.2, 0]} fontSize={0.1} color="#3b82f6" rotation={[0, Math.PI / 2, 0]}>
                   Wall Gap: {(wellToCarWall * 1000).toFixed(0)}mm
@@ -229,9 +269,13 @@ export const Shaft3DModule: React.FC<Shaft3DProps> = ({
               </group>
 
               {/* Sill Gap */}
-              <group position={[0, carY - carHeight / 2, d / 2 + sillGap / 2]}>
+              <group 
+                position={[0, carY - carHeight / 2, d / 2 + sillGap / 2]}
+                onPointerOver={(e) => { e.stopPropagation(); setHoveredZone('sill'); }}
+                onPointerOut={() => setHoveredZone(null)}
+              >
                 <Box args={[w * 0.6, 0.05, sillGap]}>
-                  <meshStandardMaterial color="#f59e0b" transparent opacity={0.4} />
+                  <meshStandardMaterial color={hoveredZone === 'sill' ? "#fbbf24" : "#f59e0b"} transparent opacity={hoveredZone === 'sill' ? 0.6 : 0.4} />
                 </Box>
                 <Text position={[0, 0.15, sillGap / 2]} fontSize={0.08} color="#f59e0b" font="/fonts/Inter-Bold.woff">
                   Sill Gap: {(sillGap * 1000).toFixed(0)}mm
@@ -239,9 +283,13 @@ export const Shaft3DModule: React.FC<Shaft3DProps> = ({
               </group>
 
               {/* Car to Counterweight Clearance */}
-              <group position={[0, carY, -d / 2 + 0.3 + carToCwtDistance / 2]}>
+              <group 
+                position={[0, carY, -d / 2 + 0.3 + carToCwtDistance / 2]}
+                onPointerOver={(e) => { e.stopPropagation(); setHoveredZone('cwt'); }}
+                onPointerOut={() => setHoveredZone(null)}
+              >
                 <Box args={[w * 0.7, carHeight, carToCwtDistance]}>
-                  <meshStandardMaterial color="#8b5cf6" transparent opacity={0.2} />
+                  <meshStandardMaterial color={hoveredZone === 'cwt' ? "#a78bfa" : "#8b5cf6"} transparent opacity={hoveredZone === 'cwt' ? 0.4 : 0.2} />
                 </Box>
                 <Text position={[0, carHeight / 2 + 0.1, 0]} fontSize={0.1} color="#8b5cf6">
                   Car-CWT Gap: {(carToCwtDistance * 1000).toFixed(0)}mm
