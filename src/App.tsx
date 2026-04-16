@@ -732,6 +732,8 @@ const RopesModule = ({ data, onChange }: { data: ProjectData, onChange: (newData
                     ropeType: belt.label,
                     beltWidth: belt.width,
                     beltThickness: belt.thickness,
+                    numBelts: 1, // Reset to 1 by default for a single belt profile unless specified
+                    beltTensileStrength: belt.mbf,
                     ropeBreakingLoad: belt.mbf,
                     ropeDiameter: belt.thickness // For D/d calculation
                   });
@@ -757,11 +759,31 @@ const RopesModule = ({ data, onChange }: { data: ProjectData, onChange: (newData
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mt-8">
           <InputGroup label="Suspension Parameters">
-            <LiftField label="Number of Ropes/Belts (n)" name="numRopes" data={data} onChange={onChange} min={1} required suggestion="Increase number of ropes to improve safety factor." />
+            <LiftField label="Number of Ropes (n)" name="numRopes" data={data} onChange={onChange} min={1} required suggestion="Increase number of ropes to improve safety factor." />
             <LiftField label="Diameter/Thickness (d)" name="ropeDiameter" unit="mm" data={data} onChange={onChange} min={4} max={20} required suggestion="D/d ratio must be ≥ 40 for steel ropes." />
             <LiftField label="Breaking Load (Fmin)" name="ropeBreakingLoad" unit="N" data={data} onChange={onChange} min={1000} required suggestion="Check manufacturer data for minimum breaking force." />
+            <div className="space-y-1">
+              <label className="text-[11px] font-bold text-on-surface-variant uppercase">Groove Type</label>
+              <select 
+                value={data.grooveType}
+                onChange={(e) => onChange({ grooveType: e.target.value as any })}
+                className="w-full bg-surface-container-low border border-outline-variant/20 rounded-sm px-3 py-2 text-sm focus:ring-1 focus:ring-primary outline-none"
+              >
+                <option value="V">V-Groove</option>
+                <option value="semi-circular">Semi-Circular</option>
+                <option value="U">U-Groove</option>
+              </select>
+            </div>
+            <LiftField label="Spec. Pressure (p)" name="ropeSpecificPressure" unit="MPa" data={data} onChange={onChange} min={0} required />
             <LiftField label="Simple Pulleys (Nps)" name="numSimpleBends" data={data} onChange={onChange} min={0} required />
             <LiftField label="Reverse Pulleys (Npr)" name="numReverseBends" data={data} onChange={onChange} min={0} required suggestion="Reverse bends significantly reduce rope lifetime." />
+          </InputGroup>
+
+          <InputGroup label="Belt Specific Parameters">
+            <LiftField label="Belt Width" name="beltWidth" unit="mm" data={data} onChange={onChange} min={1} />
+            <LiftField label="Belt Thickness" name="beltThickness" unit="mm" data={data} onChange={onChange} min={1} />
+            <LiftField label="Number of Belts" name="numBelts" data={data} onChange={onChange} min={1} />
+            <LiftField label="Tensile Strength" name="beltTensileStrength" unit="N" data={data} onChange={onChange} min={1000} />
           </InputGroup>
 
           <InputGroup label="Machine & Sheave">
@@ -1637,6 +1659,26 @@ const CalculationMemoryModule = ({ data }: { data: ProjectData }) => {
           <div className="p-2 bg-slate-50 rounded border border-slate-100">
             <p className="opacity-50">Num Ropes (n)</p>
             <p className="text-slate-900">{data.numRopes}</p>
+          </div>
+          <div className="p-2 bg-slate-50 rounded border border-slate-100">
+            <p className="opacity-50">Groove Type</p>
+            <p className="text-slate-900">{data.grooveType}</p>
+          </div>
+          <div className="p-2 bg-slate-50 rounded border border-slate-100">
+            <p className="opacity-50">Spec. Pressure</p>
+            <p className="text-slate-900">{data.ropeSpecificPressure} MPa</p>
+          </div>
+          <div className="p-2 bg-slate-50 rounded border border-slate-100">
+            <p className="opacity-50">Belt Width/Thick</p>
+            <p className="text-slate-900">{data.beltWidth}x{data.beltThickness} mm</p>
+          </div>
+          <div className="p-2 bg-slate-50 rounded border border-slate-100">
+            <p className="opacity-50">Num Belts</p>
+            <p className="text-slate-900">{data.numBelts}</p>
+          </div>
+          <div className="p-2 bg-slate-50 rounded border border-slate-100">
+            <p className="opacity-50">Belt Strength</p>
+            <p className="text-slate-900">{data.beltTensileStrength} N</p>
           </div>
         </div>
       </section>
