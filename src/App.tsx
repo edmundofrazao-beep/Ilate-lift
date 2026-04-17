@@ -19,6 +19,7 @@ import { SafetyComponentsModule } from './modules/SafetyComponentsModule';
 import { PDFExportModule, ValidationModal, SimpleModal, ValidationResult } from './modules/PDFExportModule';
 import { OverspeedGovernorModule } from './modules/OverspeedGovernorModule';
 import { TractionSheavesModule } from './modules/TractionSheavesModule';
+import { CounterweightModule } from './modules/CounterweightModule';
 
 /**
  * @license
@@ -43,6 +44,7 @@ import {
   Unlock,
   History, 
   FileText, 
+  Database,
   CheckSquare,
   Play,
   AlertTriangle,
@@ -356,45 +358,53 @@ export default function App() {
   };
 
   const modules: ModuleStatus[] = [
-    { id: 'overview', label: 'Overview', icon: LayoutDashboard, status: 'implemented', category: 'Project' },
-    { id: 'global', label: 'General (Clause 4.1)', icon: Globe, status: 'implemented', category: 'Project' },
-    
+    // Project Definition
+    { id: 'overview', label: 'Overview', icon: LayoutDashboard, status: 'implemented', category: 'Project Overview' },
+    { id: 'global', label: 'General Parameters (4.1)', icon: Globe, status: 'implemented', category: 'Project Overview' },
+    { id: 'cybersecurity', label: 'Cybersecurity (ISO 8100-20)', icon: Shield, status: 'placeholder', category: 'Project Overview' },
+
+    // Cabin / Car
+    { id: 'doors', label: 'Door Locking (4.2)', icon: Lock, status: 'implemented', category: 'Cabin / Car' },
+    { id: 'sling', label: 'Car Frame / Sling', icon: Box, status: 'implemented', category: 'Cabin / Car' },
+    { id: 'cabin', label: '3D Cabin Explorer', icon: Maximize2, status: 'implemented', category: 'Cabin / Car' },
+
+    // Counterweight
+    { id: 'cwt', label: 'Counterweight Definition', icon: Database, status: 'placeholder', category: 'Counterweight' },
+
+    // Guide Rails (4.10)
+    { id: 'rails-params', label: 'Profiles & Material', icon: ArrowUpDown, status: 'implemented', category: 'Guide Rails (4.10)' },
+    { id: 'rails-forces', label: 'Forces & Displacements', icon: Activity, status: 'implemented', category: 'Guide Rails (4.10)' },
+    { id: 'rails-verify', label: 'Verification', icon: CheckSquare, status: 'implemented', category: 'Guide Rails (4.10)' },
+
     // Traction System
-    { id: 'traction-verify', label: 'Verification (4.11)', icon: Activity, status: 'implemented', category: 'Traction System' },
-    { id: 'traction-params', label: 'Parameters', icon: Settings2, status: 'implemented', category: 'Traction System' },
+    { id: 'traction-params', label: 'Traction Parameters', icon: Settings2, status: 'implemented', category: 'Traction System' },
     { id: 'sheaves', label: 'Traction Sheaves', icon: Settings, status: 'implemented', category: 'Traction System' },
+    { id: 'traction-verify', label: 'System Verification', icon: CheckSquare, status: 'implemented', category: 'Traction System' },
     
-    // Suspension
-    { id: 'suspension', label: 'Suspension Means (4.12)', icon: Cable, status: 'implemented', category: 'Suspension & Compensation Means' },
+    // Suspension & Compensation
+    { id: 'suspension-params', label: 'Suspension Configuration', icon: Cable, status: 'implemented', category: 'Suspension & Compensation Means' },
+    { id: 'suspension-verify', label: 'Suspension Verification', icon: CheckSquare, status: 'implemented', category: 'Suspension & Compensation Means' },
     { id: 'compensation', label: 'Compensation Means', icon: Package, status: 'implemented', category: 'Suspension & Compensation Means' },
 
-    // Mechanical
-    { id: 'rails', label: 'Guide Rails (4.10)', icon: ArrowUpDown, status: 'implemented', category: 'Mechanical Systems' },
-    { id: 'sling', label: 'Car Frame / Sling', icon: Box, status: 'implemented', category: 'Mechanical Systems' },
+    // Safety Systems
+    { id: 'safety', label: 'Safety Gear (4.3)', icon: ShieldCheck, status: 'implemented', category: 'Safety Components' },
+    { id: 'osg', label: 'Overspeed Governor (4.4)', icon: ShieldAlert, status: 'implemented', category: 'Safety Components' },
+    { id: 'buffers', label: 'Buffers (4.5)', icon: Box, status: 'implemented', category: 'Safety Components' },
+    { id: 'acop-ucmp', label: 'ACOP / UCMP (4.7/4.8)', icon: ShieldAlert, status: 'implemented', category: 'Safety Components' },
+
+    // Electronics & Safety
+    { id: 'sil', label: 'SIL / PESSAL (4.18)', icon: Zap, status: 'implemented', category: 'Electronics & Safety' },
+    { id: 'alarms', label: 'Remote Alarms (EN 81-28)', icon: Bell, status: 'implemented', category: 'Electronics & Safety' },
+    { id: 'seismic', label: 'Seismic (EN 81-77)', icon: Zap, status: 'implemented', category: 'Electronics & Safety' },
+
+    // Clearances & Geometry
+    { id: 'clearances', label: 'Clearances (ISO 8100-1)', icon: Ruler, status: 'implemented', category: 'Hoistway & Clearances' },
+    { id: 'shaft', label: '3D Shaft Configurator', icon: Box, status: 'implemented', category: 'Hoistway & Clearances' },
 
     // Hydraulic
-    { id: 'hydraulic', label: 'Hydraulic (4.15)', icon: Droplets, status: 'implemented', category: 'Hydraulic' },
+    { id: 'hydraulic', label: 'Hydraulic (4.15)', icon: Droplets, status: 'implemented', category: 'Hydraulic systems' },
     
-    // Safety Systems
-    { id: 'safety', label: 'Safety Gear (4.3)', icon: ShieldCheck, status: 'implemented', category: 'Safety Systems' },
-    { id: 'osg', label: 'Overspeed Governor (4.4)', icon: ShieldAlert, status: 'implemented', category: 'Safety Systems' },
-    { id: 'buffers', label: 'Buffers (4.5)', icon: Box, status: 'implemented', category: 'Safety Systems' },
-    { id: 'acop-ucmp', label: 'ACOP / UCMP (4.7/4.8)', icon: ShieldAlert, status: 'implemented', category: 'Safety Systems' },
-
-    // Safety Electronics
-    { id: 'sil', label: 'SIL / PESSAL (4.18)', icon: Zap, status: 'implemented', category: 'Safety Electronics' },
-    { id: 'alarms', label: 'Remote Alarms (EN 81-28)', icon: Bell, status: 'implemented', category: 'Safety Electronics' },
-    
-    // Single Categories
-    { id: 'doors', label: 'Door Locking (4.2)', icon: Lock, status: 'implemented', category: 'Doors' },
-    { id: 'seismic', label: 'Seismic (EN 81-77)', icon: Zap, status: 'implemented', category: 'Seismic' },
-    { id: 'cybersecurity', label: 'Cybersecurity (ISO 8100-20)', icon: Shield, status: 'placeholder', category: 'Project' },
-
-    // Geometry
-    { id: 'clearances', label: 'Clearances (ISO 8100-1)', icon: Ruler, status: 'implemented', category: 'Clearances & Geometry' },
-    { id: 'shaft', label: '3D Shaft', icon: Box, status: 'implemented', category: 'Clearances & Geometry' },
-    { id: 'cabin', label: '3D Cabin', icon: Maximize2, status: 'implemented', category: 'Clearances & Geometry' },
-    
+    // Tools
     { id: 'library', label: 'Component Library', icon: Library, status: 'implemented', category: 'Tools & Documentation' },
     { id: 'formulas', label: 'Formula Library', icon: Calculator, status: 'implemented', category: 'Tools & Documentation' },
     { id: 'memory', label: 'Calculation Memory', icon: History, status: 'implemented', category: 'Tools & Documentation' },
@@ -410,7 +420,11 @@ export default function App() {
       case 'traction-params': return <TractionModule data={projectData} onChange={handleDataChange} view="params" />;
       case 'sheaves': return <TractionSheavesModule data={projectData} onChange={handleDataChange} />;
       
-      case 'suspension': return <RopesModule data={projectData} onChange={handleDataChange} />;
+      
+      // Suspension split
+      case 'suspension-params': return <RopesModule data={projectData} onChange={handleDataChange} view="params" />;
+      case 'suspension-verify': return <RopesModule data={projectData} onChange={handleDataChange} view="verify" />;
+      case 'suspension': return <RopesModule data={projectData} onChange={handleDataChange} view="all" />; // Fallback
       case 'compensation': return <div className="p-8 text-center text-on-surface-variant font-bold border border-dashed border-outline-variant/30 rounded-sm bg-surface-container-low">Compensation module coming soon (analyzes lift mass, height, speed via ISO 8100 limits).</div>;
       case 'cybersecurity': return <div className="p-8 text-center text-on-surface-variant font-bold border border-dashed border-outline-variant/30 rounded-sm bg-surface-container-low">Cybersecurity framework via ISO 8100-20 to be integrated here.</div>;
 
@@ -425,7 +439,13 @@ export default function App() {
       case 'sil': return <SafetyComponentsModule data={projectData} onChange={handleDataChange} section="sil" />;
 
       // Singular Mechanics
-      case 'rails': return <GuideRailsModule data={projectData} onChange={handleDataChange} />;
+      case 'rails-params': return <GuideRailsModule data={projectData} onChange={handleDataChange} view="params" />;
+      case 'rails-forces': return <GuideRailsModule data={projectData} onChange={handleDataChange} view="forces" />;
+      case 'rails-verify': return <GuideRailsModule data={projectData} onChange={handleDataChange} view="verify" />;
+      case 'rails': return <GuideRailsModule data={projectData} onChange={handleDataChange} view="all" />;
+
+      case 'cwt': return <CounterweightModule data={projectData} onChange={handleDataChange} />;
+      
       case 'sling': return <SlingModule data={projectData} />;
       case 'hydraulic': return <HydraulicModule data={projectData} />;
       case 'seismic': return <SeismicModule data={projectData} onChange={handleDataChange} />;

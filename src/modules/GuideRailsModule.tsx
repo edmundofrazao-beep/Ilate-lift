@@ -5,7 +5,7 @@ import { ISO_RAIL_PROFILES, BELT_PROFILES } from '../constants';
 import { CheckCircle2, ShieldCheck, Zap, AlertTriangle, Info, ChevronRight, Calculator, FileText, Database, Activity, Package, Maximize, AlertCircle, PlayCircle, Settings, CheckSquare, XCircle, Settings2 } from 'lucide-react';
 import { BlockMath, InlineMath } from 'react-katex';
 
-export const GuideRailsModule = ({ data, onChange }: { data: ProjectData, onChange: (newData: Partial<ProjectData>) => void }) => {
+export const GuideRailsModule = ({ data, onChange, view = 'all' }: { data: ProjectData, onChange: (newData: Partial<ProjectData>) => void, view?: 'all' | 'params' | 'forces' | 'verify' }) => {
   const g = 9.81;
   const E = data.materialE;
   const l = data.bracketDist;
@@ -127,6 +127,7 @@ export const GuideRailsModule = ({ data, onChange }: { data: ProjectData, onChan
           </div>
         </div>
 
+        {(view === 'all' || view === 'params') && (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8">
           <InputGroup label="Rail Geometric Properties">
             <LiftField disabled={data.railProfile !== 'Custom'} label="Section Area (A)" name="railArea" unit="mm²" data={data} onChange={onChange} min={100} required suggestion="Increase section area to reduce combined stress." />
@@ -156,15 +157,22 @@ export const GuideRailsModule = ({ data, onChange }: { data: ProjectData, onChan
               </select>
             </div>
           </InputGroup>
+        </div>
+        )}
 
+        {(view === 'all' || view === 'forces') && (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8">
           <InputGroup label="Forces & Displacements">
             <LiftField label="Auxiliary Force (Faux)" name="Faux" unit="N" data={data} onChange={onChange} min={0} max={10000} suggestion="Force exerted by auxiliary equipment." />
             <LiftField label="Structural Disp. X" name="delta_str_x" unit="mm" data={data} onChange={onChange} min={0} max={50} step={0.1} suggestion="Displacement of building structure in X." />
             <LiftField label="Structural Disp. Y" name="delta_str_y" unit="mm" data={data} onChange={onChange} min={0} max={50} step={0.1} suggestion="Displacement of building structure in Y." />
           </InputGroup>
         </div>
+        )}
 
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+        {(view === 'all' || view === 'verify') && (
+        <div className="space-y-6">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
           <div className={`p-6 border ${isBendingOk ? 'bg-surface-container-lowest border-outline-variant/10' : 'bg-error-container/10 border-error/20'}`}>
             <div className="flex items-center justify-between mb-4">
               <h4 className="text-xs font-bold uppercase text-primary">Bending Stress (σm)</h4>
@@ -315,6 +323,8 @@ export const GuideRailsModule = ({ data, onChange }: { data: ProjectData, onChan
             </div>
           </div>
         </div>
+        </div>
+        )}
       </div>
     </div>
   );

@@ -6,7 +6,7 @@ import { CheckCircle2, ShieldCheck, Zap, AlertTriangle, Info, ChevronRight, Calc
 import { BlockMath, InlineMath } from 'react-katex';
 import { computeLiftCalculations } from '../lib/calculations';
 
-export const RopesModule = ({ data, onChange }: { data: ProjectData, onChange: (newData: Partial<ProjectData>) => void }) => {
+export const RopesModule = ({ data, onChange, view = 'all' }: { data: ProjectData, onChange: (newData: Partial<ProjectData>) => void, view?: 'all' | 'params' | 'verify' }) => {
   const calc = computeLiftCalculations(data);
   const { Fstatic_per_rope, N_equiv, sf_required, sf_actual, isSfOk, iso4344_Fmin, isBreakingLoadOk } = calc.ropes;
 
@@ -30,6 +30,7 @@ export const RopesModule = ({ data, onChange }: { data: ProjectData, onChange: (
           </span>
         </div>
 
+        {(view === 'all' || view === 'verify') && (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           <div className="p-4 bg-surface-container-lowest border border-outline-variant/10">
             <p className="text-[10px] font-bold text-on-surface-variant uppercase mb-1">Static Load / Rope</p>
@@ -103,7 +104,9 @@ export const RopesModule = ({ data, onChange }: { data: ProjectData, onChange: (
             </select>
           </div>
         </div>
+        )}
 
+        {(view === 'all' || view === 'params') && (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mt-8">
           {data.suspensionType !== 'belt' && (
           <InputGroup label="Suspension Parameters">
@@ -171,8 +174,10 @@ export const RopesModule = ({ data, onChange }: { data: ProjectData, onChange: (
             <LiftField label="Reeving Factor (C_R)" name="C_R" data={data} onChange={onChange} min={1} max={4} required />
           </InputGroup>
         </div>
+        )}
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+        {(view === 'all' || view === 'verify') && (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mt-8">
           <div className="space-y-6">
             <div className="p-4 bg-surface-container-lowest border border-outline-variant/10">
               <h4 className="text-xs font-bold uppercase mb-2">Formulas (ISO 8100-2:2026)</h4>
@@ -239,6 +244,7 @@ export const RopesModule = ({ data, onChange }: { data: ProjectData, onChange: (
             </div>
           </div>
         </div>
+        )}
       </div>
     </div>
   );

@@ -1,7 +1,7 @@
 import React from 'react';
 import { ProjectData, ModuleStatus } from '../types';
 import { safeNumber, formatNumber, degToRad, InputGroup, LiftField, SliderField, CollapsibleSection } from '../components/ui';
-import { ISO_RAIL_PROFILES, BELT_PROFILES } from '../constants';
+import { ISO_RAIL_PROFILES, BELT_PROFILES, SAFETY_GEAR_PRESETS } from '../constants';
 import { CheckCircle2, ShieldCheck, Zap, AlertTriangle, Info, ChevronRight, Calculator, FileText, Database, Activity, Package, Maximize, AlertCircle, PlayCircle, Settings, CheckSquare } from 'lucide-react';
 import { BlockMath, InlineMath } from 'react-katex';
 
@@ -31,7 +31,7 @@ export const ComponentLibraryModule = () => {
       <div className="bg-surface-container-low p-6">
         <h3 className="text-lg font-bold mb-6">Technical Component Index (ISO 8100-2)</h3>
         <div className="overflow-x-auto">
-          <table className="w-full text-left text-sm">
+          <table className="w-full text-left text-sm mb-12">
             <thead>
               <tr className="border-b border-outline-variant/20 text-[10px] font-bold uppercase text-on-surface-variant">
                 <th className="px-4 py-3">ISO Section</th>
@@ -54,6 +54,28 @@ export const ComponentLibraryModule = () => {
                       {c.status}
                     </span>
                   </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+
+          <h3 className="text-lg font-bold mb-6">Safety Gear Preset Database</h3>
+          <table className="w-full text-left text-sm">
+            <thead>
+              <tr className="border-b border-outline-variant/20 text-[10px] font-bold uppercase text-on-surface-variant">
+                <th className="px-4 py-3">Preset Name</th>
+                <th className="px-4 py-3">Max Mass (P+Q) kg</th>
+                <th className="px-4 py-3">Braking Force (N)</th>
+                <th className="px-4 py-3">Cert. Speed (m/s)</th>
+              </tr>
+            </thead>
+            <tbody>
+              {SAFETY_GEAR_PRESETS.map((preset, i) => (
+                <tr key={i} className="border-b border-outline-variant/10 hover:bg-primary/5 transition-colors">
+                  <td className="px-4 py-3 font-bold">{preset.name}</td>
+                  <td className="px-4 py-3">{formatNumber(preset.maxMass)}</td>
+                  <td className="px-4 py-3">{formatNumber(preset.brakingForce)}</td>
+                  <td className="px-4 py-3">{formatNumber(preset.certifiedSpeed)}</td>
                 </tr>
               ))}
             </tbody>
