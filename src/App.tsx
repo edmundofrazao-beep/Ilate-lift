@@ -165,6 +165,8 @@ export default function App() {
     uprightSection: 'UPE 140',
     uprightArea: 1640,
     uprightWy: 86400,
+    slingWidth: 1250,
+    slingDepth: 1450,
     slingHeight: 3500,
     sheaveHardness: 210,
     sheaveMaterial: 'Cast Iron',
@@ -185,6 +187,8 @@ export default function App() {
     osgManufacturer: '',
     osgModel: '',
     osgSerialNumber: '',
+    railBoltDiameter: 12,
+    railNumBoltsPerJoint: 8,
     alarmButtonType: 'NO',
     alarmBackupBatteryTime: 1, // hours
     alarmCommunicationType: 'GSM',
@@ -200,6 +204,8 @@ export default function App() {
     ruptureValveFlow: 120,
     ruptureValvePressure: 6.0,
     // New Traction & Belt Variables
+    ropeWearPercentage: 0,
+    bufferForceCurveExponent: 1.5,
     suspensionType: 'wire-rope',
     compensationType: 'none',
     grooveType: 'semi-circular',
@@ -446,7 +452,7 @@ export default function App() {
 
       case 'cwt': return <CounterweightModule data={projectData} onChange={handleDataChange} />;
       
-      case 'sling': return <SlingModule data={projectData} />;
+      case 'sling': return <SlingModule data={projectData} onChange={handleDataChange} />;
       case 'hydraulic': return <HydraulicModule data={projectData} />;
       case 'seismic': return <SeismicModule data={projectData} onChange={handleDataChange} />;
       case 'doors': return <DoorLockingModule />;

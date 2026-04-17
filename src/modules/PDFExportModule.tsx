@@ -178,10 +178,19 @@ export const ValidationModal = ({ isOpen, onClose, results, onNavigate }: { isOp
             </div>
           ) : (
             results.map((r, i) => (
-              <div key={i} className={`p-4 border-l-4 flex gap-4 ${
+              <div 
+                key={i} 
+                className={`p-4 border-l-4 flex gap-4 transition-colors ${r.moduleId && onNavigate ? 'cursor-pointer hover:bg-black/5 hover:border-l-8' : ''} ${
                 r.type === 'error' ? 'bg-error-container/10 border-error' : 
                 r.type === 'warning' ? 'bg-amber-50 border-amber-400' : 'bg-emerald-50 border-emerald-500'
-              }`}>
+              }`}
+                onClick={() => {
+                  if (r.moduleId && onNavigate) {
+                    onNavigate(r.moduleId);
+                    onClose();
+                  }
+                }}
+              >
                 {r.type === 'error' ? <XCircle className="text-error shrink-0" size={18} /> : 
                  r.type === 'warning' ? <AlertTriangle className="text-amber-500 shrink-0" size={18} /> : 
                  <CheckCircle2 className="text-emerald-500 shrink-0" size={18} />}
@@ -193,16 +202,13 @@ export const ValidationModal = ({ isOpen, onClose, results, onNavigate }: { isOp
                   <p className="text-sm text-on-surface font-medium mb-2">{r.msg}</p>
                   <div className="flex items-center gap-2 mt-2">
                     {r.moduleId && onNavigate && (
-                      <button 
-                        onClick={() => { onNavigate(r.moduleId!); onClose(); }}
-                        className="px-3 py-1 bg-primary/10 text-primary hover:bg-primary/20 text-[10px] font-bold uppercase rounded-sm transition-colors"
-                      >
-                        Go to Module
-                      </button>
+                      <span className="text-[10px] uppercase font-bold text-primary/70 flex items-center gap-1 group-hover:text-primary transition-colors">
+                        Click to navigate
+                      </span>
                     )}
                     {r.onAction && r.actionLabel && (
                       <button 
-                        onClick={() => { r.onAction!(); onClose(); }}
+                        onClick={(e) => { e.stopPropagation(); r.onAction!(); onClose(); }}
                         className="px-3 py-1 bg-emerald-100 text-emerald-700 hover:bg-emerald-200 text-[10px] font-bold uppercase rounded-sm transition-colors"
                       >
                         {r.actionLabel}

@@ -1,6 +1,7 @@
 export function computeLiftCalculations(data: any) {
   const g = 9.81;
   const r = parseInt(data.suspension?.split(':')[0] || '1');
+  const d_eff = data.ropeDiameter * (1 - (data.ropeWearPercentage || 0) / 100);
 
   // Traction Calculations
   const T1_static = ((data.carMass + data.ratedLoad) * g) / r;
@@ -12,13 +13,16 @@ export function computeLiftCalculations(data: any) {
   const beta = data.undercutAngle * Math.PI / 180;
   const gamma = data.grooveAngle * Math.PI / 180;
   
+  // Apply a small coefficient penalty proportional to wear (up to 15% loss at 10% wear)
+  const wearPenalty = 1 - Math.min(1.5 * ((data.ropeWearPercentage || 0) / 100), 0.2);
+
   let f_load = 0;
   if (data.grooveType === 'V') {
-    f_load = data.frictionCoeff * (4 / Math.sin(gamma / 2));
+    f_load = data.frictionCoeff * (4 / Math.sin(gamma / 2)) * wearPenalty;
   } else if (data.grooveType === 'semi-circular') {
-    f_load = data.frictionCoeff * (4 * (Math.cos(gamma/2) - Math.sin(beta/2))) / (Math.PI - beta - gamma - Math.sin(beta) + Math.sin(gamma));
+    f_load = data.frictionCoeff * (4 * (Math.cos(gamma/2) - Math.sin(beta/2))) / (Math.PI - beta - gamma - Math.sin(beta) + Math.sin(gamma)) * wearPenalty;
   } else {
-    f_load = data.frictionCoeff * 4 / Math.PI;
+    f_load = data.frictionCoeff * 4 / Math.PI * wearPenalty;
   }
   
   const alpha = data.wrapAngle * Math.PI / 180;
@@ -27,15 +31,15 @@ export function computeLiftCalculations(data: any) {
   const traction_ratio_dynamic = T2_dynamic > 0 ? T1_dynamic / T2_dynamic : 0;
   const isTractionOk = traction_ratio_static <= expMuAlpha && traction_ratio_dynamic <= expMuAlpha;
 
-  // Specific Pressure (EN 81-50 / ISO 8100-2 formulas)
+  // Specific Pressure (EN 81-50 / ISO 8100-2 formulas) using effective diameter
   let p_groove = 0;
   if (data.grooveType === 'V') {
-    p_groove = (T1_static + T2_static) / (data.numRopes * data.ropeDiameter * data.sheaveDiameter * Math.sin(gamma / 2));
+    p_groove = (T1_static + T2_static) / (data.numRopes * d_eff * data.sheaveDiameter * Math.sin(gamma / 2));
   } else if (data.grooveType === 'semi-circular') {
-    p_groove = (8 * (T1_static + T2_static) * Math.cos(beta / 2)) / (data.numRopes * data.ropeDiameter * data.sheaveDiameter * (Math.PI - beta - Math.sin(beta)));
+    p_groove = (8 * (T1_static + T2_static) * Math.cos(beta / 2)) / (data.numRopes * d_eff * data.sheaveDiameter * (Math.PI - beta - Math.sin(beta)));
   } else {
     // U-groove is essentially semi-circular with beta = 0
-    p_groove = (8 * (T1_static + T2_static)) / (data.numRopes * data.ropeDiameter * data.sheaveDiameter * Math.PI);
+    p_groove = (8 * (T1_static + T2_static)) / (data.numRopes * d_eff * data.sheaveDiameter * Math.PI);
   }
 
   // Allowable Specific Pressure limit approximation based on material & speed
@@ -55,7 +59,7 @@ export function computeLiftCalculations(data: any) {
   const Fstatic_total = (data.carMass + data.ratedLoad) * g;
   const Fstatic_per_rope = data.numRopes > 0 ? Fstatic_total / (r * data.numRopes) : 0;
   const N_equiv = data.numSimpleBends + 4 * data.numReverseBends;
-  const Dd = data.ropeDiameter > 0 ? data.sheaveDiameter / data.ropeDiameter : 0;
+  const Dd = d_eff > 0 ? data.sheaveDiameter / d_eff : 0;
   
   let sf_required = 12;
   if (Dd > 0 && N_equiv > 0) {
@@ -87,12 +91,25 @@ export function computeLiftCalculations(data: any) {
   const bucklingFactor = (data.carMass + data.ratedLoad) * g * omega / data.railArea;
   const maxDeflection = Math.min(5, data.bracketDist / 500);
 
+  // Guide Rails - Fastening & Fatigue
+  const boltArea = Math.PI * Math.pow((data.railBoltDiameter || 12) / 2, 2);
+  const totalBoltArea = boltArea * (data.railNumBoltsPerJoint || 8);
+  const railConnectionStress = ((data.carMass + data.ratedLoad) * g) / totalBoltArea;
+  const lubFactor = data.railLubrication === 'dry' ? 0.8 : (data.railLubrication === 'oiled' ? 1.2 : 1.5);
+  const estimatedFatigueLife = (data.loadCycles || 1000000) * lubFactor;
+
   // Buffer Energy Calculation
   const impactMass = data.carMass + data.ratedLoad; // Worst case: Car + rated load
   const v_impact = 1.15 * data.speed;
   const Ek = 0.5 * impactMass * Math.pow(v_impact, 2); // Kinetic Energy (Joules)
   const Ep = impactMass * g * (data.bufferStroke / 1000); // Potential Energy across stroke (Joules)
   const bufferEnergyTotal = Ek + Ep;
+  
+  // Non-linear integration based on user-defined exponent (Clause 4.5.3)
+  // F(x) = F_max * (x/h)^exponent
+  // Integral = (F_max * h) / (exponent + 1) => solving for F_max required to dissipate Ek+Ep
+  const nExponent = data.bufferForceCurveExponent || 1;
+  const bufferFmaxRequired = (bufferEnergyTotal * (nExponent + 1)) / (data.bufferStroke / 1000 || 0.001);
 
   // Safety Gear & OSG
   const minTripping = 1.15 * data.speed;
@@ -103,6 +120,13 @@ export function computeLiftCalculations(data: any) {
   const totalMass = data.carMass + data.ratedLoad;
   const retardationG = data.safetyGearBrakingForce > 0 ? (data.safetyGearBrakingForce / (totalMass * g)) - 1 : 0;
   
+  // Sling Strength Calculation
+  const slingTotalArea = (data.uprightArea || 1) * 2; // Two uprights
+  const slingWy = (data.uprightWy || 1) * 2;
+  const F_safety_gear_total = totalMass * g * (1 + retardationG);
+  const slingBendingMoment = (F_safety_gear_total * (data.slingWidth || 1) / 2) / 1000; // Simplified Moment (N*m)
+  const uprightStress = (F_safety_gear_total / slingTotalArea) + ((slingBendingMoment * 1000) / slingWy); // MPa
+
   // ACOP
   const acop_max_limit = data.speed <= 1.0 ? 1.15 * data.speed + 0.25 : 1.15 * data.speed;
 
@@ -121,13 +145,16 @@ export function computeLiftCalculations(data: any) {
       iso4344_Fmin, isBreakingLoadOk
     },
     guideRails: {
-      lambda, omega, bucklingFactor, maxDeflection
+      lambda, omega, bucklingFactor, maxDeflection, railConnectionStress, estimatedFatigueLife
     },
     safetyGear: {
       minTripping, maxTripping, totalMass, retardationG, acop_max_limit
     },
     buffers: {
-      Ek, Ep, totalEnergy: bufferEnergyTotal
+      Ek, Ep, totalEnergy: bufferEnergyTotal, FmaxRequired: bufferFmaxRequired
+    },
+    sling: {
+      uprightStress, slingTotalArea, slingWy, slingBendingMoment, F_safety_gear_total
     },
     hydraulic: {
       A_ram, P_hyd, pressure

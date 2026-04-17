@@ -33,9 +33,11 @@ export const TractionSheavesModule = ({ data, onChange }: { data: ProjectData, o
             <div className="p-6 bg-surface-container-lowest border border-outline-variant/10 space-y-4">
               <LiftField label="Sheave Diameter (D)" name="sheaveDiameter" unit="mm" data={data} onChange={onChange} min={200} max={1000} step={10} />
               <LiftField label="Rope Diameter (d)" name="ropeDiameter" unit="mm" data={data} onChange={onChange} min={4} max={20} step={0.5} />
+              <LiftField label="Rope Wear Reduction" name="ropeWearPercentage" unit="%" data={data} onChange={onChange} min={0} max={15} step={1} suggestion="Simulate rope reduction over time" />
+              
               <div className="space-y-1 group">
                 <div className="flex justify-between items-center text-[11px] font-bold text-on-surface-variant uppercase">
-                  <label>D/d Ratio</label>
+                  <label>D/d Ratio (Nominal)</label>
                   {data.sheaveDiameter / data.ropeDiameter < 40 && <span className="text-[9px] text-error font-bold animate-pulse">Required: ≥ 40</span>}
                 </div>
                 <input 
@@ -109,11 +111,11 @@ export const TractionSheavesModule = ({ data, onChange }: { data: ProjectData, o
               Compliance Checks
             </h4>
             
-            <div className={`p-4 border ${data.sheaveDiameter/data.ropeDiameter >= 40 ? 'bg-emerald-50 border-emerald-200' : 'bg-error-container/10 border-error/20'}`}>
-              <p className="text-[10px] font-bold uppercase mb-1">D/d Ratio</p>
-              <p className="text-xl font-black">{formatNumber(data.sheaveDiameter/data.ropeDiameter)}</p>
+            <div className={`p-4 border ${calc.traction.DdRatio >= 40 ? 'bg-emerald-50 border-emerald-200' : 'bg-error-container/10 border-error/20'}`}>
+              <p className="text-[10px] font-bold uppercase mb-1">Effective D/d Ratio</p>
+              <p className="text-xl font-black">{formatNumber(calc.traction.DdRatio, 1)}</p>
               <p className="mt-2 text-[10px] opacity-70">
-                Required: ≥ 40
+                Required: ≥ 40 (Nominal D/d is {formatNumber(data.sheaveDiameter/data.ropeDiameter, 1)})
               </p>
             </div>
 

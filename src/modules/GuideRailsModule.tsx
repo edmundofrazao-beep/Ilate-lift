@@ -144,6 +144,8 @@ export const GuideRailsModule = ({ data, onChange, view = 'all' }: { data: Proje
             <LiftField label="Elastic Modulus (E)" name="materialE" unit="N/mm²" data={data} onChange={onChange} min={100000} max={300000} required />
             <LiftField label="Yield Strength (Rp0.2)" name="materialYield" unit="N/mm²" data={data} onChange={onChange} min={100} max={600} required suggestion="Use higher grade steel (e.g. S355) if stresses are too high." />
             <LiftField label="Bracket Distance (l)" name="bracketDist" unit="mm" data={data} onChange={onChange} min={500} max={6000} required suggestion="Reduce bracket distance to significantly lower bending stress and deflection." />
+            <LiftField label="Joint Bolts per side" name="railNumBoltsPerJoint" unit="" data={data} onChange={onChange} min={4} max={16} step={2} suggestion="Typical fishplate connection" />
+            <LiftField label="Bolt Diameter" name="railBoltDiameter" unit="mm" data={data} onChange={onChange} min={8} max={24} step={2} />
             <div className="space-y-1 mt-4">
               <label className="text-[10px] font-bold uppercase opacity-60">Rail Lubrication Condition</label>
               <select 
@@ -267,7 +269,31 @@ export const GuideRailsModule = ({ data, onChange, view = 'all' }: { data: Proje
               <div>δy: {formatNumber(delta_y)}</div>
             </div>
           </div>
-        </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
+            <div className={`p-6 border ${guideRails.railConnectionStress < data.materialYield / 2 ? 'bg-surface-container-lowest border-outline-variant/10' : 'bg-error-container/10 border-error/20'}`}>
+              <div className="flex items-center justify-between mb-4">
+                <h4 className="text-xs font-bold uppercase text-primary">Rail Fastening (Bolt Stress)</h4>
+              </div>
+              <p className="text-2xl font-black">{formatNumber(guideRails.railConnectionStress)} <span className="text-xs font-normal opacity-50">N/mm²</span></p>
+              <div className="mt-4 flex items-center gap-2">
+                {guideRails.railConnectionStress < data.materialYield / 2 ? <CheckCircle2 size={14} className="text-emerald-600" /> : <AlertTriangle size={14} className="text-amber-500" />}
+                <span className="text-[10px] font-bold uppercase opacity-70">Safety Limit (50% yield): {formatNumber(data.materialYield / 2)}</span>
+              </div>
+            </div>
+
+            <div className="p-6 border bg-surface-container-lowest border-outline-variant/10">
+              <div className="flex items-center justify-between mb-4">
+                <h4 className="text-xs font-bold uppercase text-primary">Fatigue Life Estimate</h4>
+              </div>
+              <p className="text-2xl font-black">{formatNumber(guideRails.estimatedFatigueLife / 1000000, 1)} <span className="text-xs font-normal opacity-50">Million Cycles</span></p>
+              <div className="mt-4 flex items-center gap-2">
+                <CheckCircle2 size={14} className="text-emerald-600" />
+                <span className="text-[10px] font-bold uppercase opacity-70">Factor scaled by lubrication: {data.railLubrication}</span>
+              </div>
+            </div>
+          </div>
 
         <div className="mt-8 space-y-6">
           <CollapsibleSection title="ISO 8100-2:2026 Guide Rail Formula Details" icon={Info}>

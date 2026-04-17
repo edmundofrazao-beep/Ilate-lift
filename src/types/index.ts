@@ -44,6 +44,7 @@ export interface ProjectData {
   numReverseBends: number; // Npr
   ropeBreakingLoad: number; // Fmin (N)
   ropeGrade: number; // ISO 4344 Tensile Grade
+  ropeWearPercentage: number; // 0-100% reduction in diameter over time
   // Safety Gear Advanced
   safetyGearMaxMass: number; // P+Q max (kg)
   safetyGearBrakingForce: number; // Fb (N)
@@ -60,12 +61,15 @@ export interface ProjectData {
   bufferMaxMass: number; // kg
   bufferMinMass: number; // kg
   bufferIsLinear: boolean;
+  bufferForceCurveExponent: number; // For non-linear buffers (Clause 4.5.3)
   bufferManualOverride: boolean;
   bufferManualStroke: number; // mm
   // Sling Properties
   uprightSection: string;
   uprightArea: number; // A (mm2)
   uprightWy: number; // Wy (mm3)
+  slingWidth: number; // W (mm)
+  slingDepth: number; // D (mm)
   slingHeight: number; // H (mm)
   // Sheave Properties
   sheaveHardness: number; // HB
@@ -89,6 +93,9 @@ export interface ProjectData {
   osgManufacturer: string;
   osgModel: string;
   osgSerialNumber: string;
+  // Guide Rail Fastening
+  railBoltDiameter: number; // mm
+  railNumBoltsPerJoint: number; // count
   // EN 81-28 (Remote Alarms)
   alarmButtonType: 'NO' | 'NC';
   alarmBackupBatteryTime: number; // hours

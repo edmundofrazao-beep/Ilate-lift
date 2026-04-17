@@ -32,10 +32,11 @@ export const SafetyComponentsModule = ({ data, onChange, section = 'all' }: { da
   // 4.5 Buffer Logic
   const impactMass = bufferTarget === 'car' ? (data.carMass + data.ratedLoad) : data.cwtMass;
   const v_impact = 1.15 * data.speed; // Impact speed is 115% of rated speed
-  const Ek = 0.5 * impactMass * v_impact * v_impact;
   const h_m = data.bufferStroke / 1000;
-  const Ep = impactMass * g * h_m;
-  const Etotal = Ek + Ep;
+  const { buffers } = computeLiftCalculations(data);
+  const Ek = buffers.Ek;
+  const Ep = buffers.Ep;
+  const Etotal = buffers.totalEnergy;
 
   // New ISO 8100-2 Buffer Speed Validation
   let isBufferTypeValid = true;
@@ -51,22 +52,10 @@ export const SafetyComponentsModule = ({ data, onChange, section = 'all' }: { da
     const eta = 0.5;
     Ecap = impactMass * (1.0 * g + g) * h_m * eta; // Capacity at 1.0gn limit
   } else {
-    // Numerical integration of a non-linear force-stroke curve for energy dissipation buffer
-    // Simulating a hydraulic buffer profile where force rises quickly and plateaus
-    const steps = 100;
-    const dx = h_m / steps;
-    const F_max = impactMass * (1.0 * g + g); // Max force at 1.0gn
-    let integratedEnergy = 0;
-    for (let i = 0; i < steps; i++) {
-      const normalizedX1 = (i * dx) / h_m;
-      const normalizedX2 = ((i + 1) * dx) / h_m;
-      // Simulated hydraulic profile: F(x) = F_max * (1 - exp(-10 * x/h))
-      const F1 = F_max * (1 - Math.exp(-10 * normalizedX1));
-      const F2 = F_max * (1 - Math.exp(-10 * normalizedX2));
-      // Trapezoidal rule integration
-      integratedEnergy += ((F1 + F2) / 2) * dx;
-    }
-    Ecap = integratedEnergy;
+    // Integration using the user-defined exponent curve F(x) = F_max * (x/h)^exponent
+    const nExponent = data.bufferForceCurveExponent || 1.5;
+    const F_max = impactMass * (1.0 * g + g); // Max force at 1.0gn limit
+    Ecap = (F_max * h_m) / (nExponent + 1);
   }
   
   // ISO 8100-2:2026 Clause 4.5.2
@@ -281,6 +270,8 @@ export const SafetyComponentsModule = ({ data, onChange, section = 'all' }: { da
                     <h5 className="text-[10px] font-bold uppercase text-primary">Overspeed Governor Link</h5>
                     <LiftField label="OSG Max Braking Force (F_max)" name="osgMaxBrakingForce" unit="N" data={data} onChange={onChange} min={0} max={10000} />
                     <LiftField label="OSG Tensile Force (Ft)" name="osgTensileForce" unit="N" data={data} onChange={onChange} min={0} max={5000} />
+                    <LiftField label="OSG Rope Breaking Load" name="osgBreakingLoad" unit="N" data={data} onChange={onChange} min={0} max={20000} step={100} />
+                    
                     <div className={`p-3 rounded-sm border ${data.osgMaxBrakingForce >= data.osgTensileForce ? 'bg-emerald-500/10 border-emerald-500/20' : 'bg-error/10 border-error/20'}`}>
                       <div className="flex items-center justify-between mb-1">
                         <span className="text-[10px] font-bold uppercase">Force Validation</span>
@@ -288,6 +279,16 @@ export const SafetyComponentsModule = ({ data, onChange, section = 'all' }: { da
                       </div>
                       <span className={`text-[11px] font-bold ${data.osgMaxBrakingForce >= data.osgTensileForce ? 'text-emerald-600' : 'text-error'}`}>
                         {data.osgMaxBrakingForce >= data.osgTensileForce ? 'F_max is ≥ Ft' : 'F_max must be ≥ Ft'}
+                      </span>
+                    </div>
+
+                    <div className={`p-3 rounded-sm border ${data.osgBreakingLoad / Math.max(data.osgTensileForce, 1) >= 8.0 ? 'bg-emerald-500/10 border-emerald-500/20' : 'bg-error/10 border-error/20'}`}>
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="text-[10px] font-bold uppercase">Safety Factor</span>
+                        {data.osgBreakingLoad / Math.max(data.osgTensileForce, 1) >= 8.0 ? <CheckCircle2 size={14} className="text-emerald-500" /> : <XCircle size={14} className="text-error" />}
+                      </div>
+                      <span className={`text-[11px] font-bold ${data.osgBreakingLoad / Math.max(data.osgTensileForce, 1) >= 8.0 ? 'text-emerald-600' : 'text-error'}`}>
+                        Factor: {(data.osgBreakingLoad / Math.max(data.osgTensileForce, 1)).toFixed(1)} (Min 8.0)
                       </span>
                     </div>
                   </div>
@@ -516,6 +517,10 @@ export const SafetyComponentsModule = ({ data, onChange, section = 'all' }: { da
                     <label htmlFor="bufferLinear" className="text-[11px] font-bold text-on-surface-variant uppercase cursor-pointer">Linear Characteristic</label>
                   </div>
                   
+                  {!data.bufferIsLinear && (
+                    <LiftField label="Force Curve Exponent (n)" name="bufferForceCurveExponent" unit="" data={data} onChange={onChange} min={0.1} max={5} step={0.1} suggestion="E.g., 1.5 for slight progressivity, 3.0 for sharp rise" />
+                  )}
+
                   <div className="flex items-center gap-2 py-1 mt-2">
                     <input 
                       type="checkbox"

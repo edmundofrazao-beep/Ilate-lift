@@ -113,6 +113,30 @@ export const OverspeedGovernorModule = ({ data, onChange }: { data: ProjectData,
               <p className="mt-2 text-[10px] opacity-70">Required: ≥ 8.0</p>
             </div>
             
+            <div className="p-4 bg-surface-container-low border border-outline-variant/20 rounded-sm">
+              <h5 className="font-bold text-primary mb-3 uppercase text-[10px] flex items-center gap-1">
+                OSG Certificate Information
+              </h5>
+              <div className="space-y-2">
+                <div className="flex justify-between">
+                  <span className="text-[10px] text-on-surface-variant uppercase font-bold">Manufacturer</span>
+                  <span className="text-[10px] font-mono">{data.osgManufacturer || 'N/A'}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-[10px] text-on-surface-variant uppercase font-bold">Model</span>
+                  <span className="text-[10px] font-mono">{data.osgModel || 'N/A'}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-[10px] text-on-surface-variant uppercase font-bold">Serial Number</span>
+                  <span className="text-[10px] font-mono">{data.osgSerialNumber || 'N/A'}</span>
+                </div>
+                <div className="flex justify-between pt-2 mt-2 border-t border-outline-variant/10">
+                  <span className="text-[10px] text-on-surface-variant uppercase font-bold">Rope Break Load</span>
+                  <span className="text-[10px] font-mono">{formatNumber(data.osgBreakingLoad)} N</span>
+                </div>
+              </div>
+            </div>
+
             <div className="p-4 bg-primary/5 border border-primary/20 rounded-sm">
               <h5 className="font-bold text-primary mb-2 uppercase text-[10px] flex items-center gap-1">
                 <Info size={12} />
