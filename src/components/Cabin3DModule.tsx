@@ -162,6 +162,23 @@ export const Cabin3DModule: React.FC<Cabin3DProps> = ({
               <meshStandardMaterial color="#f8fafc" emissive="#fff" emissiveIntensity={0.1} />
             </mesh>
 
+            {/* Measures */}
+            <Html position={[0, -0.1, depth / 2]} center>
+              <div className="bg-black/60 text-white px-2 py-0.5 rounded text-[10px] whitespace-nowrap">
+                W: {(width * 1000).toFixed(0)} mm
+              </div>
+            </Html>
+            <Html position={[-width / 2 - 0.1, 0, 0]} center>
+              <div className="bg-black/60 text-white px-2 py-0.5 rounded text-[10px] whitespace-nowrap transform -rotate-90">
+                D: {(depth * 1000).toFixed(0)} mm
+              </div>
+            </Html>
+            <Html position={[width / 2, height / 2, depth / 2]} center>
+              <div className="bg-black/60 text-white px-2 py-0.5 rounded text-[10px] whitespace-nowrap">
+                H: {(height * 1000).toFixed(0)} mm
+              </div>
+            </Html>
+
             {/* Mirror (EN 81-70) */}
             {showAccessibility && (
               <mesh 

@@ -18,6 +18,7 @@ import {
   ShieldAlert,
   Box, 
   Lock,
+  Unlock,
   History, 
   FileText, 
   CheckSquare,
@@ -42,6 +43,7 @@ import {
 } from 'lucide-react';
 import { Shaft3DModule } from './components/Shaft3DModule';
 import { Cabin3DModule } from './components/Cabin3DModule';
+import { computeLiftCalculations } from './lib/calculations';
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
 
@@ -90,6 +92,7 @@ interface ProjectData {
   numSimpleBends: number; // Nps
   numReverseBends: number; // Npr
   ropeBreakingLoad: number; // Fmin (N)
+  ropeGrade: number; // ISO 4344 Tensile Grade
   // Safety Gear Advanced
   safetyGearMaxMass: number; // P+Q max (kg)
   safetyGearBrakingForce: number; // Fb (N)
@@ -123,12 +126,19 @@ interface ProjectData {
   dangerousFraction: number; // B (%)
   // Door Locking (4.2)
   doorLockingForce: number; // N
-  doorLockingEngagement: number; // mm
-  doorLockingElectricalCheck: boolean;
+  doorMinimumEngagement: number; // mm
+  doorElectricalSafetyCheck: boolean;
+  doorLimitSwitchType: 'NO' | 'NC';
+  doorElectricalContinuity: boolean;
   osgMaxBrakingForce: number; // F_max (N)
   osgManufacturer: string;
   osgModel: string;
   osgSerialNumber: string;
+  // EN 81-28 (Remote Alarms)
+  alarmButtonType: 'NO' | 'NC';
+  alarmBackupBatteryTime: number; // hours
+  alarmCommunicationType: 'PSTN' | 'GSM' | 'VoIP';
+  alarmFilteringImplemented: boolean;
   // Shaft Geometry (Module I)
   shaftWidth: number; // mm
   shaftDepth: number; // mm
@@ -159,6 +169,10 @@ interface ProjectData {
   carToCounterweightClearance: number; // mm
   carToLandingSillClearance: number; // mm
   showClearances: boolean;
+  // EN 81-77 Seismic
+  seismicCategory: 0 | 1 | 2 | 3;
+  designAcceleration: number; // ad (m/s2)
+  primaryWaveDetection: boolean;
   // Additional Variables from HTML Engine
   Faux: number; // N
   delta_str_x: number; // mm
@@ -230,9 +244,9 @@ const formatNumber = (val: number, decimals = 2) => {
 const degToRad = (deg: number) => (deg * Math.PI) / 180;
 
 const InputGroup = ({ label, children }: { label: string, children: React.ReactNode }) => (
-  <div className="space-y-4 p-6 bg-surface-container-low border border-outline-variant/5">
-    <h3 className="text-xs font-bold uppercase tracking-widest text-primary border-b border-primary/20 pb-2">{label}</h3>
-    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+  <div className="space-y-4 p-6 bg-surface-container-lowest border border-outline-variant/10 rounded-lg shadow-sm">
+    <h3 className="text-xs font-bold uppercase tracking-widest text-primary border-b border-outline-variant/10 pb-2 mb-4">{label}</h3>
+    <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4">
       {children}
     </div>
   </div>
@@ -248,7 +262,9 @@ const LiftField = ({
   min,
   max,
   required = false,
-  suggestion
+  suggestion,
+  disabled = false,
+  step
 }: { 
   label: string, 
   name: keyof ProjectData, 
@@ -259,12 +275,14 @@ const LiftField = ({
   min?: number,
   max?: number,
   required?: boolean,
-  suggestion?: string
+  suggestion?: string,
+  disabled?: boolean,
+  step?: number
 }) => {
   const [error, setError] = React.useState<string | null>(null);
 
   const validate = (val: any) => {
-    if (type !== 'number') return null;
+    if (type !== 'number' || disabled) return null;
     const n = parseFloat(val);
     if (required && (val === '' || isNaN(n))) return 'Required';
     if (!isNaN(n)) {
@@ -274,20 +292,22 @@ const LiftField = ({
     return null;
   };
 
-  const isInvalid = !!error;
+  const isInvalid = !!error && !disabled;
 
   return (
-    <div className="space-y-1 group">
+    <div className={`space-y-1 group ${disabled ? 'opacity-50' : ''}`}>
       <div className="flex justify-between items-center">
         <label className="text-[11px] font-bold text-on-surface-variant uppercase flex items-center gap-1.5">
           {label}
           {isInvalid && <AlertCircle size={10} className="text-error" />}
         </label>
-        {error && <span className="text-[9px] text-error font-bold uppercase animate-pulse">{error}</span>}
+        {isInvalid && <span className="text-[9px] text-error font-bold uppercase animate-pulse">{error}</span>}
       </div>
       <div className="relative">
         <input 
           type={type}
+          disabled={disabled}
+          step={step}
           value={typeof data[name] === 'boolean' ? undefined : (data[name] as string | number)}
           checked={typeof data[name] === 'boolean' ? (data[name] as boolean) : undefined}
           onChange={(e) => {
@@ -302,12 +322,26 @@ const LiftField = ({
           }}
           className={`
             ${type === 'checkbox' ? "rounded-sm border-outline-variant/30 text-primary focus:ring-primary" : "w-full bg-surface-container-lowest border rounded-sm px-3 py-2 text-sm focus:ring-1 focus:ring-primary outline-none transition-all"}
-            ${error ? 'border-error ring-1 ring-error bg-error/5' : 'border-outline-variant/20 hover:border-primary/30'}
+            ${isInvalid ? 'border-error ring-1 ring-error bg-error/5' : 'border-outline-variant/20 hover:border-primary/30'}
+            ${disabled ? 'bg-surface-container-low cursor-not-allowed' : ''}
           `}
         />
         {unit && <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] font-bold text-on-surface-variant opacity-50">{unit}</span>}
       </div>
-      {isInvalid && suggestion && (
+      {(!disabled && type === 'number' && min !== undefined && max !== undefined) && (
+        <div className="mt-1">
+          <input 
+            type="range"
+            min={min}
+            max={max}
+            step={step || ((max - min) > 100 ? 1 : (max - min) > 10 ? 0.1 : 0.01)}
+            value={data[name] as number}
+            onChange={(e) => onChange({ [name]: parseFloat(e.target.value) })}
+            className="w-full h-1 bg-surface-container-low rounded-lg appearance-none cursor-pointer accent-primary"
+          />
+        </div>
+      )}
+      {isInvalid && suggestion && !disabled && (
         <p className="text-[9px] text-error/80 italic font-medium mt-1 leading-tight">
           Suggestion: {suggestion}
         </p>
@@ -315,6 +349,33 @@ const LiftField = ({
     </div>
   );
 };
+
+const SliderField = ({ label, value, onChange, min, max, unit }: { label: string, value: number, onChange: (val: number) => void, min: number, max: number, unit: string }) => (
+  <div className="space-y-1">
+    <div className="flex justify-between items-center text-[10px] font-bold uppercase">
+      <span className="opacity-50">{label}</span>
+      <span className="text-primary">{value} {unit}</span>
+    </div>
+    <div className="flex items-center gap-4">
+      <input 
+        type="range" 
+        min={min} 
+        max={max} 
+        value={value} 
+        onChange={(e) => onChange(parseFloat(e.target.value))} 
+        className="flex-1 h-1.5 bg-surface-container-low rounded-lg appearance-none cursor-pointer accent-primary" 
+      />
+      <input 
+        type="number"
+        min={min}
+        max={max}
+        value={value}
+        onChange={(e) => onChange(parseFloat(e.target.value) || min)}
+        className="w-20 bg-surface-container-lowest border border-outline-variant/20 rounded-sm px-2 py-1 text-xs focus:ring-1 focus:ring-primary outline-none"
+      />
+    </div>
+  </div>
+);
 
 const CollapsibleSection = ({ title, children, icon: Icon }: { title: string, children: React.ReactNode, icon?: any }) => {
   const [isOpen, setIsOpen] = React.useState(false);
@@ -416,6 +477,74 @@ const OverviewModule = ({ modules, onSelect }: { modules: ModuleStatus[], onSele
   </div>
 );
 
+const SEISMIC_CATEGORIES = [
+  { id: 0, label: 'Category 0 (ad ≤ 1 m/s²)' },
+  { id: 1, label: 'Category 1 (1 < ad ≤ 2.5 m/s²)' },
+  { id: 2, label: 'Category 2 (2.5 < ad ≤ 4 m/s²)' },
+  { id: 3, label: 'Category 3 (ad > 4 m/s²)' },
+];
+
+const SeismicModule = ({ data, onChange }: { data: ProjectData, onChange: (newData: Partial<ProjectData>) => void }) => {
+  return (
+    <div className="space-y-8">
+      <div className="bg-surface-container-low p-8 border-t-2 border-primary">
+        <div className="flex items-center justify-between mb-8">
+          <h3 className="text-xl font-bold">Seismic Conditions (EN 81-77)</h3>
+          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 uppercase tracking-widest">Verification Status active</span>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8">
+          <InputGroup label="Seismic Parameters (ad)">
+            <LiftField label="Design Acceleration (ad)" name="designAcceleration" unit="m/s²" data={data} onChange={(v) => {
+              const ad = v.designAcceleration || 0;
+              let cat = 0;
+              if (ad > 1 && ad <= 2.5) cat = 1;
+              else if (ad > 2.5 && ad <= 4) cat = 2;
+              else if (ad > 4) cat = 3;
+              onChange({ designAcceleration: ad, seismicCategory: cat as any });
+            }} min={0} required />
+            <div className="space-y-1">
+              <label className="text-[11px] font-bold text-on-surface-variant uppercase flex items-center gap-1.5">Seismic Category</label>
+              <div className="w-full bg-surface-container-lowest border border-outline-variant/20 rounded-sm px-3 py-2 text-sm text-on-surface opacity-70">
+                {SEISMIC_CATEGORIES.find(c => c.id === data.seismicCategory)?.label || 'Category 0'}
+              </div>
+            </div>
+            <div className="flex items-center gap-3 p-2 bg-surface-container-lowest border border-outline-variant/10 rounded-sm">
+              <input type="checkbox" checked={data.primaryWaveDetection} onChange={e => onChange({ primaryWaveDetection: e.target.checked })} className="rounded-sm border-outline-variant/30 text-primary focus:ring-primary" />
+              <label className="text-[11px] font-bold text-on-surface-variant uppercase cursor-pointer">Primary Wave Detection</label>
+            </div>
+          </InputGroup>
+          <div className="p-6 bg-surface-container-lowest border border-outline-variant/10 rounded-sm">
+            <h4 className="text-xs font-bold uppercase tracking-widest text-primary mb-4 flex items-center gap-2">
+              <ShieldCheck size={14} />
+              EN 81-77 Requirements
+            </h4>
+            <div className="space-y-3">
+               <div className="flex items-center gap-3">
+                 <div className={`w-5 h-5 rounded flex items-center justify-center border ${data.seismicCategory >= 1 ? 'bg-emerald-600 border-emerald-600' : 'border-outline-variant opacity-50'}`}>
+                   {data.seismicCategory >= 1 && <CheckSquare size={14} className="text-white" />}
+                 </div>
+                 <span className={`text-xs font-medium ${data.seismicCategory >= 1 ? 'text-on-surface' : 'text-on-surface-variant line-through'}`}>Prevention of snag points (Cat 1-3)</span>
+               </div>
+               <div className="flex items-center gap-3">
+                 <div className={`w-5 h-5 rounded flex items-center justify-center border ${data.seismicCategory >= 2 ? 'bg-emerald-600 border-emerald-600' : 'border-outline-variant opacity-50'}`}>
+                   {data.seismicCategory >= 2 && <CheckSquare size={14} className="text-white" />}
+                 </div>
+                 <span className={`text-xs font-medium ${data.seismicCategory >= 2 ? 'text-on-surface' : 'text-on-surface-variant line-through'}`}>Car & Cwt Retaining devices (Cat 2-3)</span>
+               </div>
+               <div className="flex items-center gap-3">
+                 <div className={`w-5 h-5 rounded flex items-center justify-center border ${data.seismicCategory === 3 ? 'bg-emerald-600 border-emerald-600' : 'border-outline-variant opacity-50'}`}>
+                   {data.seismicCategory === 3 && <CheckSquare size={14} className="text-white" />}
+                 </div>
+                 <span className={`text-xs font-medium ${data.seismicCategory === 3 ? 'text-on-surface' : 'text-on-surface-variant line-through'}`}>Seismic Detection System (Cat 3)</span>
+               </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 const GlobalProjectModule = ({ data, onChange }: { data: ProjectData, onChange: (newData: Partial<ProjectData>) => void }) => {
   return (
     <div className="space-y-6">
@@ -454,9 +583,34 @@ const GlobalProjectModule = ({ data, onChange }: { data: ProjectData, onChange: 
           <LiftField label="Travel (H)" name="travel" unit="m" data={data} onChange={onChange} min={1} max={500} required />
           <LiftField label="Number of Stops" name="stops" data={data} onChange={onChange} min={2} max={128} required />
           <LiftField label="Floor to Floor Height" name="floorHeight" unit="m" data={data} onChange={onChange} min={2} required />
-          <LiftField label="Shaft Width" name="shaftWidth" unit="mm" data={data} onChange={onChange} min={1000} required />
-          <LiftField label="Shaft Depth" name="shaftDepth" unit="mm" data={data} onChange={onChange} min={1000} required />
-          <LiftField label="Shaft Height" name="shaftHeight" unit="mm" data={data} onChange={onChange} min={3000} required />
+          
+          <div className="col-span-1 md:col-span-2 pt-4 border-t border-outline-variant/10">
+            <h4 className="text-[10px] font-bold text-on-surface-variant uppercase mb-3">Shaft Dimensions</h4>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <LiftField label="Width (Ww)" name="shaftWidth" unit="mm" data={data} onChange={onChange} min={1000} required />
+              <LiftField label="Depth (Dw)" name="shaftDepth" unit="mm" data={data} onChange={onChange} min={1000} required />
+              <LiftField label="Pit Depth" name="pitDepth" unit="mm" data={data} onChange={onChange} min={500} required />
+              <LiftField label="Headroom Height" name="headroomHeight" unit="mm" data={data} onChange={onChange} min={2500} required />
+            </div>
+          </div>
+          
+          <div className="col-span-1 md:col-span-2 pt-4 border-t border-outline-variant/10">
+            <h4 className="text-[10px] font-bold text-on-surface-variant uppercase mb-3">Cabin Dimensions</h4>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <LiftField label="Width (Wc)" name="carWidth" unit="mm" data={data} onChange={onChange} min={600} max={data.shaftWidth - 200} required />
+              <LiftField label="Depth (Dc)" name="carDepth" unit="mm" data={data} onChange={onChange} min={600} max={data.shaftDepth - 200} required />
+              <LiftField label="Height (Hc)" name="carHeight" unit="mm" data={data} onChange={onChange} min={2000} required />
+            </div>
+            {(data.carWidth >= data.shaftWidth || data.carDepth >= data.shaftDepth) && (
+              <div className="mt-3 p-3 bg-error-container/20 border border-error/50 rounded-sm flex items-start gap-2">
+                <AlertCircle size={14} className="text-error mt-0.5" />
+                <p className="text-[11px] text-error">
+                  <strong>Critical Error:</strong> Cabin dimensions exceed shaft dimensions! 
+                  Ensure appropriate clearances are maintained (typically at least 100mm on each side).
+                </p>
+              </div>
+            )}
+          </div>
         </InputGroup>
       </div>
     </div>
@@ -464,45 +618,9 @@ const GlobalProjectModule = ({ data, onChange }: { data: ProjectData, onChange: 
 };
 
 const TractionModule = ({ data, onChange }: { data: ProjectData, onChange: (newData: Partial<ProjectData>) => void }) => {
-  const g = 9.81;
-  const r = parseInt(data.suspension.split(':')[0]);
+  const calc = computeLiftCalculations(data);
+  const { T1_static, ratio_static, ratio_dynamic, isOk, DdRatio, p_groove, p_allow, expMuAlpha } = calc.traction;
   
-  // Traction Calculations (ISO 8100-2:2026)
-  const T1_static = ((data.carMass + data.ratedLoad) * g) / r;
-  const T2_static = (data.cwtMass * g) / r;
-  
-  // Dynamic Loads (Formula 28)
-  const T1_dynamic = T1_static * (1 + data.acceleration / g);
-  const T2_dynamic = T2_static * (1 - data.acceleration / g);
-  
-  const mu_dynamic = 0.1 / (1 + data.speed / 10);
-  
-  const beta = degToRad(data.undercutAngle);
-  const gamma = degToRad(data.grooveAngle);
-  
-  // f_load for different groove types
-  let f_load = 0;
-  if (data.grooveType === 'V') {
-    f_load = data.frictionCoeff * (4 / Math.sin(gamma / 2));
-  } else if (data.grooveType === 'semi-circular') {
-    f_load = data.frictionCoeff * (4 * (Math.cos(gamma/2) - Math.sin(beta/2))) / (Math.PI - beta - gamma - Math.sin(beta) + Math.sin(gamma));
-  } else {
-    f_load = data.frictionCoeff * 4 / Math.PI;
-  }
-  
-  const alpha = degToRad(data.wrapAngle);
-  const expMuAlpha = Math.exp(f_load * alpha);
-  const ratio_static = T2_static > 0 ? T1_static / T2_static : 0;
-  const ratio_dynamic = T2_dynamic > 0 ? T1_dynamic / T2_dynamic : 0;
-  
-  const isOk = ratio_static <= expMuAlpha && ratio_dynamic <= expMuAlpha;
-
-  const DdRatio = data.ropeDiameter > 0 ? data.sheaveDiameter / data.ropeDiameter : 0;
-  
-  // Specific Pressure (Formula 34)
-  const p_groove = (T1_static + T2_static) / (data.numRopes * data.ropeDiameter * data.sheaveDiameter * Math.sin(gamma/2 || 1));
-  const p_allow = (data.sheaveHardness * 10) / (1 + 2 * data.speed);
-
   return (
     <div className="space-y-8">
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -661,28 +779,8 @@ const TractionModule = ({ data, onChange }: { data: ProjectData, onChange: (newD
 };
 
 const RopesModule = ({ data, onChange }: { data: ProjectData, onChange: (newData: Partial<ProjectData>) => void }) => {
-  const g = 9.81;
-  const r = parseInt(data.suspension.split(':')[0]);
-  const Fstatic_total = (data.carMass + data.ratedLoad) * g;
-  const Fstatic_per_rope = data.numRopes > 0 ? Fstatic_total / (r * data.numRopes) : 0;
-  
-  // N_equiv calculation (ISO 8100-2:2026)
-  const N_equiv = data.numSimpleBends + 4 * data.numReverseBends;
-  
-  // Safety Factor Required (Sf) - Formula 36
-  // Sf = 10^(2.6834 - log(N_equiv / 2.6834e6) / log(D/d))
-  const Dd = data.ropeDiameter > 0 ? data.sheaveDiameter / data.ropeDiameter : 0;
-  let sf_required = 12; // Minimum default
-  
-  if (Dd > 0 && N_equiv > 0) {
-    const logN = Math.log10(N_equiv / (2.6834 * Math.pow(10, 6)));
-    const logDd = Math.log10(Dd);
-    sf_required = Math.pow(10, 2.6834 - (logN / logDd));
-  }
-
-  // Actual Safety Factor
-  const sf_actual = Fstatic_per_rope > 0 ? data.ropeBreakingLoad / Fstatic_per_rope : 0;
-  const isSfOk = sf_actual >= sf_required;
+  const calc = computeLiftCalculations(data);
+  const { Fstatic_per_rope, N_equiv, sf_required, sf_actual, isSfOk, iso4344_Fmin, isBreakingLoadOk } = calc.ropes;
 
   // Placeholder Lifetime Estimation (refined)
   const lifetime_est = useMemo(() => {
@@ -761,7 +859,26 @@ const RopesModule = ({ data, onChange }: { data: ProjectData, onChange: (newData
           <InputGroup label="Suspension Parameters">
             <LiftField label="Number of Ropes (n)" name="numRopes" data={data} onChange={onChange} min={1} required suggestion="Increase number of ropes to improve safety factor." />
             <LiftField label="Diameter/Thickness (d)" name="ropeDiameter" unit="mm" data={data} onChange={onChange} min={4} max={20} required suggestion="D/d ratio must be ≥ 40 for steel ropes." />
-            <LiftField label="Breaking Load (Fmin)" name="ropeBreakingLoad" unit="N" data={data} onChange={onChange} min={1000} required suggestion="Check manufacturer data for minimum breaking force." />
+            <div className="space-y-1">
+              <label className="text-[11px] font-bold text-on-surface-variant uppercase">Rope Grade (ISO 4344)</label>
+              <select 
+                value={data.ropeGrade}
+                onChange={(e) => onChange({ ropeGrade: parseInt(e.target.value) })}
+                className="w-full bg-surface-container-low border border-outline-variant/20 rounded-sm px-3 py-2 text-sm focus:ring-1 focus:ring-primary outline-none"
+              >
+                <option value="1570">1570 N/mm²</option>
+                <option value="1770">1770 N/mm² (Standard)</option>
+                <option value="1960">1960 N/mm² (High Strength)</option>
+              </select>
+            </div>
+            <div className="flex flex-col gap-1 p-3 bg-surface-container-lowest border border-outline-variant/10 rounded-sm">
+              <span className="text-[10px] uppercase font-bold text-on-surface-variant">ISO 4344 Min. Breaking Load</span>
+              <div className="flex items-center justify-between">
+                <span className="font-mono text-sm">{formatNumber(iso4344_Fmin)} N</span>
+                {isBreakingLoadOk ? <CheckSquare size={14} className="text-emerald-500" /> : <AlertTriangle size={14} className="text-error" />}
+              </div>
+            </div>
+            <LiftField label="Actual Breaking Load" name="ropeBreakingLoad" unit="N" data={data} onChange={onChange} min={1000} required suggestion={`Should be >= ${formatNumber(iso4344_Fmin)} N per ISO 4344.`} />
             <div className="space-y-1">
               <label className="text-[11px] font-bold text-on-surface-variant uppercase">Groove Type</label>
               <select 
@@ -996,14 +1113,14 @@ const GuideRailsModule = ({ data, onChange }: { data: ProjectData, onChange: (ne
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8">
           <InputGroup label="Rail Geometric Properties">
-            <LiftField label="Section Area (A)" name="railArea" unit="mm²" data={data} onChange={onChange} min={100} required suggestion="Increase section area to reduce combined stress." />
-            <LiftField label="Inertia Moment (Iy)" name="railIy" unit="mm⁴" data={data} onChange={onChange} min={1000} required suggestion="Higher Iy reduces deflection in the Y axis." />
-            <LiftField label="Inertia Moment (Ix)" name="railIx" unit="mm⁴" data={data} onChange={onChange} min={1000} required suggestion="Higher Ix reduces deflection in the X axis." />
-            <LiftField label="Section Modulus (Wy)" name="railWy" unit="mm³" data={data} onChange={onChange} min={100} required suggestion="Wy directly affects bending stress capacity." />
-            <LiftField label="Section Modulus (Wx)" name="railWx" unit="mm³" data={data} onChange={onChange} min={100} required />
-            <LiftField label="Gyration Radius (iy)" name="railIyRadius" unit="mm" data={data} onChange={onChange} min={1} required suggestion="Radius of gyration affects buckling stability." />
-            <LiftField label="Gyration Radius (ix)" name="railIxRadius" unit="mm" data={data} onChange={onChange} min={1} required />
-            <LiftField label="Rail Weight (q1)" name="railWeight" unit="kg/m" data={data} onChange={onChange} min={1} required />
+            <LiftField disabled={data.railProfile !== 'Custom'} label="Section Area (A)" name="railArea" unit="mm²" data={data} onChange={onChange} min={100} required suggestion="Increase section area to reduce combined stress." />
+            <LiftField disabled={data.railProfile !== 'Custom'} label="Inertia Moment (Iy)" name="railIy" unit="mm⁴" data={data} onChange={onChange} min={1000} required suggestion="Higher Iy reduces deflection in the Y axis." />
+            <LiftField disabled={data.railProfile !== 'Custom'} label="Inertia Moment (Ix)" name="railIx" unit="mm⁴" data={data} onChange={onChange} min={1000} required suggestion="Higher Ix reduces deflection in the X axis." />
+            <LiftField disabled={data.railProfile !== 'Custom'} label="Section Modulus (Wy)" name="railWy" unit="mm³" data={data} onChange={onChange} min={100} required suggestion="Wy directly affects bending stress capacity." />
+            <LiftField disabled={data.railProfile !== 'Custom'} label="Section Modulus (Wx)" name="railWx" unit="mm³" data={data} onChange={onChange} min={100} required />
+            <LiftField disabled={data.railProfile !== 'Custom'} label="Gyration Radius (iy)" name="railIyRadius" unit="mm" data={data} onChange={onChange} min={1} required suggestion="Radius of gyration affects buckling stability." />
+            <LiftField disabled={data.railProfile !== 'Custom'} label="Gyration Radius (ix)" name="railIxRadius" unit="mm" data={data} onChange={onChange} min={1} required />
+            <LiftField disabled={data.railProfile !== 'Custom'} label="Rail Weight (q1)" name="railWeight" unit="kg/m" data={data} onChange={onChange} min={1} required />
           </InputGroup>
 
           <InputGroup label="Material & Installation">
@@ -1145,87 +1262,15 @@ const GuideRailsModule = ({ data, onChange }: { data: ProjectData, onChange: (ne
               Profile Properties ({data.guideType})
             </h4>
             <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-              <div className="space-y-1">
-                <label className="text-[9px] font-bold opacity-50 uppercase">Area (A) [mm²]</label>
-                <input 
-                  type="number"
-                  value={data.railArea}
-                  onChange={(e) => onChange({ railArea: safeNumber(e.target.value) })}
-                  className="w-full bg-surface-container-low border border-outline-variant/20 rounded-sm px-2 py-1 text-sm outline-none focus:ring-1 focus:ring-primary"
-                />
-              </div>
-              <div className="space-y-1">
-                <label className="text-[9px] font-bold opacity-50 uppercase">Inertia (Iy) [mm⁴]</label>
-                <input 
-                  type="number"
-                  value={data.railIy}
-                  onChange={(e) => onChange({ railIy: safeNumber(e.target.value) })}
-                  className="w-full bg-surface-container-low border border-outline-variant/20 rounded-sm px-2 py-1 text-sm outline-none focus:ring-1 focus:ring-primary"
-                />
-              </div>
-              <div className="space-y-1">
-                <label className="text-[9px] font-bold opacity-50 uppercase">Inertia (Ix) [mm⁴]</label>
-                <input 
-                  type="number"
-                  value={data.railIx}
-                  onChange={(e) => onChange({ railIx: safeNumber(e.target.value) })}
-                  className="w-full bg-surface-container-low border border-outline-variant/20 rounded-sm px-2 py-1 text-sm outline-none focus:ring-1 focus:ring-primary"
-                />
-              </div>
-              <div className="space-y-1">
-                <label className="text-[9px] font-bold opacity-50 uppercase">Radius (iy) [mm]</label>
-                <input 
-                  type="number"
-                  value={data.railIyRadius}
-                  onChange={(e) => onChange({ railIyRadius: safeNumber(e.target.value) })}
-                  className="w-full bg-surface-container-low border border-outline-variant/20 rounded-sm px-2 py-1 text-sm outline-none focus:ring-1 focus:ring-primary"
-                />
-              </div>
-              <div className="space-y-1">
-                <label className="text-[9px] font-bold opacity-50 uppercase">Radius (ix) [mm]</label>
-                <input 
-                  type="number"
-                  value={data.railIxRadius}
-                  onChange={(e) => onChange({ railIxRadius: safeNumber(e.target.value) })}
-                  className="w-full bg-surface-container-low border border-outline-variant/20 rounded-sm px-2 py-1 text-sm outline-none focus:ring-1 focus:ring-primary"
-                />
-              </div>
-              <div className="space-y-1">
-                <label className="text-[9px] font-bold opacity-50 uppercase">Modulus (Wy) [mm³]</label>
-                <input 
-                  type="number"
-                  value={data.railWy}
-                  onChange={(e) => onChange({ railWy: safeNumber(e.target.value) })}
-                  className="w-full bg-surface-container-low border border-outline-variant/20 rounded-sm px-2 py-1 text-sm outline-none focus:ring-1 focus:ring-primary"
-                />
-              </div>
-              <div className="space-y-1">
-                <label className="text-[9px] font-bold opacity-50 uppercase">Modulus (Wx) [mm³]</label>
-                <input 
-                  type="number"
-                  value={data.railWx}
-                  onChange={(e) => onChange({ railWx: safeNumber(e.target.value) })}
-                  className="w-full bg-surface-container-low border border-outline-variant/20 rounded-sm px-2 py-1 text-sm outline-none focus:ring-1 focus:ring-primary"
-                />
-              </div>
-              <div className="space-y-1">
-                <label className="text-[9px] font-bold opacity-50 uppercase">Weight (q1) [kg/m]</label>
-                <input 
-                  type="number"
-                  value={data.railWeight}
-                  onChange={(e) => onChange({ railWeight: safeNumber(e.target.value) })}
-                  className="w-full bg-surface-container-low border border-outline-variant/20 rounded-sm px-2 py-1 text-sm outline-none focus:ring-1 focus:ring-primary"
-                />
-              </div>
-              <div className="space-y-1">
-                <label className="text-[9px] font-bold opacity-50 uppercase">Bracket Dist. (l) [mm]</label>
-                <input 
-                  type="number"
-                  value={data.bracketDist}
-                  onChange={(e) => onChange({ bracketDist: safeNumber(e.target.value) })}
-                  className="w-full bg-surface-container-low border border-outline-variant/20 rounded-sm px-2 py-1 text-sm outline-none focus:ring-1 focus:ring-primary"
-                />
-              </div>
+              <LiftField label="Area (A)" name="railArea" unit="mm²" data={data} onChange={onChange} min={0} max={10000} />
+              <LiftField label="Inertia (Iy)" name="railIy" unit="mm⁴" data={data} onChange={onChange} min={0} max={10000000} />
+              <LiftField label="Inertia (Ix)" name="railIx" unit="mm⁴" data={data} onChange={onChange} min={0} max={10000000} />
+              <LiftField label="Radius (iy)" name="railIyRadius" unit="mm" data={data} onChange={onChange} min={0} max={100} />
+              <LiftField label="Radius (ix)" name="railIxRadius" unit="mm" data={data} onChange={onChange} min={0} max={100} />
+              <LiftField label="Modulus (Wy)" name="railWy" unit="mm³" data={data} onChange={onChange} min={0} max={100000} />
+              <LiftField label="Modulus (Wx)" name="railWx" unit="mm³" data={data} onChange={onChange} min={0} max={100000} />
+              <LiftField label="Weight (q1)" name="railWeight" unit="kg/m" data={data} onChange={onChange} min={0} max={100} />
+              <LiftField label="Bracket Dist. (l)" name="bracketDist" unit="mm" data={data} onChange={onChange} min={0} max={5000} />
             </div>
           </div>
 
@@ -1332,121 +1377,7 @@ const HydraulicModule = ({ data }: { data: ProjectData }) => {
   );
 };
 
-const ACOP_UCMP_Module = ({ data, onChange }: { data: ProjectData, onChange: (newData: Partial<ProjectData>) => void }) => {
-  const isAcopOk = data.acopTrippingSpeed > data.speed && data.acopTrippingSpeed <= 1.15 * data.speed + 0.25;
-  const isUcmpOk = data.ucmpDetectionDist <= 150; // Simplified requirement
-
-  return (
-    <div className="space-y-8">
-      <div className="bg-surface-container-low p-8 border-t-2 border-primary">
-        <div className="flex items-center justify-between mb-8">
-          <h3 className="text-xl font-bold">ACOP & UCMP Verification (4.7 / 4.8)</h3>
-          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700 uppercase tracking-widest">ISO 8100-2 Compliant</span>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-          {/* ACOP Section */}
-          <div className="space-y-6 p-6 bg-surface-container-lowest border border-outline-variant/10">
-            <div className="flex items-center gap-3 mb-2">
-              <ShieldAlert className="text-primary" size={20} />
-              <h4 className="text-sm font-bold uppercase tracking-wider">4.7 Ascending Car Overspeed Protection</h4>
-            </div>
-            
-            <div className="space-y-4">
-              <div className="space-y-1">
-                <label className="text-[11px] font-bold text-on-surface-variant uppercase">Protection Type</label>
-                <select 
-                  value={data.acopType}
-                  onChange={(e) => onChange({ acopType: e.target.value as any })}
-                  className="w-full bg-surface-container-low border border-outline-variant/20 rounded-sm px-3 py-2 text-sm outline-none"
-                >
-                  <option value="governor">Overspeed Governor</option>
-                  <option value="rope-brake">Rope Brake</option>
-                  <option value="safety-gear">Safety Gear</option>
-                </select>
-              </div>
-              <div className="space-y-1">
-                <label className="text-[11px] font-bold text-on-surface-variant uppercase">Tripping Speed [m/s]</label>
-                <input 
-                  type="number"
-                  value={data.acopTrippingSpeed}
-                  onChange={(e) => onChange({ acopTrippingSpeed: safeNumber(e.target.value) })}
-                  className="w-full bg-surface-container-low border border-outline-variant/20 rounded-sm px-3 py-2 text-sm outline-none"
-                />
-              </div>
-              
-              <div className={`p-4 rounded-sm border ${isAcopOk ? 'bg-emerald-50 border-emerald-200' : 'bg-error-container/10 border-error/20'}`}>
-                <div className="flex items-center justify-between mb-1">
-                  <span className="text-[10px] font-bold uppercase opacity-60">Verification Status</span>
-                  {isAcopOk ? <CheckCircle2 size={14} className="text-emerald-600" /> : <XCircle size={14} className="text-error" />}
-                </div>
-                <p className="text-xs font-medium mb-2">
-                  {isAcopOk 
-                    ? `Tripping speed of ${data.acopTrippingSpeed} m/s is within the normative range.` 
-                    : `Tripping speed must be > ${data.speed} m/s and ≤ ${(1.15 * data.speed + 0.25).toFixed(2)} m/s.`}
-                </p>
-                <div className="pt-2 border-t border-black/5">
-                  <p className="text-[10px] text-on-surface-variant italic">
-                    <strong>ISO 8100-2:2026 Clause 4.7.4.1:</strong> The means of protection shall detect ascending car overspeed at a speed not less than 115% of the rated speed, and not greater than the limits specified in 4.7.4.2.
-                  </p>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* UCMP Section */}
-          <div className="space-y-6 p-6 bg-surface-container-lowest border border-outline-variant/10">
-            <div className="flex items-center gap-3 mb-2">
-              <ShieldCheck className="text-primary" size={20} />
-              <h4 className="text-sm font-bold uppercase tracking-wider">4.8 Unintended Car Movement Protection</h4>
-            </div>
-            
-            <div className="space-y-4">
-              <div className="space-y-1">
-                <label className="text-[11px] font-bold text-on-surface-variant uppercase">Stopping Component</label>
-                <select 
-                  value={data.ucmpType}
-                  onChange={(e) => onChange({ ucmpType: e.target.value as any })}
-                  className="w-full bg-surface-container-low border border-outline-variant/20 rounded-sm px-3 py-2 text-sm outline-none"
-                >
-                  <option value="brake">Machine Brake</option>
-                  <option value="safety-gear">Safety Gear</option>
-                  <option value="valve">Rupture Valve</option>
-                </select>
-              </div>
-              <div className="space-y-1">
-                <label className="text-[11px] font-bold text-on-surface-variant uppercase">Detection Distance [mm]</label>
-                <input 
-                  type="number"
-                  value={data.ucmpDetectionDist}
-                  onChange={(e) => onChange({ ucmpDetectionDist: safeNumber(e.target.value) })}
-                  className="w-full bg-surface-container-low border border-outline-variant/20 rounded-sm px-3 py-2 text-sm outline-none"
-                />
-              </div>
-              
-              <div className={`p-4 rounded-sm border ${isUcmpOk ? 'bg-emerald-50 border-emerald-200' : 'bg-error-container/10 border-error/20'}`}>
-                <div className="flex items-center justify-between mb-1">
-                  <span className="text-[10px] font-bold uppercase opacity-60">Verification Status</span>
-                  {isUcmpOk ? <CheckCircle2 size={14} className="text-emerald-600" /> : <XCircle size={14} className="text-error" />}
-                </div>
-                <p className="text-xs font-medium mb-2">
-                  {isUcmpOk 
-                    ? `Detection distance of ${data.ucmpDetectionDist} mm is compliant with ISO 8100-2.` 
-                    : `Detection distance exceeds the typical 150mm limit for safe stopping.`}
-                </p>
-                <div className="pt-2 border-t border-black/5">
-                  <p className="text-[10px] text-on-surface-variant italic">
-                    <strong>ISO 8100-2:2026 Clause 4.8.3.1:</strong> The unintended movement shall be detected before the car leaves the unlocking zone. The car shall be stopped within 1200 mm from the landing (Clause 4.8.4).
-                  </p>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-};
+// Removed ACOP_UCMP_Module since it is already natively implemented inside SafetyComponentsModule
 
 const RuptureValveModule = ({ data, onChange }: { data: ProjectData, onChange: (newData: Partial<ProjectData>) => void }) => {
   const isFlowOk = data.ruptureValveFlow > 0;
@@ -1459,24 +1390,8 @@ const RuptureValveModule = ({ data, onChange }: { data: ProjectData, onChange: (
         4.9 Rupture Valves / Restrictors
       </h4>
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <div className="space-y-1">
-          <label className="text-[11px] font-bold text-on-surface-variant uppercase">Tripping Flow [L/min]</label>
-          <input 
-            type="number"
-            value={data.ruptureValveFlow}
-            onChange={(e) => onChange({ ruptureValveFlow: safeNumber(e.target.value) })}
-            className="w-full bg-surface-container-lowest border border-outline-variant/20 rounded-sm px-3 py-2 text-sm outline-none"
-          />
-        </div>
-        <div className="space-y-1">
-          <label className="text-[11px] font-bold text-on-surface-variant uppercase">Max Operating Pressure [MPa]</label>
-          <input 
-            type="number"
-            value={data.ruptureValvePressure}
-            onChange={(e) => onChange({ ruptureValvePressure: safeNumber(e.target.value) })}
-            className="w-full bg-surface-container-lowest border border-outline-variant/20 rounded-sm px-3 py-2 text-sm outline-none"
-          />
-        </div>
+        <LiftField label="Tripping Flow" name="ruptureValveFlow" unit="L/min" data={data} onChange={onChange} min={0} max={500} />
+        <LiftField label="Max Operating Pressure" name="ruptureValvePressure" unit="MPa" data={data} onChange={onChange} min={0} max={20} />
       </div>
       <div className="mt-4 p-4 bg-primary/5 border border-primary/10 rounded-sm">
         <p className="text-[10px] opacity-70 italic">
@@ -1503,6 +1418,9 @@ const ComponentLibraryModule = () => {
     { id: '4.13', name: 'Traction Sheaves', cat: 'Mechanical', status: 'implemented' },
     { id: '4.15', name: 'Hydraulic System', cat: 'Hydraulic', status: 'implemented' },
     { id: '4.18', name: 'SIL-rated Circuits', cat: 'Electrical', status: 'implemented' },
+    { id: 'EN 81-28', name: 'Remote Alarms on Lifts', cat: 'Safety/Comm', status: 'implemented' },
+    { id: 'EN 81-58', name: 'Fire Resistance of Doors', cat: 'Safety/Fire', status: 'implemented' },
+    { id: 'ISO 4344:2022', name: 'Steel Wire Ropes - Min Requirements', cat: 'Mechanical', status: 'implemented' },
   ];
 
   return (
@@ -2139,6 +2057,14 @@ const SafetyComponentsModule = ({ data, onChange, section = 'all' }: { data: Pro
   const h_m = data.bufferStroke / 1000;
   const Ep = impactMass * g * h_m;
   const Etotal = Ek + Ep;
+
+  // New ISO 8100-2 Buffer Speed Validation
+  let isBufferTypeValid = true;
+  let typeValidationError = '';
+  if (data.bufferType === 'energy-accumulation' && data.speed > 1.0) {
+    isBufferTypeValid = false;
+    typeValidationError = 'Energy accumulation buffers only permitted for rated speeds <= 1.0 m/s';
+  }
   
   // Non-linear buffer capacity estimation (Clause 4.5.3)
   let Ecap = 0;
@@ -2184,6 +2110,7 @@ const SafetyComponentsModule = ({ data, onChange, section = 'all' }: { data: Pro
   // a_avg must be <= 1.0gn
   const a_avg = h_m > 0 ? (v_impact * v_impact) / (2 * h_m * g) : 0;
   const isEnergyOk = Etotal <= Ecap;
+  const isBufferCompliant = isStrokeOk && isBufferMassOk && isBufferTypeValid && (data.bufferType === 'energy-accumulation' ? true : isEnergyOk);
   
   const F_buffer = impactMass * (a_avg + g);
   const strokeUtilization = h_m > 0 ? (h_min / (data.bufferStroke)) * 100 : 0;
@@ -2229,53 +2156,64 @@ const SafetyComponentsModule = ({ data, onChange, section = 'all' }: { data: Pro
               <div className="space-y-4 p-6 bg-surface-container-lowest border border-outline-variant/10">
                 <h5 className="text-[10px] font-bold uppercase text-primary mb-4">Verification Parameters</h5>
                 <div className="space-y-4">
-                  <div className="space-y-1">
-                    <label className="text-[11px] font-bold text-on-surface-variant uppercase">Mechanical Strength (N)</label>
-                    <div className="relative">
-                      <input 
-                        type="number"
-                        value={data.doorLockingForce}
-                        onChange={(e) => onChange({ doorLockingForce: safeNumber(e.target.value) })}
+                  <LiftField label="Mechanical Strength" name="doorLockingForce" unit="N" data={data} onChange={onChange} min={0} max={5000} />
+                  <LiftField label="Minimum Engagement" name="doorMinimumEngagement" unit="mm" data={data} onChange={onChange} min={0} max={20} />
+                  <div className="pt-4 border-t border-outline-variant/10 space-y-4">
+                    <h5 className="text-[10px] font-bold uppercase text-primary">Door Limit Switch</h5>
+                    <div className="space-y-1">
+                      <label className="text-[11px] font-bold text-on-surface-variant uppercase">Switch Type</label>
+                      <select 
+                        value={data.doorLimitSwitchType}
+                        onChange={(e) => onChange({ doorLimitSwitchType: e.target.value as 'NO' | 'NC' })}
                         className="w-full bg-surface-container-low border border-outline-variant/20 rounded-sm px-3 py-2 text-sm focus:ring-1 focus:ring-primary outline-none"
-                      />
-                      <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] font-bold opacity-50">N</span>
+                      >
+                        <option value="NC">Normally Closed (NC)</option>
+                        <option value="NO">Normally Open (NO)</option>
+                      </select>
                     </div>
-                  </div>
-                  <div className="space-y-1">
-                    <label className="text-[11px] font-bold text-on-surface-variant uppercase">Minimum Engagement (mm)</label>
-                    <div className="relative">
+                    <div className="flex items-center gap-3 p-2 bg-surface-container-lowest border border-outline-variant/10 rounded-sm">
                       <input 
-                        type="number"
-                        value={data.doorLockingEngagement}
-                        onChange={(e) => onChange({ doorLockingEngagement: safeNumber(e.target.value) })}
-                        className="w-full bg-surface-container-low border border-outline-variant/20 rounded-sm px-3 py-2 text-sm focus:ring-1 focus:ring-primary outline-none"
+                        type="checkbox"
+                        checked={data.doorElectricalContinuity}
+                        onChange={(e) => onChange({ doorElectricalContinuity: e.target.checked })}
+                        className="rounded-sm border-outline-variant/30 text-primary focus:ring-primary"
                       />
-                      <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] font-bold opacity-50">mm</span>
+                      <label className="text-[11px] font-bold text-on-surface-variant uppercase cursor-pointer">Electrical Continuity Check</label>
                     </div>
-                  </div>
-                  <div className="flex items-center gap-3 p-2 bg-surface-container-lowest border border-outline-variant/10 rounded-sm">
-                    <input 
-                      type="checkbox"
-                      checked={data.doorLockingElectricalCheck}
-                      onChange={(e) => onChange({ doorLockingElectricalCheck: e.target.checked })}
-                      className="rounded-sm border-outline-variant/30 text-primary focus:ring-primary"
-                    />
-                    <label className="text-[11px] font-bold text-on-surface-variant uppercase cursor-pointer">Electrical Safety Check</label>
+                    <div className="flex items-center gap-3 p-2 bg-surface-container-lowest border border-outline-variant/10 rounded-sm">
+                      <input 
+                        type="checkbox"
+                        checked={data.doorElectricalSafetyCheck}
+                        onChange={(e) => onChange({ doorElectricalSafetyCheck: e.target.checked })}
+                        className="rounded-sm border-outline-variant/30 text-primary focus:ring-primary"
+                      />
+                      <label className="text-[11px] font-bold text-on-surface-variant uppercase cursor-pointer">Electrical Safety Check</label>
+                    </div>
                   </div>
                 </div>
               </div>
 
               <div className="lg:col-span-2 space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <div className={`p-4 border ${data.doorLockingForce >= 1000 ? 'bg-emerald-50 border-emerald-200' : 'bg-error-container/10 border-error/20'}`}>
                     <p className="text-[10px] font-bold uppercase mb-1">Mechanical Strength</p>
                     <p className="text-xl font-black">{formatNumber(data.doorLockingForce)} N</p>
                     <p className="mt-2 text-[10px] opacity-70 italic">Required: ≥ 1000N</p>
                   </div>
-                  <div className={`p-4 border ${data.doorLockingEngagement >= 7 ? 'bg-emerald-50 border-emerald-200' : 'bg-error-container/10 border-error/20'}`}>
+                  <div className={`p-4 border ${data.doorMinimumEngagement >= 7 ? 'bg-emerald-50 border-emerald-200' : 'bg-error-container/10 border-error/20'}`}>
                     <p className="text-[10px] font-bold uppercase mb-1">Lock Engagement</p>
-                    <p className="text-xl font-black">{formatNumber(data.doorLockingEngagement)} mm</p>
+                    <p className="text-xl font-black">{formatNumber(data.doorMinimumEngagement)} mm</p>
                     <p className="mt-2 text-[10px] opacity-70 italic">Required: ≥ 7mm</p>
+                  </div>
+                  <div className={`p-4 border ${(data.doorMinimumEngagement >= 7 && data.doorElectricalSafetyCheck) ? 'bg-emerald-50 border-emerald-200' : 'bg-error-container/10 border-error/20'}`}>
+                    <div className="flex justify-between items-start mb-1">
+                      <p className="text-[10px] font-bold uppercase">Interlocking Status</p>
+                      {(data.doorMinimumEngagement >= 7 && data.doorElectricalSafetyCheck) ? <Lock size={16} className="text-emerald-500" /> : <Unlock size={16} className="text-error" />}
+                    </div>
+                    <p className={`text-sm font-bold mt-1 ${(data.doorMinimumEngagement >= 7 && data.doorElectricalSafetyCheck) ? 'text-emerald-700' : 'text-error'}`}>
+                      {(data.doorMinimumEngagement >= 7 && data.doorElectricalSafetyCheck) ? 'LOCKED & SECURE' : 'UNSECURED'}
+                    </p>
+                    <p className="mt-2 text-[10px] opacity-70 italic whitespace-nowrap overflow-hidden text-ellipsis">Requires ≥7mm + Elec Check</p>
                   </div>
                 </div>
 
@@ -2292,22 +2230,22 @@ const SafetyComponentsModule = ({ data, onChange, section = 'all' }: { data: Pro
                       <span className="text-xs font-medium">Mechanical strength without permanent deformation (F ≥ 1000N).</span>
                     </div>
                     <div className="flex items-center gap-3">
-                      <div className={`w-5 h-5 rounded flex items-center justify-center border ${data.doorLockingEngagement >= 7 ? 'bg-emerald-600 border-emerald-600' : 'border-outline-variant'}`}>
-                        {data.doorLockingEngagement >= 7 && <CheckSquare size={14} className="text-white" />}
+                      <div className={`w-5 h-5 rounded flex items-center justify-center border ${data.doorMinimumEngagement >= 7 ? 'bg-emerald-600 border-emerald-600' : 'border-outline-variant'}`}>
+                        {data.doorMinimumEngagement >= 7 && <CheckSquare size={14} className="text-white" />}
                       </div>
                       <span className="text-xs font-medium">Minimum mechanical engagement of 7mm before electrical contact.</span>
                     </div>
                     <div className="flex items-center gap-3">
-                      <div className={`w-5 h-5 rounded flex items-center justify-center border ${data.doorLockingElectricalCheck ? 'bg-emerald-600 border-emerald-600' : 'border-outline-variant'}`}>
-                        {data.doorLockingElectricalCheck && <CheckSquare size={14} className="text-white" />}
+                      <div className={`w-5 h-5 rounded flex items-center justify-center border ${data.doorElectricalSafetyCheck ? 'bg-emerald-600 border-emerald-600' : 'border-outline-variant'}`}>
+                        {data.doorElectricalSafetyCheck && <CheckSquare size={14} className="text-white" />}
                       </div>
                       <span className="text-xs font-medium">Safety electrical device with positive break verified.</span>
                     </div>
                     <div className="flex items-center gap-3">
-                      <div className="w-5 h-5 rounded flex items-center justify-center border border-outline-variant">
-                        {/* Placeholder for manual check */}
+                      <div className={`w-5 h-5 rounded flex items-center justify-center border ${data.doorElectricalContinuity && data.doorLimitSwitchType === 'NC' ? 'bg-emerald-600 border-emerald-600' : 'border-outline-variant'}`}>
+                        {(data.doorElectricalContinuity && data.doorLimitSwitchType === 'NC') && <CheckSquare size={14} className="text-white" />}
                       </div>
-                      <span className="text-xs font-medium">Protection against accidental manipulation (preventing opening from outside without key).</span>
+                      <span className="text-xs font-medium">Limit switch electrical continuity verified directly through NC circuit.</span>
                     </div>
                     <div className="flex items-center gap-3">
                       <div className="w-5 h-5 rounded flex items-center justify-center border border-outline-variant">
@@ -2345,55 +2283,8 @@ const SafetyComponentsModule = ({ data, onChange, section = 'all' }: { data: Pro
                       <option value="buffered">Instantaneous w/ Buffered Effect</option>
                     </select>
                   </div>
-                  <div className="space-y-1">
-                    <label className="text-[11px] font-bold text-on-surface-variant uppercase">Tripping Speed (vt)</label>
-                    <div className="relative">
-                      <input 
-                        type="number"
-                        value={data.osgTrippingSpeed}
-                        onChange={(e) => onChange({ osgTrippingSpeed: safeNumber(e.target.value) })}
-                        className="w-full bg-surface-container-low border border-outline-variant/20 rounded-sm px-3 py-2 text-sm focus:ring-1 focus:ring-primary outline-none"
-                      />
-                      <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] font-bold opacity-50">m/s</span>
-                    </div>
-                  </div>
-                  <div className="space-y-1">
-                    <label className="text-[11px] font-bold text-on-surface-variant uppercase">Tensile Force (Ft)</label>
-                    <div className="relative">
-                      <input 
-                        type="number"
-                        value={data.osgTensileForce}
-                        onChange={(e) => onChange({ osgTensileForce: safeNumber(e.target.value) })}
-                        className="w-full bg-surface-container-low border border-outline-variant/20 rounded-sm px-3 py-2 text-sm focus:ring-1 focus:ring-primary outline-none"
-                      />
-                      <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] font-bold opacity-50">N</span>
-                    </div>
-                  </div>
-                  <div className="space-y-1">
-                    <label className="text-[11px] font-bold text-on-surface-variant uppercase">Mechanism Breaking Load (Fr)</label>
-                    <div className="relative">
-                      <input 
-                        type="number"
-                        value={data.osgBreakingLoad}
-                        onChange={(e) => onChange({ osgBreakingLoad: safeNumber(e.target.value) })}
-                        className="w-full bg-surface-container-low border border-outline-variant/20 rounded-sm px-3 py-2 text-sm focus:ring-1 focus:ring-primary outline-none"
-                      />
-                      <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] font-bold opacity-50">N</span>
-                    </div>
-                  </div>
-                  <div className="space-y-1">
-                    <label className="text-[11px] font-bold text-on-surface-variant uppercase">Maximum Braking Force (F_max)</label>
-                    <div className="relative">
-                      <input 
-                        type="number"
-                        placeholder="Enter maximum braking force"
-                        value={data.osgMaxBrakingForce}
-                        onChange={(e) => onChange({ osgMaxBrakingForce: safeNumber(e.target.value) })}
-                        className="w-full bg-surface-container-low border border-outline-variant/20 rounded-sm px-3 py-2 text-sm focus:ring-1 focus:ring-primary outline-none"
-                      />
-                      <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] font-bold opacity-50">N</span>
-                    </div>
-                  </div>
+                  <LiftField label="Tripping Speed (vt)" name="osgTrippingSpeed" unit="m/s" data={data} onChange={onChange} min={0} max={5} step={0.01} />
+                  <LiftField label="Mechanism Breaking Load (Fr)" name="osgBreakingLoad" unit="N" data={data} onChange={onChange} min={0} max={10000} />
                 </div>
 
                 <div className="pt-4 border-t border-outline-variant/10 space-y-4">
@@ -2591,32 +2482,22 @@ const SafetyComponentsModule = ({ data, onChange, section = 'all' }: { data: Pro
                       ))}
                     </select>
                   </div>
-                  <div className="space-y-1">
-                    <label className="text-[11px] font-bold text-on-surface-variant uppercase">Max Certified Mass (P+Q)</label>
-                    <input 
-                      type="number"
-                      value={data.safetyGearMaxMass}
-                      onChange={(e) => onChange({ safetyGearMaxMass: safeNumber(e.target.value) })}
-                      className="w-full bg-surface-container-low border border-outline-variant/20 rounded-sm px-3 py-2 text-sm outline-none"
-                    />
-                  </div>
-                  <div className="space-y-1">
-                    <label className="text-[11px] font-bold text-on-surface-variant uppercase">Braking Force (Fb) [N]</label>
-                    <input 
-                      type="number"
-                      value={data.safetyGearBrakingForce}
-                      onChange={(e) => onChange({ safetyGearBrakingForce: safeNumber(e.target.value) })}
-                      className="w-full bg-surface-container-low border border-outline-variant/20 rounded-sm px-3 py-2 text-sm outline-none"
-                    />
-                  </div>
-                  <div className="space-y-1">
-                    <label className="text-[11px] font-bold text-on-surface-variant uppercase">Certified Speed [m/s]</label>
-                    <input 
-                      type="number"
-                      value={data.safetyGearCertifiedSpeed}
-                      onChange={(e) => onChange({ safetyGearCertifiedSpeed: safeNumber(e.target.value) })}
-                      className="w-full bg-surface-container-low border border-outline-variant/20 rounded-sm px-3 py-2 text-sm outline-none"
-                    />
+                  <LiftField label="Max Certified Mass (P+Q)" name="safetyGearMaxMass" unit="kg" data={data} onChange={onChange} min={0} max={10000} />
+                  <LiftField label="Braking Force (Fb)" name="safetyGearBrakingForce" unit="N" data={data} onChange={onChange} min={0} max={100000} />
+                  <LiftField label="Certified Speed" name="safetyGearCertifiedSpeed" unit="m/s" data={data} onChange={onChange} min={0} max={10} step={0.01} />
+                  <div className="pt-4 border-t border-outline-variant/10 space-y-4">
+                    <h5 className="text-[10px] font-bold uppercase text-primary">Overspeed Governor Link</h5>
+                    <LiftField label="OSG Max Braking Force (F_max)" name="osgMaxBrakingForce" unit="N" data={data} onChange={onChange} min={0} max={10000} />
+                    <LiftField label="OSG Tensile Force (Ft)" name="osgTensileForce" unit="N" data={data} onChange={onChange} min={0} max={5000} />
+                    <div className={`p-3 rounded-sm border ${data.osgMaxBrakingForce >= data.osgTensileForce ? 'bg-emerald-500/10 border-emerald-500/20' : 'bg-error/10 border-error/20'}`}>
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="text-[10px] font-bold uppercase">Force Validation</span>
+                        {data.osgMaxBrakingForce >= data.osgTensileForce ? <CheckCircle2 size={14} className="text-emerald-500" /> : <XCircle size={14} className="text-error" />}
+                      </div>
+                      <span className={`text-[11px] font-bold ${data.osgMaxBrakingForce >= data.osgTensileForce ? 'text-emerald-600' : 'text-error'}`}>
+                        {data.osgMaxBrakingForce >= data.osgTensileForce ? 'F_max is ≥ Ft' : 'F_max must be ≥ Ft'}
+                      </span>
+                    </div>
                   </div>
                   <div className="space-y-1">
                     <label className="text-[11px] font-bold text-on-surface-variant uppercase">Rail Surface Condition</label>
@@ -2646,12 +2527,12 @@ const SafetyComponentsModule = ({ data, onChange, section = 'all' }: { data: Pro
                             <p className="text-xl font-black">{formatNumber(data.osgTrippingSpeed)} m/s</p>
                             <p className="text-[10px] opacity-50">Limit: {data.safetyGearCertifiedSpeed} m/s</p>
                           </div>
-                          <div className={`p-4 border ${isRetardationOk ? 'bg-emerald-50 border-emerald-200' : 'bg-amber-50 bg-opacity-10 border-amber border-opacity-20'}`}>
+                          <div className={`p-4 border ${isRetardationOk ? 'bg-emerald-50 border-emerald-200' : 'bg-error-container/10 border-error/20'}`}>
                             <div className="flex items-center justify-between mb-3">
                               <p className="text-[10px] font-bold uppercase tracking-wider">Resultant Retardation (gn)</p>
                               <div className="flex items-center gap-2">
-                                <div className={`w-2 h-2 rounded-full animate-pulse ${isRetardationOk ? 'bg-emerald-500' : 'bg-amber-500'}`} />
-                                <span className={`text-[9px] font-bold px-2 py-0.5 rounded-full uppercase ${isRetardationOk ? 'bg-emerald-600 text-white' : 'bg-amber-600 text-white'}`}>
+                                <div className={`w-2 h-2 rounded-full animate-pulse ${isRetardationOk ? 'bg-emerald-500' : 'bg-error'}`} />
+                                <span className={`text-[9px] font-bold px-2 py-0.5 rounded-full uppercase ${isRetardationOk ? 'bg-emerald-600 text-white' : 'bg-error text-white'}`}>
                                   {isRetardationOk ? 'ISO 8100-2 Compliant' : 'Non-Compliant'}
                                 </span>
                               </div>
@@ -2665,8 +2546,8 @@ const SafetyComponentsModule = ({ data, onChange, section = 'all' }: { data: Pro
                                   <p className="text-3xl font-black">{formatNumber(retardationG)} gn</p>
                                   <p className="text-[10px] opacity-40 font-bold uppercase">Result</p>
                                 </div>
-                                <div className="p-2 rounded bg-white/50 border border-black/5">
-                                  <p className={`text-[11px] font-bold ${isRetardationOk ? 'text-emerald-700' : 'text-amber-700'}`}>
+                                <div className={`p-2 rounded border ${isRetardationOk ? 'bg-emerald-500/10 border-emerald-500/20' : 'bg-error/10 border-error/20'}`}>
+                                  <p className={`text-[11px] font-bold ${isRetardationOk ? 'text-emerald-700' : 'text-error'}`}>
                                     {retardationG < 0.2 ? '❌ STATUS: Insufficient Braking' : 
                                      retardationG > 1.0 ? '❌ STATUS: Excessive Retardation' : 
                                      '✅ STATUS: Safe Deceleration'}
@@ -2702,9 +2583,9 @@ const SafetyComponentsModule = ({ data, onChange, section = 'all' }: { data: Pro
                             
                             <div className="relative h-3 bg-surface-container-low rounded-full overflow-visible mb-2">
                               <div className="absolute inset-0 flex rounded-full overflow-hidden">
-                                <div className="h-full bg-amber-200" style={{ width: '16.6%' }} />
+                                <div className="h-full bg-error" style={{ width: '16.6%' }} />
                                 <div className="h-full bg-emerald-500" style={{ width: '66.6%' }} />
-                                <div className="h-full bg-amber-200" style={{ width: '16.8%' }} />
+                                <div className="h-full bg-error" style={{ width: '16.8%' }} />
                               </div>
                               
                               <div 
@@ -2842,34 +2723,10 @@ const SafetyComponentsModule = ({ data, onChange, section = 'all' }: { data: Pro
                     />
                     <label htmlFor="bufferLinear" className="text-[11px] font-bold text-on-surface-variant uppercase cursor-pointer">Linear Characteristic</label>
                   </div>
-                  <div className="space-y-1">
-                    <label className="text-[11px] font-bold text-on-surface-variant uppercase">Buffer Stroke (h) [mm]</label>
-                    <input 
-                      type="number"
-                      value={data.bufferStroke}
-                      onChange={(e) => onChange({ bufferStroke: safeNumber(e.target.value) })}
-                      className="w-full bg-surface-container-low border border-outline-variant/20 rounded-sm px-3 py-2 text-sm outline-none"
-                    />
-                  </div>
+                  <LiftField label="Buffer Stroke (h)" name="bufferStroke" unit="mm" data={data} onChange={onChange} min={50} max={1000} />
                   <div className="grid grid-cols-2 gap-2">
-                    <div className="space-y-1">
-                      <label className="text-[11px] font-bold text-on-surface-variant uppercase">Min Mass [kg]</label>
-                      <input 
-                        type="number"
-                        value={data.bufferMinMass}
-                        onChange={(e) => onChange({ bufferMinMass: safeNumber(e.target.value) })}
-                        className="w-full bg-surface-container-low border border-outline-variant/20 rounded-sm px-3 py-2 text-sm outline-none"
-                      />
-                    </div>
-                    <div className="space-y-1">
-                      <label className="text-[11px] font-bold text-on-surface-variant uppercase">Max Mass [kg]</label>
-                      <input 
-                        type="number"
-                        value={data.bufferMaxMass}
-                        onChange={(e) => onChange({ bufferMaxMass: safeNumber(e.target.value) })}
-                        className="w-full bg-surface-container-low border border-outline-variant/20 rounded-sm px-3 py-2 text-sm outline-none"
-                      />
-                    </div>
+                    <LiftField label="Min Mass" name="bufferMinMass" unit="kg" data={data} onChange={onChange} min={0} max={5000} />
+                    <LiftField label="Max Mass" name="bufferMaxMass" unit="kg" data={data} onChange={onChange} min={0} max={5000} />
                   </div>
                 </div>
               </div>
@@ -3051,6 +2908,90 @@ const SafetyComponentsModule = ({ data, onChange, section = 'all' }: { data: Pro
             </section>
             )}
 
+          {/* EN 81-28 Remote Alarms */}
+          {(section === 'all' || section === 'safety') && (
+          <section className="space-y-6">
+            <div className="flex items-center gap-4 border-b border-outline-variant/20 pb-2">
+              <ShieldCheck className="text-primary" size={20} />
+              <h4 className="text-sm font-bold uppercase tracking-wider">EN 81-28 Remote Alarms on Lifts</h4>
+            </div>
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+              <div className="space-y-4 p-6 bg-surface-container-lowest border border-outline-variant/10">
+                <h5 className="text-[10px] font-bold uppercase text-primary mb-4">Alarm System Parameters</h5>
+                <div className="space-y-4">
+                  <div className="space-y-1">
+                    <label className="text-[11px] font-bold text-on-surface-variant uppercase">Alarm Button Type</label>
+                    <select 
+                      value={data.alarmButtonType}
+                      onChange={(e) => onChange({ alarmButtonType: e.target.value as any })}
+                      className="w-full bg-surface-container-low border border-outline-variant/20 rounded-sm px-3 py-2 text-sm outline-none"
+                    >
+                      <option value="NO">Normally Open (NO)</option>
+                      <option value="NC">Normally Closed (NC)</option>
+                    </select>
+                  </div>
+                  <LiftField label="Backup Battery Autonomy" name="alarmBackupBatteryTime" unit="hours" data={data} onChange={onChange} min={1} required suggestion="EN 81-28 requires minimum 1 hour of autonomy." />
+                  <div className="space-y-1">
+                    <label className="text-[11px] font-bold text-on-surface-variant uppercase">Communication Interface</label>
+                    <select 
+                      value={data.alarmCommunicationType}
+                      onChange={(e) => onChange({ alarmCommunicationType: e.target.value as any })}
+                      className="w-full bg-surface-container-low border border-outline-variant/20 rounded-sm px-3 py-2 text-sm outline-none"
+                    >
+                      <option value="PSTN">PSTN (Analog Line)</option>
+                      <option value="GSM">GSM / Cellular</option>
+                      <option value="VoIP">VoIP (SIP)</option>
+                    </select>
+                  </div>
+                  <div className="flex items-center gap-3 p-2 bg-surface-container-lowest border border-outline-variant/10 rounded-sm">
+                    <input 
+                      type="checkbox"
+                      checked={data.alarmFilteringImplemented}
+                      onChange={(e) => onChange({ alarmFilteringImplemented: e.target.checked })}
+                      className="rounded-sm border-outline-variant/30 text-primary focus:ring-primary"
+                    />
+                    <label className="text-[11px] font-bold text-on-surface-variant uppercase cursor-pointer">Alarm Filtering logic</label>
+                  </div>
+                </div>
+              </div>
+              <div className="lg:col-span-2 space-y-4">
+                 <div className="p-6 bg-surface-container-lowest border border-outline-variant/10 rounded-sm">
+                  <h5 className="text-[10px] font-bold uppercase text-primary mb-4 flex items-center gap-2">
+                    <CheckSquare size={12} />
+                    EN 81-28 Compliance Verification
+                  </h5>
+                  <div className="space-y-3">
+                    <div className="flex items-center gap-3">
+                      <div className={`w-5 h-5 rounded flex items-center justify-center border ${data.alarmBackupBatteryTime >= 1 ? 'bg-emerald-600 border-emerald-600' : 'border-outline-variant'}`}>
+                        {data.alarmBackupBatteryTime >= 1 && <CheckSquare size={14} className="text-white" />}
+                      </div>
+                      <span className={`text-xs font-medium ${data.alarmBackupBatteryTime >= 1 ? 'text-on-surface' : 'text-on-surface-variant'}`}>
+                        Backup battery time ({data.alarmBackupBatteryTime}h) meets minimum 1hr requirement.
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <div className={`w-5 h-5 rounded flex items-center justify-center border ${data.alarmFilteringImplemented ? 'bg-emerald-600 border-emerald-600' : 'border-outline-variant'}`}>
+                        {data.alarmFilteringImplemented && <CheckSquare size={14} className="text-white" />}
+                      </div>
+                      <span className={`text-xs font-medium ${data.alarmFilteringImplemented ? 'text-on-surface' : 'text-on-surface-variant'}`}>
+                        Alarm filtering is implemented to reduce false alarms.
+                      </span>
+                    </div>
+                     <div className="flex items-center gap-3">
+                      <div className={`w-5 h-5 rounded flex items-center justify-center border ${data.alarmCommunicationType === 'PSTN' ? 'bg-amber-500 border-amber-500' : 'bg-emerald-600 border-emerald-600'}`}>
+                        {(data.alarmCommunicationType === 'PSTN') ? <AlertCircle size={14} className="text-white" /> : <CheckSquare size={14} className="text-white" />}
+                      </div>
+                      <span className={`text-xs font-medium ${data.alarmCommunicationType === 'PSTN' ? 'text-amber-700' : 'text-on-surface'}`}>
+                        Communication type: {data.alarmCommunicationType}. {data.alarmCommunicationType === 'PSTN' && "Warning: PSTN lines are being phased out globally."}
+                      </span>
+                    </div>
+                  </div>
+                 </div>
+              </div>
+            </div>
+          </section>
+          )}
+
           {/* 4.7 Ascending Car Overspeed Protection (ACOP) */}
           {(section === 'all' || section === 'acop') && (
           <section className="space-y-6">
@@ -3074,18 +3015,7 @@ const SafetyComponentsModule = ({ data, onChange, section = 'all' }: { data: Pro
                       <option value="safety-gear">Safety Gear (Bi-directional)</option>
                     </select>
                   </div>
-                  <div className="space-y-1">
-                    <label className="text-[11px] font-bold text-on-surface-variant uppercase">Tripping Speed (vt_acop)</label>
-                    <div className="relative">
-                      <input 
-                        type="number"
-                        value={data.acopTrippingSpeed}
-                        onChange={(e) => onChange({ acopTrippingSpeed: safeNumber(e.target.value) })}
-                        className="w-full bg-surface-container-low border border-outline-variant/20 rounded-sm px-3 py-2 text-sm outline-none"
-                      />
-                      <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] font-bold opacity-50">m/s</span>
-                    </div>
-                  </div>
+                  <LiftField label="Tripping Speed (vt_acop)" name="acopTrippingSpeed" unit="m/s" data={data} onChange={onChange} min={0} max={5} step={0.01} />
                 </div>
               </div>
               <div className="lg:col-span-2 space-y-4">
@@ -3149,18 +3079,7 @@ const SafetyComponentsModule = ({ data, onChange, section = 'all' }: { data: Pro
                       <option value="valve">Hydraulic Valve</option>
                     </select>
                   </div>
-                  <div className="space-y-1">
-                    <label className="text-[11px] font-bold text-on-surface-variant uppercase">Detection Distance (s)</label>
-                    <div className="relative">
-                      <input 
-                        type="number"
-                        value={data.ucmpDetectionDist}
-                        onChange={(e) => onChange({ ucmpDetectionDist: safeNumber(e.target.value) })}
-                        className="w-full bg-surface-container-low border border-outline-variant/20 rounded-sm px-3 py-2 text-sm outline-none"
-                      />
-                      <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] font-bold opacity-50">mm</span>
-                    </div>
-                  </div>
+                  <LiftField label="Detection Distance (s)" name="ucmpDetectionDist" unit="mm" data={data} onChange={onChange} min={0} max={500} />
                 </div>
               </div>
               <div className="lg:col-span-2 space-y-4">
@@ -3209,52 +3128,23 @@ const SafetyComponentsModule = ({ data, onChange, section = 'all' }: { data: Pro
               <h4 className="text-sm font-bold uppercase tracking-wider">4.18 SIL-rated Circuits (PESSRAL)</h4>
             </div>
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-              <div className="space-y-4 p-6 bg-surface-container-lowest border border-outline-variant/10">
-                <h5 className="text-[10px] font-bold uppercase text-primary mb-4">PESSRAL Configuration</h5>
-                <div className="space-y-4">
-                  <div className="space-y-1">
-                    <label className="text-[11px] font-bold text-on-surface-variant uppercase">Target SIL Level</label>
-                    <select 
-                      value={data.silLevel}
-                      onChange={(e) => onChange({ silLevel: safeNumber(e.target.value) })}
-                      className="w-full bg-surface-container-low border border-outline-variant/20 rounded-sm px-3 py-2 text-sm outline-none"
-                    >
-                      <option value={1}>SIL 1</option>
-                      <option value={2}>SIL 2</option>
-                      <option value={3}>SIL 3</option>
-                    </select>
-                  </div>
-                  <div className="space-y-1">
-                    <label className="text-[11px] font-bold text-on-surface-variant uppercase">Failure Rate (λ) [failures/h]</label>
-                    <input 
-                      type="number"
-                      value={data.failureRate}
-                      onChange={(e) => onChange({ failureRate: safeNumber(e.target.value) })}
-                      className="w-full bg-surface-container-low border border-outline-variant/20 rounded-sm px-3 py-2 text-sm outline-none"
-                    />
-                  </div>
-                  <div className="grid grid-cols-2 gap-2">
-                    <div className="space-y-1">
-                      <label className="text-[11px] font-bold text-on-surface-variant uppercase">Dangerous Fraction (B) [%]</label>
-                      <input 
-                        type="number"
-                        value={data.dangerousFraction}
-                        onChange={(e) => onChange({ dangerousFraction: safeNumber(e.target.value) })}
-                        className="w-full bg-surface-container-low border border-outline-variant/20 rounded-sm px-3 py-2 text-sm outline-none"
-                      />
-                    </div>
-                    <div className="space-y-1">
-                      <label className="text-[11px] font-bold text-on-surface-variant uppercase">Diagnostic Coverage (DC) [%]</label>
-                      <input 
-                        type="number"
-                        value={data.diagnosticCoverage}
-                        onChange={(e) => onChange({ diagnosticCoverage: safeNumber(e.target.value) })}
-                        className="w-full bg-surface-container-low border border-outline-variant/20 rounded-sm px-3 py-2 text-sm outline-none"
-                      />
-                    </div>
-                  </div>
+              <InputGroup label="PESSRAL Configuration">
+                <div className="space-y-1 col-span-2">
+                  <label className="text-[11px] font-bold text-on-surface-variant uppercase">Target SIL Level</label>
+                  <select 
+                    value={data.silLevel}
+                    onChange={(e) => onChange({ silLevel: safeNumber(e.target.value) })}
+                    className="w-full bg-surface-container-lowest border border-outline-variant/20 rounded-sm px-3 py-2 text-sm focus:ring-1 focus:ring-primary outline-none transition-all"
+                  >
+                    <option value={1}>SIL 1</option>
+                    <option value={2}>SIL 2</option>
+                    <option value={3}>SIL 3</option>
+                  </select>
                 </div>
-              </div>
+                <LiftField label="Failure Rate (λ)" name="failureRate" unit="failures/h" data={data} onChange={onChange} min={0} />
+                <LiftField label="Dangerous Fraction (B)" name="dangerousFraction" unit="%" data={data} onChange={onChange} min={0} max={100} />
+                <LiftField label="Diagnostic Coverage (DC)" name="diagnosticCoverage" unit="%" data={data} onChange={onChange} min={0} max={100} />
+              </InputGroup>
               <div className="lg:col-span-2">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className={`p-6 border ${isPfhOk ? 'bg-emerald-50 border-emerald-200' : 'bg-error-container/10 border-error/20'}`}>
@@ -3552,6 +3442,7 @@ export default function App() {
     numSimpleBends: 2,
     numReverseBends: 0,
     ropeBreakingLoad: 45000,
+    ropeGrade: 1770,
     safetyGearMaxMass: 2500,
     safetyGearBrakingForce: 35000,
     safetyGearCertifiedSpeed: 1.5,
@@ -3578,12 +3469,18 @@ export default function App() {
     diagnosticCoverage: 90,
     dangerousFraction: 50,
     doorLockingForce: 1000,
-    doorLockingEngagement: 7,
-    doorLockingElectricalCheck: true,
+    doorMinimumEngagement: 7,
+    doorElectricalSafetyCheck: true,
+    doorLimitSwitchType: 'NC',
+    doorElectricalContinuity: true,
     osgMaxBrakingForce: 300,
     osgManufacturer: '',
     osgModel: '',
     osgSerialNumber: '',
+    alarmButtonType: 'NO',
+    alarmBackupBatteryTime: 1, // hours
+    alarmCommunicationType: 'GSM',
+    alarmFilteringImplemented: false,
     shaftWidth: 2000,
     shaftDepth: 2000,
     shaftHeight: 30000,
@@ -3612,6 +3509,10 @@ export default function App() {
     carToCounterweightClearance: 50,
     carToLandingSillClearance: 35,
     showClearances: true,
+    // EN 81-77 Seismic
+    seismicCategory: 0,
+    designAcceleration: 0,
+    primaryWaveDetection: false,
     // Additional Variables from HTML Engine
     Faux: 4000,
     delta_str_x: 0.6,
@@ -3640,7 +3541,17 @@ export default function App() {
   });
 
   const handleDataChange = (newData: Partial<ProjectData>) => {
-    setProjectData(prev => ({ ...prev, ...newData }));
+    setProjectData(prev => {
+      const merged = { ...prev, ...newData };
+      // Enforce physical constraints: Cabin cannot exceed shaft minus 200mm for clearances
+      if ('shaftWidth' in newData && merged.carWidth > merged.shaftWidth - 200) {
+        merged.carWidth = merged.shaftWidth - 200;
+      }
+      if ('shaftDepth' in newData && merged.carDepth > merged.shaftDepth - 200) {
+        merged.carDepth = merged.shaftDepth - 200;
+      }
+      return merged;
+    });
   };
 
   const validateProject = () => {
@@ -3674,6 +3585,7 @@ export default function App() {
   const modules: ModuleStatus[] = [
     { id: 'overview', label: 'Overview', icon: LayoutDashboard, status: 'implemented' },
     { id: 'global', label: 'General (Clause 4.1)', icon: Globe, status: 'implemented' },
+    { id: 'seismic', label: 'Seismic (EN 81-77)', icon: Zap, status: 'implemented' },
     { id: 'doors', label: 'Door Locking (4.2)', icon: Lock, status: 'implemented' },
     { id: 'safety', label: 'Safety Gear (4.3)', icon: ShieldCheck, status: 'implemented' },
     { id: 'buffers', label: 'Buffers (4.5)', icon: Box, status: 'implemented' },
@@ -3698,6 +3610,7 @@ export default function App() {
     switch (activeTab) {
       case 'overview': return <OverviewModule modules={modules} onSelect={setActiveTab} />;
       case 'global': return <GlobalProjectModule data={projectData} onChange={handleDataChange} />;
+      case 'seismic': return <SeismicModule data={projectData} onChange={handleDataChange} />;
       case 'doors': return <DoorLockingModule />;
       case 'traction': return <TractionModule data={projectData} onChange={handleDataChange} />;
       case 'ropes': return <RopesModule data={projectData} onChange={handleDataChange} />;
@@ -3706,7 +3619,7 @@ export default function App() {
       case 'hydraulic': return <HydraulicModule data={projectData} />;
       case 'safety': return <SafetyComponentsModule data={projectData} onChange={handleDataChange} section="safety" />;
       case 'buffers': return <SafetyComponentsModule data={projectData} onChange={handleDataChange} section="buffers" />;
-      case 'acop-ucmp': return <ACOP_UCMP_Module data={projectData} onChange={handleDataChange} />;
+      case 'acop-ucmp': return <SafetyComponentsModule data={projectData} onChange={handleDataChange} section="acop" />;
       case 'sil': return <SafetyComponentsModule data={projectData} onChange={handleDataChange} section="sil" />;
       case 'clearances': return <ClearanceValidationModule data={projectData} />;
       case 'formulas': return <FormulaLibraryModule />;
@@ -3718,10 +3631,13 @@ export default function App() {
         <div className="space-y-6">
           <div className="bg-surface-container-low p-6 rounded-sm border border-outline-variant/10">
             <h3 className="text-xl font-black uppercase tracking-tighter mb-4">3D Shaft Geometry Explorer</h3>
-            <Shaft3DModule 
+              <Shaft3DModule 
               width={projectData.shaftWidth}
               depth={projectData.shaftDepth}
               height={projectData.shaftHeight}
+              carWidth={projectData.carWidth / 1000}
+              carDepth={projectData.carDepth / 1000}
+              carHeight={projectData.carHeight / 1000}
               carPos={projectData.carPositionPercent / 100}
               wellToCarWall={projectData.wellToCarWall}
               sillGap={projectData.sillGap}
@@ -3730,15 +3646,15 @@ export default function App() {
               headroomGeneral={projectData.headroomGeneral}
             />
             <div className="mt-6 p-4 bg-surface-container-lowest border border-outline-variant/10 rounded-sm">
-              <h4 className="text-[10px] font-bold uppercase text-primary mb-2">Simulation Controls</h4>
-              <input 
-                type="range"
-                min="0"
-                max="100"
-                value={projectData.carPositionPercent}
-                onChange={(e) => handleDataChange({ carPositionPercent: safeNumber(e.target.value) })}
-                className="w-full h-2 bg-surface-container-low rounded-lg appearance-none cursor-pointer accent-primary"
-              />
+              <h4 className="text-[10px] font-bold uppercase text-primary mb-4">Simulation & Geometry Controls</h4>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-4">
+                <SliderField label="Car Position" value={projectData.carPositionPercent} min={0} max={100} onChange={v => handleDataChange({ carPositionPercent: v })} unit="%" />
+                <SliderField label="Shaft Width" value={projectData.shaftWidth} min={1000} max={5000} onChange={v => handleDataChange({ shaftWidth: v })} unit="mm" />
+                <SliderField label="Shaft Depth" value={projectData.shaftDepth} min={1000} max={5000} onChange={v => handleDataChange({ shaftDepth: v })} unit="mm" />
+                <SliderField label="Shaft Height" value={projectData.shaftHeight} min={3000} max={100000} onChange={v => handleDataChange({ shaftHeight: v })} unit="mm" />
+                <SliderField label="Pit Depth" value={projectData.pitDepth} min={500} max={4000} onChange={v => handleDataChange({ pitDepth: v })} unit="mm" />
+                <SliderField label="Headroom Height" value={projectData.headroomHeight} min={2500} max={6000} onChange={v => handleDataChange({ headroomHeight: v })} unit="mm" />
+              </div>
             </div>
           </div>
         </div>
@@ -3752,7 +3668,16 @@ export default function App() {
               depth={projectData.carDepth / 1000}
               height={projectData.carHeight / 1000}
             />
-            <div className="mt-6 grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="mt-6 p-4 bg-surface-container-lowest border border-outline-variant/10 rounded-sm mb-6">
+              <h4 className="text-[10px] font-bold uppercase text-primary mb-4">Dimensions Controls</h4>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-x-8 gap-y-4">
+                <SliderField label="Car Width" value={projectData.carWidth} min={800} max={3000} onChange={v => handleDataChange({ carWidth: v })} unit="mm" />
+                <SliderField label="Car Depth" value={projectData.carDepth} min={800} max={3000} onChange={v => handleDataChange({ carDepth: v })} unit="mm" />
+                <SliderField label="Car Height" value={projectData.carHeight} min={2000} max={3500} onChange={v => handleDataChange({ carHeight: v })} unit="mm" />
+              </div>
+            </div>
+            
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div className="p-4 bg-emerald-50 border border-emerald-100 rounded-sm">
                 <h4 className="text-[10px] font-bold uppercase text-emerald-700 mb-2 flex items-center gap-2">
                   <Accessibility size={12} />
