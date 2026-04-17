@@ -9,6 +9,7 @@ export const safeNumber = (val: any, fallback = 0) => {
 };
 
 export const formatNumber = (val: number, decimals = 2) => {
+  if (isNaN(val)) return '-';
   return val.toLocaleString('pt-PT', { minimumFractionDigits: decimals, maximumFractionDigits: decimals });
 };
 
@@ -79,7 +80,7 @@ export const LiftField = ({
           type={type}
           disabled={disabled}
           step={step}
-          value={typeof data[name] === 'boolean' ? undefined : (data[name] as string | number)}
+          value={typeof data[name] === 'boolean' ? undefined : (data[name] === undefined || data[name] === null || (type === 'number' && Number.isNaN(data[name] as any)) ? '' : String(data[name]))}
           checked={typeof data[name] === 'boolean' ? (data[name] as boolean) : undefined}
           onChange={(e) => {
             const val = type === 'checkbox' ? e.target.checked : e.target.value;
@@ -106,7 +107,7 @@ export const LiftField = ({
             min={min}
             max={max}
             step={step || ((max - min) > 100 ? 1 : (max - min) > 10 ? 0.1 : 0.01)}
-            value={data[name] as number}
+            value={Number.isNaN(data[name] as number) ? min || 0 : String(data[name])}
             onChange={(e) => onChange({ [name]: parseFloat(e.target.value) })}
             className="w-full h-1 bg-surface-container-low rounded-lg appearance-none cursor-pointer accent-primary"
           />
@@ -132,7 +133,7 @@ export const SliderField = ({ label, value, onChange, min, max, unit }: { label:
         type="range" 
         min={min} 
         max={max} 
-        value={value} 
+        value={Number.isNaN(value) ? min || 0 : String(value)} 
         onChange={(e) => onChange(parseFloat(e.target.value))} 
         className="flex-1 h-1.5 bg-surface-container-low rounded-lg appearance-none cursor-pointer accent-primary" 
       />
@@ -140,7 +141,7 @@ export const SliderField = ({ label, value, onChange, min, max, unit }: { label:
         type="number"
         min={min}
         max={max}
-        value={value}
+        value={Number.isNaN(value) ? '' : String(value)}
         onChange={(e) => onChange(parseFloat(e.target.value) || min)}
         className="w-20 bg-surface-container-lowest border border-outline-variant/20 rounded-sm px-2 py-1 text-xs focus:ring-1 focus:ring-primary outline-none"
       />

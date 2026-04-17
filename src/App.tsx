@@ -474,16 +474,32 @@ export default function App() {
               pitRefugeHeight={projectData.pitRefugeHeight}
               carToCwtDistance={projectData.carToCwtDistance}
               headroomGeneral={projectData.headroomGeneral}
+              showClearances={projectData.showClearances}
             />
             <div className="mt-6 p-4 bg-surface-container-lowest border border-outline-variant/10 rounded-sm">
-              <h4 className="text-[10px] font-bold uppercase text-primary mb-4">Simulation & Geometry Controls</h4>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-4">
+              <div className="flex justify-between items-center mb-4">
+                <h4 className="text-[10px] font-bold uppercase text-primary">Simulation & Geometry Controls</h4>
+                <label className="flex items-center gap-2 cursor-pointer text-[10px] font-bold uppercase tracking-wider">
+                  <input 
+                    type="checkbox" 
+                    checked={projectData.showClearances} 
+                    onChange={e => handleDataChange({ showClearances: e.target.checked })}
+                    className="accent-primary"
+                  />
+                  Show Dynamic Clearances
+                </label>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-x-8 gap-y-6">
                 <SliderField label="Car Position" value={projectData.carPositionPercent} min={0} max={100} onChange={v => handleDataChange({ carPositionPercent: v })} unit="%" />
                 <SliderField label="Shaft Width" value={projectData.shaftWidth} min={1000} max={5000} onChange={v => handleDataChange({ shaftWidth: v })} unit="mm" />
                 <SliderField label="Shaft Depth" value={projectData.shaftDepth} min={1000} max={5000} onChange={v => handleDataChange({ shaftDepth: v })} unit="mm" />
                 <SliderField label="Shaft Height" value={projectData.shaftHeight} min={3000} max={100000} onChange={v => handleDataChange({ shaftHeight: v })} unit="mm" />
                 <SliderField label="Pit Depth" value={projectData.pitDepth} min={500} max={4000} onChange={v => handleDataChange({ pitDepth: v })} unit="mm" />
                 <SliderField label="Headroom Height" value={projectData.headroomHeight} min={2500} max={6000} onChange={v => handleDataChange({ headroomHeight: v })} unit="mm" />
+                <div className="col-span-1 md:col-span-2 lg:col-span-3 border-t border-outline-variant/10 pt-4 mt-2" />
+                <SliderField label="Pit Refuge Height" value={projectData.pitRefugeHeight} min={0.5} max={2.0} onChange={v => handleDataChange({ pitRefugeHeight: v })} unit="m" />
+                <SliderField label="Headroom Gen. Clearance" value={projectData.headroomGeneral} min={0.5} max={2.0} onChange={v => handleDataChange({ headroomGeneral: v })} unit="m" />
+                <SliderField label="Car to CWT Dist." value={projectData.carToCwtDistance} min={0.05} max={0.5} onChange={v => handleDataChange({ carToCwtDistance: v })} unit="m" />
               </div>
             </div>
           </div>

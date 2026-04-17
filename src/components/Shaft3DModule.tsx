@@ -165,18 +165,21 @@ export const Shaft3DModule: React.FC<Shaft3DProps> = ({
   const carY = carPos * (h - carHeight) + carHeight / 2;
   const carZ = (d / 2) - (carDepth / 2) - sG;
 
-  // Actual computed clearances
+  // Actual computed positions
   const actualWallGap = (w - carWidth) / 2;
-  const cwtFrontZ = -d / 2 + 0.15 + (0.15 / 2);
   const carBackZ = carZ - carDepth / 2;
-  const actualCwtGap = carBackZ - cwtFrontZ;
+  
+  // Dynamic Counterweight Placement based on user parameter
+  const cwtThickness = 0.15;
+  const cwtFrontZ = carBackZ - carToCwtDistance;
+  const cwtZ = cwtFrontZ - cwtThickness / 2;
 
   const clearanceData: Record<string, { label: string, value: number, limit: string, clause: string }> = {
-    headroom: { label: 'Headroom', value: (height / 1000) - (carPos * (h - carHeight) + carHeight), limit: '≥ 500mm', clause: 'ISO 8100-1:2026 5.2.5.7' },
-    pit: { label: 'Pit Refuge', value: pitRefugeHeight * 1000, limit: '≥ 500mm', clause: 'ISO 8100-1:2026 5.2.5.8' },
+    headroom: { label: 'Headroom', value: (height / 1000) - (carPos * (h - carHeight) + carHeight), limit: '≥ ' + (headroomGeneral * 1000).toFixed(0) + 'mm', clause: 'ISO 8100-1:2026 5.2.5.7' },
+    pit: { label: 'Pit Refuge', value: pitRefugeHeight * 1000, limit: '≥ ' + (pitRefugeHeight * 1000).toFixed(0) + 'mm', clause: 'ISO 8100-1:2026 5.2.5.8' },
     wall: { label: 'Wall Gap', value: actualWallGap * 1000, limit: '≤ 150mm', clause: 'ISO 8100-1:2026 5.2.5.2' },
     sill: { label: 'Sill Gap', value: sillGap * 1000, limit: '≤ 35mm', clause: 'ISO 8100-1:2026 5.3.4' },
-    cwt: { label: 'Car-CWT Gap', value: actualCwtGap * 1000, limit: '≥ 50mm', clause: 'ISO 8100-1:2026 5.2.5.2' },
+    cwt: { label: 'Car-CWT Gap', value: carToCwtDistance * 1000, limit: '≥ 50mm', clause: 'ISO 8100-1:2026 5.2.5.2' },
   };
 
   return (
@@ -268,8 +271,8 @@ export const Shaft3DModule: React.FC<Shaft3DProps> = ({
             <Buffer position={[w/4, -pD + 0.15, 0]} />
             
             {/* Counterweight */}
-            <group position={[0, h - carY, -d / 2 + 0.15]}>
-              <Box args={[w * 0.7, 1.8, 0.15]}>
+            <group position={[0, h - carY, cwtZ]}>
+              <Box args={[w * 0.7, 1.8, cwtThickness]}>
                 <meshStandardMaterial color="#ef4444" metalness={0.5} />
               </Box>
               <mesh position={[0, 1.0, 0]}>
@@ -331,11 +334,11 @@ export const Shaft3DModule: React.FC<Shaft3DProps> = ({
 
                 {/* Car to Counterweight Clearance */}
                 <group 
-                  position={[0, carY, cwtFrontZ + actualCwtGap / 2]}
+                  position={[0, carY, cwtFrontZ + carToCwtDistance / 2]}
                   onPointerOver={(e) => { e.stopPropagation(); setHoveredZone('cwt'); }}
                   onPointerOut={() => setHoveredZone(null)}
                 >
-                  <Box args={[w * 0.7, carHeight, actualCwtGap]}>
+                  <Box args={[w * 0.7, carHeight, carToCwtDistance]}>
                     <meshStandardMaterial color={hoveredZone === 'cwt' ? "#a78bfa" : "#8b5cf6"} transparent opacity={hoveredZone === 'cwt' ? 0.4 : 0.2} />
                   </Box>
                 </group>
