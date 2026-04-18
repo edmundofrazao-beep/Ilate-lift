@@ -74,13 +74,46 @@ export const GuideRailsModule = ({ data, onChange, view = 'all' }: { data: Proje
   const bucklingUtilization = (sigma_k / data.materialYield) * 100;
   const combinedUtilization = (sigma_combined / data.materialYield) * 100;
   const deflectionUtilization = (delta / deflectionLimit) * 100;
+  const cockpitMetrics = [
+    { label: 'Profile', value: data.railProfile || data.guideType || 'Custom' },
+    { label: 'Combined Stress', value: `${formatNumber(sigma_combined)} N/mm²` },
+    { label: 'Deflection', value: `${formatNumber(delta)} mm` },
+    { label: 'Bracket Span', value: `${data.bracketDist} mm` },
+  ];
 
   return (
     <div className="space-y-8">
-      <div className="bg-surface-container-low p-8 border-t-2 border-outline">
+      <div className="rounded-sm border border-outline-variant/20 bg-surface-container-low p-8">
+        <div className="mb-8 grid grid-cols-1 gap-4 xl:grid-cols-[1.15fr_0.85fr]">
+          <div className="rounded-sm border border-outline-variant/20 bg-gradient-to-br from-surface-container-high to-surface-container-lowest p-6">
+            <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-primary/30 bg-primary/10 px-3 py-1 text-[10px] font-black uppercase tracking-[0.22em] text-primary">
+              <Activity size={12} />
+              Rail cockpit
+            </div>
+            <h3 className="text-2xl font-black tracking-tight text-on-surface">Guide Rails Calculation (4.10)</h3>
+            <p className="mt-3 max-w-2xl text-sm leading-relaxed text-on-surface-variant">
+              Bending, buckling, fastening and displacement logic are grouped here as a single inspection surface. This should feel like a rail verification cockpit, not just a table of formulas.
+            </p>
+          </div>
+          <div className="rounded-sm border border-outline-variant/20 bg-surface-container-lowest p-6">
+            <div className="mb-4 flex items-center gap-2">
+              <Settings2 size={14} className="text-primary" />
+              <h4 className="text-[11px] font-black uppercase tracking-[0.22em] text-white">Live Rail State</h4>
+            </div>
+            <div className="space-y-3">
+              {cockpitMetrics.map((metric) => (
+                <div key={metric.label} className="flex items-center justify-between gap-4 rounded-sm border border-outline-variant/20 bg-surface-container-low p-3">
+                  <span className="text-[10px] font-bold uppercase tracking-[0.16em] text-on-surface-variant">{metric.label}</span>
+                  <span className="text-sm font-black text-on-surface">{metric.value}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+
         <div className="flex items-center justify-between mb-8">
           <h3 className="text-xl font-bold">Guide Rails Calculation (4.10)</h3>
-          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700 uppercase">Implemented (ISO 8100-2)</span>
+          <span className="rounded-full border border-emerald-500/20 bg-emerald-500/10 px-3 py-1 text-[10px] font-bold uppercase tracking-[0.18em] text-emerald-300">Implemented (ISO 8100-2)</span>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">

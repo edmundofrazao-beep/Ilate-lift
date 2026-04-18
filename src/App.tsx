@@ -71,7 +71,6 @@ import {
 } from 'lucide-react';
 import { Shaft3DModule } from './components/Shaft3DModule';
 import { Cabin3DModule } from './components/Cabin3DModule';
-import { computeLiftCalculations } from './lib/calculations';
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
 
@@ -111,6 +110,7 @@ export default function App() {
     ratedLoad: 1000,
     carMass: 1200,
     cwtMass: 1700,
+    balanceRatio: 0.5,
     speed: 1.0,
     travel: 30,
     stops: 10,

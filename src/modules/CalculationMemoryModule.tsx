@@ -79,9 +79,50 @@ export const CalculationMemoryModule = ({ data }: { data: ProjectData }) => {
   const delta_x = (data.railIx > 0 && E > 0) ? ((Fh * 0.5) * Math.pow(l, 3)) / (48 * E * data.railIx) : 0;
   const delta = Math.sqrt(Math.pow(delta_y, 2) + Math.pow(delta_x, 2));
   const isDeflectionOk = delta < 5;
+  const summaryRows = [
+    { label: 'Traction Ratio', value: formatNumber(tractionRatio), status: tractionRatio > 0 ? 'tracked' : 'pending' },
+    { label: 'Equivalent Pulley Count', value: formatNumber(N_equiv), status: 'computed' },
+    { label: 'PFH', value: pfh.toExponential(2), status: isSilOk ? 'ok' : 'review' },
+    { label: 'Combined Rail Stress', value: `${formatNumber(sigma_combined)} N/mm²`, status: isCombinedOk ? 'ok' : 'review' },
+  ];
 
   return (
-    <div id="calculation-memory-report" className="space-y-8 max-w-5xl mx-auto bg-white p-12 shadow-sm border border-outline-variant/10 font-serif text-slate-900">
+    <div className="space-y-6">
+      <div className="rounded-sm border border-outline-variant/20 bg-surface-container-low p-6">
+        <div className="grid grid-cols-1 gap-4 xl:grid-cols-[1.05fr_0.95fr]">
+          <div className="rounded-sm border border-outline-variant/20 bg-gradient-to-br from-surface-container-high to-surface-container-lowest p-6">
+            <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-primary/30 bg-primary/10 px-3 py-1 text-[10px] font-black uppercase tracking-[0.22em] text-primary">
+              <FileText size={12} />
+              Calculation memory
+            </div>
+            <h3 className="text-2xl font-black tracking-tight text-on-surface">Technical Memory Workspace</h3>
+            <p className="mt-3 max-w-2xl text-sm leading-relaxed text-on-surface-variant">
+              This module should evolve into an editable and exportable engineering report. For now it consolidates the most important calculations in one executive technical view.
+            </p>
+          </div>
+          <div className="rounded-sm border border-outline-variant/20 bg-surface-container-lowest p-6">
+            <div className="mb-4 flex items-center gap-2">
+              <Database size={14} className="text-primary" />
+              <h4 className="text-[11px] font-black uppercase tracking-[0.22em] text-white">Executive Snapshot</h4>
+            </div>
+            <div className="space-y-3">
+              {summaryRows.map((row) => (
+                <div key={row.label} className="flex items-center justify-between gap-4 rounded-sm border border-outline-variant/20 bg-surface-container-low p-3">
+                  <span className="text-[10px] font-bold uppercase tracking-[0.16em] text-on-surface-variant">{row.label}</span>
+                  <div className="text-right">
+                    <div className="text-sm font-black text-on-surface">{row.value}</div>
+                    <div className={`text-[9px] font-black uppercase tracking-[0.16em] ${row.status === 'ok' ? 'text-emerald-300' : row.status === 'review' ? 'text-amber-300' : 'text-white/45'}`}>
+                      {row.status}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div id="calculation-memory-report" className="space-y-8 max-w-5xl mx-auto bg-white p-12 shadow-sm border border-outline-variant/10 font-serif text-slate-900">
       <div className="text-center border-b-2 border-slate-900 pb-8 mb-8">
         <h2 className="text-3xl font-black uppercase tracking-tighter">Technical Calculation Report</h2>
         <p className="text-sm italic mt-2">Project Alpha-7 | ISO 8100-2:2026 Engineering Compliance</p>
@@ -352,6 +393,7 @@ export const CalculationMemoryModule = ({ data }: { data: ProjectData }) => {
 
       <div className="mt-12 pt-8 border-t border-on-surface/10 text-[10px] text-on-surface-variant italic">
         Note: Verification to be confirmed by the exact clause of ISO 8100-2:2026. Pre-dimensioning results.
+      </div>
       </div>
     </div>
   );

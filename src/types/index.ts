@@ -5,6 +5,7 @@ export interface ProjectData {
   ratedLoad: number; // Q (kg)
   carMass: number; // P (kg)
   cwtMass: number; // Mcwt (kg)
+  balanceRatio: number; // 0-1 target counterweight balance ratio
   speed: number; // v (m/s)
   travel: number; // H (m)
   stops: number;
@@ -179,3 +180,38 @@ export interface ModuleStatus {
   category?: string;
 }
 
+export interface StandardDefinition {
+  id: string;
+  title: string;
+  shortTitle: string;
+  family: 'ISO' | 'EN';
+  year: string;
+  role: string;
+  status: 'implemented' | 'partial' | 'planned';
+  priority: 'foundation' | 'core' | 'extended';
+  sourcePath?: string;
+}
+
+export interface RuleDefinition {
+  id: string;
+  standardId: string;
+  clause: string;
+  title: string;
+  subsystem: string;
+  applicability: string[];
+  requiredInputs: string[];
+  moduleIds: string[];
+  status: 'implemented' | 'partial' | 'planned';
+  severity: 'info' | 'warning' | 'error';
+}
+
+export interface StandardsCoverageSummary {
+  totalStandards: number;
+  implementedStandards: number;
+  partialStandards: number;
+  plannedStandards: number;
+  totalRules: number;
+  implementedRules: number;
+  partialRules: number;
+  plannedRules: number;
+}

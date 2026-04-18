@@ -24,15 +24,24 @@ export const CounterweightModule = ({ data, onChange }: { data: ProjectData, onC
             <div className="p-6 bg-surface-container-lowest border border-outline-variant/10 space-y-4">
               <LiftField label="Rated Load (Q)" name="ratedLoad" unit="kg" data={data} onChange={onChange} min={100} max={10000} required />
               <LiftField label="Car Mass (P)" name="carMass" unit="kg" data={data} onChange={onChange} min={100} max={10000} required />
-              <LiftField 
-                label="Target Balance Ratio" 
-                name="balanceRatio" 
-                unit="%" 
-                data={{ balanceRatio: data.balanceRatio * 100 }} 
-                onChange={(newData: any) => onChange({ balanceRatio: newData.balanceRatio / 100 })} 
-                min={10} max={90} step={1} 
-                suggestion="Typical is 50% for traction. For hydraulic balance it differs."
-              />
+              <div className="space-y-1">
+                <label className="text-[11px] font-bold text-on-surface-variant uppercase">Target Balance Ratio</label>
+                <div className="relative">
+                  <input
+                    type="number"
+                    min={10}
+                    max={90}
+                    step={1}
+                    value={data.balanceRatio * 100}
+                    onChange={(e) => onChange({ balanceRatio: Number(e.target.value) / 100 })}
+                    className="w-full rounded-sm border border-outline-variant/20 bg-surface-container-lowest px-3 py-2 text-sm outline-none transition-all focus:ring-1 focus:ring-primary"
+                  />
+                  <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] font-bold text-on-surface-variant opacity-50">%</span>
+                </div>
+                <p className="text-[9px] italic leading-tight text-on-surface-variant">
+                  Typical is 50% for traction. For hydraulic configurations the balance strategy can differ.
+                </p>
+              </div>
               <LiftField 
                 label="Counterweight Mass (CWT)" 
                 name="cwtMass" 

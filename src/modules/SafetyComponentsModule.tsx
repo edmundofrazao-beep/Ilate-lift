@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { ProjectData, ModuleStatus } from '../types';
 import { safeNumber, formatNumber, degToRad, InputGroup, LiftField, SliderField, CollapsibleSection } from '../components/ui';
 import { ISO_RAIL_PROFILES, BELT_PROFILES, SAFETY_GEAR_PRESETS } from '../constants';
+import { computeLiftCalculations } from '../lib/calculations';
 import { CheckCircle2, ShieldCheck, Zap, AlertTriangle, Info, ChevronRight, Calculator, FileText, Database, Activity, Package, Maximize, AlertCircle, PlayCircle, Settings, CheckSquare, Lock, Unlock, XCircle } from 'lucide-react';
 import { BlockMath, InlineMath } from 'react-katex';
 
@@ -105,12 +106,48 @@ export const SafetyComponentsModule = ({ data, onChange, section = 'all' }: { da
 
   // 4.8 UCMP Logic
   const isUcmpOk = data.ucmpDetectionDist > 0 && data.ucmpDetectionDist <= 1200;
+  const topStates = [
+    { label: 'Door Locking', ok: data.doorLockingForce >= 1000 && data.doorMinimumEngagement >= 7 && data.doorElectricalSafetyCheck },
+    { label: 'Safety Gear', ok: isMassOk && isSpeedOk && isRetardationOk },
+    { label: 'Buffers', ok: isBufferCompliant && isEnergyOk },
+    { label: 'SIL / PESSRAL', ok: isSilOk },
+  ];
 
   return (
     <div className="space-y-8">
-      <div className="bg-surface-container-low p-8 border-t-2 border-primary">
+      <div className="rounded-sm border border-outline-variant/20 bg-surface-container-low p-8">
+        <div className="mb-8 grid grid-cols-1 gap-4 xl:grid-cols-[1.1fr_0.9fr]">
+          <div className="rounded-sm border border-outline-variant/20 bg-gradient-to-br from-surface-container-high to-surface-container-lowest p-6">
+            <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-primary/30 bg-primary/10 px-3 py-1 text-[10px] font-black uppercase tracking-[0.22em] text-primary">
+              <ShieldCheck size={12} />
+              Safety cockpit
+            </div>
+            <h3 className="text-2xl font-black tracking-tight text-on-surface">Safety Verification Layer</h3>
+            <p className="mt-3 max-w-2xl text-sm leading-relaxed text-on-surface-variant">
+              Door locking, safety gear, buffers, ACOP, UCMP and SIL checks are grouped here as the active safety control surface of the product.
+            </p>
+          </div>
+          <div className="rounded-sm border border-outline-variant/20 bg-surface-container-lowest p-6">
+            <div className="mb-4 flex items-center gap-2">
+              <Activity size={14} className="text-primary" />
+              <h4 className="text-[11px] font-black uppercase tracking-[0.22em] text-white">System State</h4>
+            </div>
+            <div className="grid grid-cols-1 gap-3">
+              {topStates.map((state) => (
+                <div key={state.label} className="flex items-center justify-between gap-4 rounded-sm border border-outline-variant/20 bg-surface-container-low p-3">
+                  <span className="text-[10px] font-bold uppercase tracking-[0.16em] text-on-surface-variant">{state.label}</span>
+                  <span className={`text-[10px] font-black uppercase tracking-[0.16em] ${state.ok ? 'text-emerald-300' : 'text-rose-300'}`}>
+                    {state.ok ? 'stable' : 'review'}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+
         <div className="flex items-center justify-between mb-8">
           <h3 className="text-xl font-bold">Safety Verification</h3>
+          <span className="rounded-full border border-primary/20 bg-primary/10 px-3 py-1 text-[10px] font-bold uppercase tracking-[0.18em] text-primary">active safety matrix</span>
         </div>
 
         <div className="space-y-12">
