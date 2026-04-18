@@ -561,29 +561,6 @@ export default function App() {
           </div>
         </div>
       );
-      case 'export': return (
-        <div className="space-y-8">
-          <div className="bg-surface-container-low p-8 border border-outline-variant/10 rounded-sm">
-            <div className="flex items-center justify-between mb-8">
-              <div>
-                <h3 className="text-2xl font-black uppercase tracking-tighter">Export Engine</h3>
-                <p className="text-sm text-on-surface-variant opacity-70">Generate comprehensive technical documentation</p>
-              </div>
-              <button 
-                onClick={() => window.print()}
-                className="px-6 py-2.5 bg-primary text-white rounded-sm font-bold text-xs uppercase tracking-widest flex items-center gap-2 hover:opacity-90 transition-all"
-              >
-                <FileText size={16} />
-                Print Report
-              </button>
-            </div>
-            
-            <div className="bg-white p-8 border border-outline-variant/20 shadow-lg max-w-4xl mx-auto overflow-hidden">
-              <CalculationMemoryModule data={projectData} />
-            </div>
-          </div>
-        </div>
-      );
       default: return <div className="p-8 text-center opacity-50">Module in development.</div>;
     }
   };

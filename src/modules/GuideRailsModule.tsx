@@ -4,11 +4,14 @@ import { safeNumber, formatNumber, degToRad, InputGroup, LiftField, SliderField,
 import { ISO_RAIL_PROFILES, BELT_PROFILES } from '../constants';
 import { CheckCircle2, ShieldCheck, Zap, AlertTriangle, Info, ChevronRight, Calculator, FileText, Database, Activity, Package, Maximize, AlertCircle, PlayCircle, Settings, CheckSquare, XCircle, Settings2 } from 'lucide-react';
 import { BlockMath, InlineMath } from 'react-katex';
+import { computeLiftCalculations } from '../lib/calculations';
 
 export const GuideRailsModule = ({ data, onChange, view = 'all' }: { data: ProjectData, onChange: (newData: Partial<ProjectData>) => void, view?: 'all' | 'params' | 'forces' | 'verify' }) => {
   const g = 9.81;
   const E = data.materialE;
   const l = data.bracketDist;
+  
+  const { guideRails } = computeLiftCalculations(data);
   
   // 1. Bending Stress (Combined X and Y)
   const Fh = (data.ratedLoad + data.carMass) * g * 0.1;
