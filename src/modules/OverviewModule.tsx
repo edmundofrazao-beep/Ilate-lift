@@ -48,9 +48,9 @@ export const OverviewModule = ({ modules, onSelect }: { modules: ModuleStatus[],
                         <m.icon size={18} className="text-primary group-hover:scale-110 transition-transform" />
                         <span className="text-sm font-bold">{m.label}</span>
                       </div>
-                      <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full uppercase ${
-                        m.status === 'implemented' ? 'bg-emerald-100 text-emerald-700' :
-                        m.status === 'partial' ? 'bg-amber-100 text-amber-700' : 'bg-slate-100 text-slate-500'
+                      <span className={`text-[10px] font-bold px-2 py-0.5 uppercase border ${
+                        m.status === 'implemented' ? 'bg-emerald-900/30 text-emerald-500 border-emerald-500/30' :
+                        m.status === 'partial' ? 'bg-amber-900/30 text-amber-500 border-amber-500/30' : 'bg-surface-container-high text-on-surface-variant border-outline-variant'
                       }`}>
                         {m.status}
                       </span>

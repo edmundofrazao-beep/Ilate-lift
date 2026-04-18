@@ -162,6 +162,13 @@ export interface ProjectData {
   carWidth: number; // mm
   carDepth: number; // mm
   carHeight: number; // mm
+  
+  // Cybersecurity (ISO 8100-20)
+  cyberNetworkIsolation: boolean;
+  cyberAccessControl: 'Basic' | 'Role-Based' | 'Multi-Factor';
+  cyberDataEncryption: boolean;
+  cyberVulnerabilityPatching: boolean;
+  cyberIntrusionDetection: boolean;
 }
 
 export interface ModuleStatus {

@@ -1,42 +1,55 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap');
 @import "tailwindcss";
 
 @theme {
   --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
   
-  /* Custom Palette from Design System */
-  --color-primary: #4355b9;
-  --color-primary-dim: #3649ac;
-  --color-primary-container: #dee0ff;
-  --color-on-primary-container: #3648ac;
+  /* ILATE Custom Palette - Industrial/Technical System */
   
-  --color-secondary: #526074;
-  --color-secondary-container: #d5e3fc;
+  /* Action / Active / Highlights - ILATE Orange */
+  --color-primary: #FF5A00;
+  --color-primary-dim: #E04F00;
+  --color-primary-container: #331200;
+  --color-on-primary-container: #FFB388;
   
-  --color-tertiary: #535f78;
-  --color-tertiary-container: #d1ddfa;
+  --color-secondary: #475569;
+  --color-secondary-container: #1e293b;
   
-  --color-surface: #f8f9ff;
-  --color-surface-container-lowest: #ffffff;
-  --color-surface-container-low: #eff4ff;
-  --color-surface-container: #e5eeff;
-  --color-surface-container-high: #dce9ff;
-  --color-surface-container-highest: #d2e4ff;
+  --color-tertiary: #64748b;
+  --color-tertiary-container: #334155;
   
-  --color-on-surface: #00345e;
-  --color-on-surface-variant: #26619d;
+  /* Base Slate/Navy Depths */
+  --color-surface: #0B111A;                /* Base background */
+  --color-surface-container-lowest: #070A0F; /* Deepest elements */
+  --color-surface-container-low: #101722;    /* General cards */
+  --color-surface-container: #151E2D;        /* Elevated panels */
+  --color-surface-container-high: #1E293B;   /* Modals / Dropdowns */
+  --color-surface-container-highest: #2A384F;/* Hover states */
   
-  --color-outline: #477dbb;
-  --color-outline-variant: #81b5f6;
+  /* Text and Readability */
+  --color-on-surface: #F8FAFC;         /* Almost white main text */
+  --color-on-surface-variant: #94A3B8; /* Slate light for secondary */
   
-  --color-error: #9e3f4e;
-  --color-error-container: #ff8b9a;
-  --color-on-error-container: #782232;
+  /* Borders - Subtle but visible */
+  --color-outline: #334155;
+  --color-outline-variant: #1E293B;
+  
+  /* Controlled Error */
+  --color-error: #EF4444;
+  --color-error-container: #450A0A;
+  --color-on-error-container: #FECACA;
 }
 
 @layer base {
   body {
     @apply bg-surface text-on-surface antialiased;
     font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+  }
+  
+  /* Hard constraints for ILATE visual system */
+  * {
+    border-color: var(--color-outline-variant);
   }
 }
 

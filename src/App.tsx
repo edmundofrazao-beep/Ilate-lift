@@ -20,6 +20,7 @@ import { PDFExportModule, ValidationModal, SimpleModal, ValidationResult } from 
 import { OverspeedGovernorModule } from './modules/OverspeedGovernorModule';
 import { TractionSheavesModule } from './modules/TractionSheavesModule';
 import { CounterweightModule } from './modules/CounterweightModule';
+import { CybersecurityModule } from './modules/CybersecurityModule';
 
 /**
  * @license
@@ -253,7 +254,14 @@ export default function App() {
     cwtScreenHeight: 2.1,
     carWidth: 1200,
     carDepth: 1400,
-    carHeight: 2200
+    carHeight: 2200,
+    
+    // Cybersecurity Defaults
+    cyberNetworkIsolation: true,
+    cyberAccessControl: 'Basic',
+    cyberDataEncryption: true,
+    cyberVulnerabilityPatching: false,
+    cyberIntrusionDetection: false
   });
 
   const handleDataChange = (newData: Partial<ProjectData>) => {
@@ -402,6 +410,7 @@ export default function App() {
     { id: 'sil', label: 'SIL / PESSAL (4.18)', icon: Zap, status: 'implemented', category: 'Electronics & Safety' },
     { id: 'alarms', label: 'Remote Alarms (EN 81-28)', icon: Bell, status: 'implemented', category: 'Electronics & Safety' },
     { id: 'seismic', label: 'Seismic (EN 81-77)', icon: Zap, status: 'implemented', category: 'Electronics & Safety' },
+    { id: 'cybersecurity', label: 'Cybersecurity (ISO 8100-20)', icon: Lock, status: 'implemented', category: 'Electronics & Safety' },
 
     // Clearances & Geometry
     { id: 'clearances', label: 'Clearances (ISO 8100-1)', icon: Ruler, status: 'implemented', category: 'Hoistway & Clearances' },
@@ -416,6 +425,19 @@ export default function App() {
     { id: 'memory', label: 'Calculation Memory', icon: History, status: 'implemented', category: 'Tools & Documentation' },
     { id: 'export', label: 'PDF Export', icon: FileText, status: 'implemented', category: 'Tools & Documentation' },
   ];
+
+  const exportProjectData = () => {
+    const dataStr = JSON.stringify(projectData, null, 2);
+    const blob = new Blob([dataStr], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `ilate-project-${Date.now()}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
 
   const renderContent = () => {
     switch (activeTab) {
@@ -432,7 +454,7 @@ export default function App() {
       case 'suspension-verify': return <RopesModule data={projectData} onChange={handleDataChange} view="verify" />;
       case 'suspension': return <RopesModule data={projectData} onChange={handleDataChange} view="all" />; // Fallback
       case 'compensation': return <div className="p-8 text-center text-on-surface-variant font-bold border border-dashed border-outline-variant/30 rounded-sm bg-surface-container-low">Compensation module coming soon (analyzes lift mass, height, speed via ISO 8100 limits).</div>;
-      case 'cybersecurity': return <div className="p-8 text-center text-on-surface-variant font-bold border border-dashed border-outline-variant/30 rounded-sm bg-surface-container-low">Cybersecurity framework via ISO 8100-20 to be integrated here.</div>;
+      case 'cybersecurity': return <CybersecurityModule data={projectData} onChange={handleDataChange} />;
 
       // Safety Systems
       case 'safety': return <SafetyComponentsModule data={projectData} onChange={handleDataChange} section="safety" />;
@@ -568,16 +590,16 @@ export default function App() {
   return (
     <div className="flex h-screen overflow-hidden bg-surface text-on-surface font-sans">
       {/* Sidebar */}
-      <aside className="fixed left-0 top-0 h-full flex flex-col py-4 gap-1 z-40 w-64 border-r border-outline-variant/10 bg-white/50 backdrop-blur-sm overflow-y-auto no-scrollbar">
+      <aside className="fixed left-0 top-0 h-full flex flex-col py-4 gap-1 z-40 w-64 border-r border-outline-variant/50 bg-surface-container overflow-y-auto no-scrollbar">
         <div className="px-6 mb-8">
-          <h1 className="text-xl font-black text-on-surface uppercase tracking-tighter">LiftCalc ISO</h1>
-          <p className="text-[10px] text-on-surface-variant font-semibold tracking-widest uppercase opacity-70">Engineering Tool v1.0</p>
+          <h1 className="text-xl font-black text-primary uppercase tracking-tighter">ILATE</h1>
+          <p className="text-[10px] text-on-surface-variant font-semibold tracking-widest uppercase mt-1">Operational Cockpit</p>
         </div>
         
         <nav className="flex-1 flex flex-col gap-4">
           {Array.from(new Set(modules.map(m => m.category || 'Other'))).map(category => (
             <div key={category} className="flex flex-col gap-0.5">
-              <h3 className="px-6 py-1 text-[10px] font-bold tracking-widest text-on-surface-variant uppercase opacity-50">
+              <h3 className="px-6 py-1 text-[10px] font-bold tracking-widest text-on-surface-variant uppercase opacity-70">
                 {category}
               </h3>
               {modules.filter(m => (m.category || 'Other') === category).map((item) => (
@@ -586,22 +608,22 @@ export default function App() {
                   onClick={() => setActiveTab(item.id)}
                   className={`flex items-center gap-3 px-6 py-2 transition-all duration-200 group text-left ${
                     activeTab === item.id 
-                      ? 'bg-primary/10 text-primary border-r-4 border-primary' 
-                      : 'text-secondary hover:bg-surface-container-low hover:translate-x-1'
+                      ? 'bg-primary/10 text-primary border-r-2 border-primary font-bold' 
+                      : 'text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface'
                   }`}
                 >
-                  <item.icon size={14} className={activeTab === item.id ? 'text-primary' : 'text-secondary opacity-70 group-hover:opacity-100'} />
-                  <span className="text-xs font-medium">{item.label}</span>
+                  <item.icon size={14} className={activeTab === item.id ? 'text-primary' : 'text-on-surface-variant opacity-70 group-hover:opacity-100 group-hover:text-primary'} />
+                  <span className="text-[11px] font-medium uppercase tracking-wider">{item.label}</span>
                 </button>
               ))}
             </div>
           ))}
         </nav>
 
-        <div className="px-6 pt-4 mt-auto">
+        <div className="px-6 pt-4 mt-auto border-t border-outline-variant/30">
           <button 
             onClick={validateProject}
-            className="w-full py-2.5 bg-gradient-to-r from-primary to-primary-dim text-white rounded-sm font-bold shadow-md hover:opacity-90 transition-all text-[11px] uppercase tracking-wider flex items-center justify-center gap-2"
+            className="w-full py-2.5 bg-primary text-surface-container-lowest rounded-sm font-bold hover:bg-primary-dim transition-colors text-[11px] uppercase tracking-wider flex items-center justify-center gap-2"
           >
             <Play size={12} fill="currentColor" />
             Validate Project
@@ -610,26 +632,35 @@ export default function App() {
       </aside>
       
       {/* Main Content */}
-      <main className="ml-64 flex-1 flex flex-col h-full overflow-hidden">
+      <main className="ml-64 flex-1 flex flex-col h-full overflow-hidden bg-surface">
         {/* Header */}
-        <header className="flex justify-between items-center w-full px-8 h-14 bg-white/70 backdrop-blur-md sticky top-0 z-50 border-b border-outline-variant/10">
+        <header className="flex justify-between items-center w-full px-8 h-14 bg-surface-container-highest sticky top-0 z-50 border-b border-outline-variant/50">
           <div className="flex items-center gap-6">
-            <span className="text-lg font-bold tracking-tighter text-on-primary-container uppercase">ISO 8100-2:2026</span>
-            <div className="h-4 w-px bg-outline-variant/20" />
-            <span className="text-xs font-bold text-on-surface-variant opacity-70 uppercase tracking-widest">{modules.find(m => m.id === activeTab)?.label}</span>
+            <span className="text-sm font-bold tracking-widest text-primary uppercase">ISO 8100 ENGINE</span>
+            <div className="h-4 w-px bg-outline-variant" />
+            <span className="text-xs font-bold text-on-surface-variant uppercase tracking-widest">{modules.find(m => m.id === activeTab)?.label}</span>
           </div>
           
           <div className="flex items-center gap-4">
+            <button
+              onClick={exportProjectData}
+              className="px-4 py-1.5 bg-surface-container border border-outline-variant/50 text-on-surface hover:text-primary hover:border-primary transition-colors rounded-sm flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest"
+            >
+              <Download size={14} />
+              Export JSON
+            </button>
+            <div className="h-4 w-px bg-outline-variant/50" />
             <div className="flex gap-1">
               <button 
                 onClick={() => setIsSettingsOpen(true)}
-                className="p-2 text-secondary hover:bg-surface-container transition-colors rounded-full"
+                className="p-2 text-on-surface-variant hover:text-primary transition-colors"
+                title="Settings"
               ><Settings size={16} /></button>
               <button 
                 onClick={() => setIsHelpOpen(true)}
-                className="p-2 text-secondary hover:bg-surface-container transition-colors rounded-full"
+                className="p-2 text-on-surface-variant hover:text-primary transition-colors"
+                title="Help"
               ><HelpCircle size={16} /></button>
-              <button className="p-2 text-secondary hover:bg-surface-container transition-colors rounded-full"><UserCircle size={16} /></button>
             </div>
           </div>
         </header>
@@ -642,18 +673,18 @@ export default function App() {
         </div>
         
         {/* Footer */}
-        <footer className="h-10 bg-surface-container-low border-t border-outline-variant/10 px-8 flex items-center justify-between text-[10px] text-on-surface-variant font-medium shrink-0">
+        <footer className="h-10 bg-surface-container-highest border-t border-outline-variant/50 px-8 flex items-center justify-between text-[10px] text-on-surface-variant font-medium shrink-0 uppercase tracking-widest">
           <div className="flex gap-6">
             <span>ISO 8100-2:2026 Engine v1.0.4</span>
-            <span>Workspace: Global Project Alpha-7</span>
+            <span className="text-primary opacity-80">Workspace: Global Project Alpha-7</span>
           </div>
           <div className="flex gap-4 items-center">
             <span className="flex items-center gap-1">
-              <CheckCircle2 size={12} className="text-emerald-600" /> 
+              <CheckCircle2 size={12} className="text-emerald-500" /> 
               All Calculations Valid
             </span>
-            <span className="bg-primary/10 px-2 py-0.5 rounded text-primary font-bold">
-              LIFTCALC ENTERPRISE
+            <span className="bg-primary border border-primary-dim px-2 py-0.5 text-surface-container-lowest font-bold">
+              ILATE ENTERPRISE
             </span>
           </div>
         </footer>
