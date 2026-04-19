@@ -20,6 +20,15 @@ export const RopesModule = ({ data, onChange, view = 'all' }: { data: ProjectDat
     return Math.max(0, base_life * factor * bend_penalty * stop_penalty / (data.loadCycles / 1000));
   }, [data.loadCycles, data.ropeType, N_equiv, data.stops]);
 
+  const discardDiameterLimit = 6;
+  const discardWearReached = data.ropeWearPercentage >= discardDiameterLimit;
+  const reverseBendSeverity = data.numReverseBends >= 4 ? 'high' : data.numReverseBends >= 2 ? 'medium' : 'low';
+  const fatigueReserveYears = data.loadCycles > 0 ? lifetime_est / data.loadCycles : 0;
+  const fatigueReserveLow = fatigueReserveYears > 0 && fatigueReserveYears < 1;
+  const discardRequiresAction = discardWearReached || !isBreakingLoadOk || !isSfOk;
+  const discardStatusTone = discardRequiresAction ? 'bg-error-container/10 border-error/20' : fatigueReserveLow || reverseBendSeverity !== 'low' ? 'bg-amber-50 border-amber-200' : 'bg-emerald-50 border-emerald-200';
+  const discardStatusLabel = discardRequiresAction ? 'replace / investigate' : fatigueReserveLow || reverseBendSeverity !== 'low' ? 'service review' : 'serviceable';
+
   return (
     <div className="space-y-8">
       <div className="bg-surface-container-low p-8 border-t-2 border-tertiary">
@@ -180,26 +189,97 @@ export const RopesModule = ({ data, onChange, view = 'all' }: { data: ProjectDat
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mt-8">
           <div className="space-y-6">
             <div className="p-4 bg-surface-container-lowest border border-outline-variant/10">
-              <h4 className="text-xs font-bold uppercase mb-2">Formulas (ISO 8100-2:2026)</h4>
-              <div className="font-mono text-[10px] space-y-1 opacity-70">
-                <p>• Sf = 10^(2.6834 - log(N_equiv / 2.6834e6) / log(D/d)) [Formula 36]</p>
-                <p>• N_equiv = N_ps + 4 · N_pr</p>
+              <div className="flex flex-wrap items-center gap-3">
+                <span className="text-[10px] font-bold uppercase tracking-[0.18em] text-primary">4.12 Formula</span>
+                <code className="text-xs font-bold text-on-surface">Sf = 10^(2.6834 - log(N_equiv / 2.6834e6) / log(D/d))</code>
+                <span className="text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant">N_equiv = Nps + 4Npr</span>
               </div>
             </div>
             
-            <div className="p-6 bg-slate-900 text-white rounded-sm">
-              <h4 className="text-xs font-bold uppercase tracking-widest text-indigo-300 mb-4 flex items-center gap-2">
-                <AlertTriangle size={14} />
-                Discard Criteria (4.14)
-              </h4>
-              <ul className="text-[10px] space-y-2 opacity-80">
-                <li>• Reduction of nominal diameter &gt; 6%</li>
-                <li>• Severe corrosion or visible deformation</li>
-                <li>• Number of broken wires exceeds ISO 4344 limit</li>
-                <li className="pt-2 border-t border-white/10 text-indigo-200 font-bold italic">
-                  Ready for integration with IoT monitoring sensors.
-                </li>
-              </ul>
+            <div className={`p-6 rounded-sm border ${discardStatusTone}`}>
+              <div className="mb-5 flex items-center justify-between gap-4">
+                <h4 className="text-xs font-bold uppercase tracking-widest text-primary flex items-center gap-2">
+                  <AlertTriangle size={14} />
+                  Discard Criteria (4.14)
+                </h4>
+                <span className="rounded-full border border-current/20 px-3 py-1 text-[10px] font-black uppercase tracking-[0.16em] text-on-surface">
+                  {discardStatusLabel}
+                </span>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <LiftField
+                  label="Diameter Reduction"
+                  name="ropeWearPercentage"
+                  unit="%"
+                  data={data}
+                  onChange={onChange}
+                  min={0}
+                  max={15}
+                  step={0.5}
+                  suggestion="A reduction above 6% should immediately trigger rope replacement review."
+                />
+                <div className="rounded-sm border border-outline-variant/20 bg-surface-container-lowest p-4">
+                  <p className="text-[10px] font-bold uppercase text-on-surface-variant">Discard Snapshot</p>
+                  <p className={`mt-2 text-2xl font-black ${discardRequiresAction ? 'text-error' : fatigueReserveLow || reverseBendSeverity !== 'low' ? 'text-amber-600' : 'text-emerald-600'}`}>
+                    {discardRequiresAction ? 'REJECT' : fatigueReserveLow || reverseBendSeverity !== 'low' ? 'REVIEW' : 'OK'}
+                  </p>
+                  <p className="mt-2 text-[10px] leading-relaxed text-on-surface-variant">Decision is driven by wear, breaking load, safety factor and reverse bends.</p>
+                </div>
+              </div>
+
+              <div className="mt-5 space-y-3">
+                <div className="flex items-center gap-3">
+                  <div className={`w-5 h-5 rounded flex items-center justify-center border ${!discardWearReached ? 'bg-emerald-600 border-emerald-600' : 'border-error bg-error/80'}`}>
+                    {!discardWearReached ? <CheckSquare size={14} className="text-white" /> : <AlertTriangle size={12} className="text-white" />}
+                  </div>
+                  <span className="text-xs font-medium">Nominal diameter reduction remains below 6%.</span>
+                </div>
+                <div className="flex items-center gap-3">
+                  <div className={`w-5 h-5 rounded flex items-center justify-center border ${isBreakingLoadOk ? 'bg-emerald-600 border-emerald-600' : 'border-error bg-error/80'}`}>
+                    {isBreakingLoadOk ? <CheckSquare size={14} className="text-white" /> : <AlertTriangle size={12} className="text-white" />}
+                  </div>
+                  <span className="text-xs font-medium">Measured breaking load still satisfies the ISO 4344 minimum reference.</span>
+                </div>
+                <div className="flex items-center gap-3">
+                  <div className={`w-5 h-5 rounded flex items-center justify-center border ${isSfOk ? 'bg-emerald-600 border-emerald-600' : 'border-error bg-error/80'}`}>
+                    {isSfOk ? <CheckSquare size={14} className="text-white" /> : <AlertTriangle size={12} className="text-white" />}
+                  </div>
+                  <span className="text-xs font-medium">Current suspension safety factor still covers the installed duty.</span>
+                </div>
+                <div className="flex items-center gap-3">
+                  <div className={`w-5 h-5 rounded flex items-center justify-center border ${reverseBendSeverity === 'low' ? 'bg-emerald-600 border-emerald-600' : reverseBendSeverity === 'medium' ? 'bg-amber-500 border-amber-500' : 'border-error bg-error/80'}`}>
+                    {reverseBendSeverity === 'low' ? <CheckSquare size={14} className="text-white" /> : <AlertTriangle size={12} className="text-white" />}
+                  </div>
+                  <span className="text-xs font-medium">
+                    Reverse bends are tracked as a fatigue accelerator.
+                  </span>
+                </div>
+              </div>
+
+              <div className="mt-5 rounded-sm border border-outline-variant/20 bg-surface-container-lowest p-4">
+                <p className="text-[10px] font-bold uppercase text-primary">Service Interpretation</p>
+                <div className="mt-3 grid grid-cols-1 md:grid-cols-3 gap-3 text-xs">
+                  <div>
+                    <p className="font-bold text-on-surface-variant uppercase text-[10px]">Wear</p>
+                    <p className={discardWearReached ? 'text-error font-bold' : 'text-emerald-600 font-bold'}>
+                      {formatNumber(data.ropeWearPercentage, 1)}%
+                    </p>
+                  </div>
+                  <div>
+                    <p className="font-bold text-on-surface-variant uppercase text-[10px]">Reverse bends</p>
+                    <p className={reverseBendSeverity === 'high' ? 'text-error font-bold' : reverseBendSeverity === 'medium' ? 'text-amber-600 font-bold' : 'text-emerald-600 font-bold'}>
+                      {data.numReverseBends} ({reverseBendSeverity})
+                    </p>
+                  </div>
+                  <div>
+                    <p className="font-bold text-on-surface-variant uppercase text-[10px]">Fatigue reserve</p>
+                    <p className={fatigueReserveLow ? 'text-amber-600 font-bold' : 'text-emerald-600 font-bold'}>
+                      {fatigueReserveYears > 0 ? `${formatNumber(fatigueReserveYears, 1)} years` : 'n/a'}
+                    </p>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
 

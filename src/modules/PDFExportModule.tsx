@@ -158,13 +158,13 @@ export type ValidationResult = {
   onAction?: () => void;
 };
 
-export const ValidationModal = ({ isOpen, onClose, results, onNavigate }: { isOpen: boolean, onClose: () => void, results: ValidationResult[], onNavigate?: (moduleId: string) => void }) => {
+export const ValidationModal = ({ isOpen, onClose, results, onNavigate, title = 'Project Validation Results' }: { isOpen: boolean, onClose: () => void, results: ValidationResult[], onNavigate?: (moduleId: string) => void, title?: string }) => {
   if (!isOpen) return null;
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-300">
       <div className="bg-surface-container-low w-full max-w-lg rounded-sm shadow-2xl border border-outline-variant/20 overflow-hidden animate-in zoom-in-95 duration-300">
         <div className="p-6 border-b border-outline-variant/10 flex items-center justify-between bg-surface-container">
-          <h3 className="text-lg font-black uppercase tracking-tighter">Project Validation Results</h3>
+          <h3 className="text-lg font-black uppercase tracking-tighter">{title}</h3>
           <button onClick={onClose} className="p-1 hover:bg-surface-container-high rounded-full transition-colors">
             <XCircle size={20} className="text-on-surface-variant" />
           </button>
@@ -203,7 +203,7 @@ export const ValidationModal = ({ isOpen, onClose, results, onNavigate }: { isOp
                   <div className="flex items-center gap-2 mt-2">
                     {r.moduleId && onNavigate && (
                       <span className="text-[10px] uppercase font-bold text-primary/70 flex items-center gap-1 group-hover:text-primary transition-colors">
-                        Click to navigate
+                        Open related section
                       </span>
                     )}
                     {r.onAction && r.actionLabel && (

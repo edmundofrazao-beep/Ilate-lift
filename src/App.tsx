@@ -12,7 +12,6 @@ import { RuptureValveModule } from './modules/RuptureValveModule';
 import { ComponentLibraryModule } from './modules/ComponentLibraryModule';
 import { CalculationMemoryModule } from './modules/CalculationMemoryModule';
 import { SlingModule } from './modules/SlingModule';
-import { DoorLockingModule } from './modules/DoorLockingModule';
 import { FormulaLibraryModule } from './modules/FormulaLibraryModule';
 import { ClearanceValidationModule } from './modules/ClearanceValidationModule';
 import { SafetyComponentsModule } from './modules/SafetyComponentsModule';
@@ -104,6 +103,7 @@ export default function App() {
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isHelpOpen, setIsHelpOpen] = useState(false);
   const [validationResults, setValidationResults] = useState<ValidationResult[]>([]);
+  const [validationModalTitle, setValidationModalTitle] = useState('Project Validation Results');
   const [projectData, setProjectData] = useState<ProjectData>({
     type: 'electric',
     suspension: '2:1',
@@ -286,8 +286,8 @@ export default function App() {
     });
   };
 
-  const validateProject = () => {
-    const calc = computeLiftCalculations(projectData);
+  const getValidationResults = (data: ProjectData) => {
+    const calc = computeLiftCalculations(data);
     const results: ValidationResult[] = [];
     
     // Traction Check (Dynamic and Static conditions from ISO 8100)
@@ -297,7 +297,7 @@ export default function App() {
         msg: `Traction condition fails (T1/T2 > e^(f*α)). Check wrap angle or equivalent friction.`,
         moduleId: 'traction-verify',
         actionLabel: 'Increase Wrap Angle',
-        onAction: () => handleDataChange({ wrapAngle: Math.min(270, projectData.wrapAngle + 15) })
+        onAction: () => handleDataChange({ wrapAngle: Math.min(270, data.wrapAngle + 15) })
       });
     }
 
@@ -307,7 +307,7 @@ export default function App() {
         msg: `Specific groove pressure (${calc.traction.p_groove.toFixed(2)} MPa) exceeds allowance (${calc.traction.p_allow.toFixed(2)} MPa).`,
         moduleId: 'sheaves',
         actionLabel: 'Increase Hardness',
-        onAction: () => handleDataChange({ sheaveHardness: Math.min(300, projectData.sheaveHardness + 20) })
+        onAction: () => handleDataChange({ sheaveHardness: Math.min(300, data.sheaveHardness + 20) })
       });
     }
     
@@ -316,36 +316,44 @@ export default function App() {
       results.push({ 
         type: 'error', 
         msg: `Rope safety factor (${calc.ropes.sf_actual.toFixed(1)}) is below normative limit (${calc.ropes.sf_required.toFixed(1)}).`,
-        moduleId: 'ropes',
+        moduleId: 'suspension-verify',
         actionLabel: 'Add Rope',
-        onAction: () => handleDataChange({ numRopes: projectData.numRopes + 1 })
+        onAction: () => handleDataChange({ numRopes: data.numRopes + 1 })
+      });
+    }
+
+    if (data.ropeWearPercentage >= 6) {
+      results.push({
+        type: 'warning',
+        msg: `Rope diameter reduction (${data.ropeWearPercentage.toFixed(1)}%) reached the discard review threshold.`,
+        moduleId: 'suspension-verify'
       });
     }
     
     // OSG Braking Force Check
-    if (projectData.osgMaxBrakingForce < projectData.osgTensileForce) {
+    if (data.osgMaxBrakingForce < data.osgTensileForce) {
       results.push({
         type: 'error',
-        msg: `OSG Max Braking Force (${projectData.osgMaxBrakingForce}N) is less than Tensile Force (${projectData.osgTensileForce}N).`,
+        msg: `OSG Max Braking Force (${data.osgMaxBrakingForce}N) is less than Tensile Force (${data.osgTensileForce}N).`,
         moduleId: 'osg',
         actionLabel: 'Match Braking Force',
-        onAction: () => handleDataChange({ osgMaxBrakingForce: projectData.osgTensileForce })
+        onAction: () => handleDataChange({ osgMaxBrakingForce: data.osgTensileForce })
       });
     }
 
     // Guide Rails Check
-    if (projectData.bracketDist > 3000) {
+    if (data.bracketDist > 3000) {
       results.push({ 
         type: 'warning', 
         msg: 'Bracket distance exceeds 3000mm. Verify buckling stability.',
-        moduleId: 'rails',
+        moduleId: 'rails-verify',
         actionLabel: 'Reduce to 2500mm',
         onAction: () => handleDataChange({ bracketDist: 2500 })
       });
     }
     
     // Buffer Check
-    if (projectData.speed > 1.0 && projectData.bufferType === 'energy-accumulation') {
+    if (data.speed > 1.0 && data.bufferType === 'energy-accumulation') {
       results.push({ 
         type: 'error', 
         msg: 'Energy accumulation buffers are only allowed for speeds ≤ 1.0 m/s.',
@@ -356,74 +364,145 @@ export default function App() {
     }
 
     // ACOP Check
-    const maxAcop = 1.15 * projectData.speed + 0.25;
-    if (projectData.acopTrippingSpeed > maxAcop) {
+    const maxAcop = 1.15 * data.speed + 0.25;
+    if (data.acopTrippingSpeed > maxAcop) {
       results.push({ 
         type: 'error', 
-        msg: `ACOP tripping speed (${projectData.acopTrippingSpeed}m/s) exceeds normative limit (${maxAcop.toFixed(2)}m/s).`,
+        msg: `ACOP tripping speed (${data.acopTrippingSpeed}m/s) exceeds normative limit (${maxAcop.toFixed(2)}m/s).`,
         moduleId: 'acop-ucmp',
         actionLabel: 'Set to Max Limit',
         onAction: () => handleDataChange({ acopTrippingSpeed: parseFloat(maxAcop.toFixed(2)) })
       });
     }
 
+    if (data.doorLockingForce < 1000 || data.doorMinimumEngagement < 7 || !data.doorElectricalSafetyCheck) {
+      results.push({
+        type: 'warning',
+        msg: 'Door locking verification is incomplete for 4.2 mechanical or electrical conditions.',
+        moduleId: 'doors'
+      });
+    }
+
+    const lambdaD = data.failureRate * (data.dangerousFraction / 100);
+    const pfh = lambdaD * (1 - (data.diagnosticCoverage / 100));
+    const silMax = data.silLevel === 3 ? 1e-7 : data.silLevel === 2 ? 1e-6 : 1e-5;
+    const minDc = data.silLevel === 3 ? 90 : data.silLevel === 2 ? 60 : 0;
+    if (pfh > silMax || data.diagnosticCoverage < minDc || data.faultTolerance < (data.silLevel >= 3 ? 1 : 0)) {
+      results.push({
+        type: 'warning',
+        msg: 'Safety circuits evidence is incomplete for the selected SIL target.',
+        moduleId: 'sil'
+      });
+    }
+
+    return results;
+  };
+
+  const getValidationScopeForTab = (tab: string) => {
+    const map: Record<string, string[]> = {
+      doors: ['doors'],
+      sling: ['sling', 'safety'],
+      sheaves: ['sheaves', 'traction-verify', 'suspension-verify'],
+      'traction-params': ['traction-verify', 'sheaves'],
+      'traction-verify': ['traction-verify', 'sheaves'],
+      'suspension-params': ['suspension-verify'],
+      'suspension-verify': ['suspension-verify'],
+      safety: ['safety'],
+      osg: ['osg'],
+      buffers: ['buffers'],
+      'acop-ucmp': ['acop-ucmp'],
+      sil: ['sil'],
+      'rails-params': ['rails-verify'],
+      'rails-forces': ['rails-verify'],
+      'rails-verify': ['rails-verify'],
+      hydraulic: ['hydraulic'],
+      clearances: ['clearances', 'shaft'],
+      shaft: ['shaft', 'clearances'],
+      cabin: ['cabin', 'doors'],
+    };
+    return map[tab] || [tab];
+  };
+
+  const validateProject = () => {
+    const results = getValidationResults(projectData);
     setValidationResults(results);
+    setValidationModalTitle('Project Validation Results');
     setIsValidationOpen(true);
   };
 
+  const validateActiveSection = () => {
+    const scopedIds = new Set(getValidationScopeForTab(activeTab));
+    const results = getValidationResults(projectData).filter(result => result.moduleId && scopedIds.has(result.moduleId));
+    setValidationResults(results);
+    setValidationModalTitle(`${activeSectionLabel} Validation`);
+    setIsValidationOpen(true);
+  };
+
+  const allValidationResults = useMemo(() => getValidationResults(projectData), [projectData]);
+  const activeSectionResults = useMemo(() => {
+    const scopedIds = new Set(getValidationScopeForTab(activeTab));
+    return allValidationResults.filter(result => result.moduleId && scopedIds.has(result.moduleId));
+  }, [activeTab, allValidationResults]);
+
+  const activeSectionStatus = activeSectionResults.some(result => result.type === 'error')
+    ? { label: 'attention', tone: 'text-error bg-error-container/10 border-error/20' }
+    : activeSectionResults.some(result => result.type === 'warning')
+      ? { label: 'review', tone: 'text-amber-700 bg-amber-50 border-amber-200' }
+      : { label: 'ok', tone: 'text-emerald-700 bg-emerald-50 border-emerald-200' };
+  const activeSectionLabel = modules.find(m => m.id === activeTab)?.label || 'Current Section';
+
   const modules: ModuleStatus[] = [
     // Project Definition
-    { id: 'overview', label: 'Overview', icon: LayoutDashboard, status: 'implemented', category: 'Project Overview' },
-    { id: 'global', label: 'General Parameters (4.1)', icon: Globe, status: 'implemented', category: 'Project Overview' },
-    { id: 'cybersecurity', label: 'Cybersecurity (ISO 8100-20)', icon: Shield, status: 'placeholder', category: 'Project Overview' },
+    { id: 'overview', label: 'Overview', icon: LayoutDashboard, status: 'implemented', category: 'Project Setup' },
+    { id: 'global', label: 'Project Parameters (4.1)', icon: Globe, status: 'implemented', category: 'Project Setup' },
 
     // Cabin / Car
-    { id: 'doors', label: 'Door Locking (4.2)', icon: Lock, status: 'implemented', category: 'Cabin / Car' },
-    { id: 'sling', label: 'Car Frame / Sling', icon: Box, status: 'implemented', category: 'Cabin / Car' },
-    { id: 'cabin', label: '3D Cabin Explorer', icon: Maximize2, status: 'implemented', category: 'Cabin / Car' },
+    { id: 'doors', label: 'Door Locking (4.2)', icon: Lock, status: 'implemented', category: 'Cabin and Car' },
+    { id: 'sling', label: 'Car Frame', icon: Box, status: 'implemented', category: 'Cabin and Car' },
+    { id: 'cabin', label: '3D Cabin', icon: Maximize2, status: 'implemented', category: 'Cabin and Car' },
 
     // Counterweight
-    { id: 'cwt', label: 'Counterweight Definition', icon: Database, status: 'placeholder', category: 'Counterweight' },
+    { id: 'cwt', label: 'Counterweight Definition', icon: Database, status: 'implemented', category: 'Counterweight' },
 
     // Guide Rails (4.10)
-    { id: 'rails-params', label: 'Profiles & Material', icon: ArrowUpDown, status: 'implemented', category: 'Guide Rails (4.10)' },
-    { id: 'rails-forces', label: 'Forces & Displacements', icon: Activity, status: 'implemented', category: 'Guide Rails (4.10)' },
-    { id: 'rails-verify', label: 'Verification', icon: CheckSquare, status: 'implemented', category: 'Guide Rails (4.10)' },
+    { id: 'rails-params', label: 'Guide Rail Setup', icon: ArrowUpDown, status: 'implemented', category: 'Guide Rails (4.10)' },
+    { id: 'rails-forces', label: 'Loads and Deflection', icon: Activity, status: 'implemented', category: 'Guide Rails (4.10)' },
+    { id: 'rails-verify', label: 'Guide Rail Checks', icon: CheckSquare, status: 'implemented', category: 'Guide Rails (4.10)' },
 
     // Traction System
-    { id: 'traction-params', label: 'Traction Parameters', icon: Settings2, status: 'implemented', category: 'Traction System' },
-    { id: 'sheaves', label: 'Traction Sheaves', icon: Settings, status: 'implemented', category: 'Traction System' },
-    { id: 'traction-verify', label: 'System Verification', icon: CheckSquare, status: 'implemented', category: 'Traction System' },
+    { id: 'traction-params', label: 'Traction Setup', icon: Settings2, status: 'implemented', category: 'Traction System' },
+    { id: 'sheaves', label: 'Sheaves and Grooves', icon: Settings, status: 'implemented', category: 'Traction System' },
+    { id: 'traction-verify', label: 'Traction Checks', icon: CheckSquare, status: 'implemented', category: 'Traction System' },
     
     // Suspension & Compensation
-    { id: 'suspension-params', label: 'Suspension Configuration', icon: Cable, status: 'implemented', category: 'Suspension & Compensation Means' },
-    { id: 'suspension-verify', label: 'Suspension Verification', icon: CheckSquare, status: 'implemented', category: 'Suspension & Compensation Means' },
-    { id: 'compensation', label: 'Compensation Means', icon: Package, status: 'implemented', category: 'Suspension & Compensation Means' },
+    { id: 'suspension-params', label: 'Suspension Setup', icon: Cable, status: 'implemented', category: 'Suspension and Compensation' },
+    { id: 'suspension-verify', label: 'Discard and Compliance', icon: CheckSquare, status: 'implemented', category: 'Suspension and Compensation' },
+    { id: 'compensation', label: 'Compensation Means', icon: Package, status: 'implemented', category: 'Suspension and Compensation' },
 
     // Safety Systems
     { id: 'safety', label: 'Safety Gear (4.3)', icon: ShieldCheck, status: 'implemented', category: 'Safety Components' },
     { id: 'osg', label: 'Overspeed Governor (4.4)', icon: ShieldAlert, status: 'implemented', category: 'Safety Components' },
     { id: 'buffers', label: 'Buffers (4.5)', icon: Box, status: 'implemented', category: 'Safety Components' },
-    { id: 'acop-ucmp', label: 'ACOP / UCMP (4.7/4.8)', icon: ShieldAlert, status: 'implemented', category: 'Safety Components' },
+    { id: 'acop-ucmp', label: 'ACOP and UCMP (4.7/4.8)', icon: ShieldAlert, status: 'implemented', category: 'Safety Components' },
 
     // Electronics & Safety
-    { id: 'sil', label: 'SIL / PESSAL (4.18)', icon: Zap, status: 'implemented', category: 'Electronics & Safety' },
-    { id: 'alarms', label: 'Remote Alarms (EN 81-28)', icon: Bell, status: 'implemented', category: 'Electronics & Safety' },
-    { id: 'seismic', label: 'Seismic (EN 81-77)', icon: Zap, status: 'implemented', category: 'Electronics & Safety' },
-    { id: 'cybersecurity', label: 'Cybersecurity (ISO 8100-20)', icon: Lock, status: 'implemented', category: 'Electronics & Safety' },
+    { id: 'sil', label: 'Safety Circuits (4.6)', icon: Zap, status: 'implemented', category: 'Control and Electronics' },
+    { id: 'alarms', label: 'Remote Alarms (EN 81-28)', icon: Bell, status: 'implemented', category: 'Control and Electronics' },
+    { id: 'seismic', label: 'Seismic (EN 81-77)', icon: Zap, status: 'implemented', category: 'Control and Electronics' },
+    { id: 'cybersecurity', label: 'Cybersecurity (ISO 8100-20)', icon: Lock, status: 'implemented', category: 'Control and Electronics' },
 
     // Clearances & Geometry
-    { id: 'clearances', label: 'Clearances (ISO 8100-1)', icon: Ruler, status: 'implemented', category: 'Hoistway & Clearances' },
-    { id: 'shaft', label: '3D Shaft Configurator', icon: Box, status: 'implemented', category: 'Hoistway & Clearances' },
+    { id: 'clearances', label: 'Clearances (ISO 8100-1)', icon: Ruler, status: 'implemented', category: 'Hoistway and Geometry' },
+    { id: 'shaft', label: '3D Shaft', icon: Box, status: 'implemented', category: 'Hoistway and Geometry' },
 
     // Hydraulic
-    { id: 'hydraulic', label: 'Hydraulic (4.15)', icon: Droplets, status: 'implemented', category: 'Hydraulic systems' },
+    { id: 'hydraulic', label: 'Hydraulic (4.15)', icon: Droplets, status: 'implemented', category: 'Hydraulic Systems' },
     
     // Tools
-    { id: 'library', label: 'Component Library', icon: Library, status: 'implemented', category: 'Tools & Documentation' },
-    { id: 'formulas', label: 'Formula Library', icon: Calculator, status: 'implemented', category: 'Tools & Documentation' },
-    { id: 'memory', label: 'Calculation Memory', icon: History, status: 'implemented', category: 'Tools & Documentation' },
-    { id: 'export', label: 'PDF Export', icon: FileText, status: 'implemented', category: 'Tools & Documentation' },
+    { id: 'library', label: 'Component Library', icon: Library, status: 'implemented', category: 'Tools and Documentation' },
+    { id: 'formulas', label: 'Formula Library', icon: Calculator, status: 'implemented', category: 'Tools and Documentation' },
+    { id: 'memory', label: 'Calculation Memory', icon: History, status: 'implemented', category: 'Tools and Documentation' },
+    { id: 'export', label: 'PDF Export', icon: FileText, status: 'implemented', category: 'Tools and Documentation' },
   ];
 
   const exportProjectData = () => {
@@ -477,7 +556,7 @@ export default function App() {
       case 'sling': return <SlingModule data={projectData} onChange={handleDataChange} />;
       case 'hydraulic': return <HydraulicModule data={projectData} />;
       case 'seismic': return <SeismicModule data={projectData} onChange={handleDataChange} />;
-      case 'doors': return <DoorLockingModule />;
+      case 'doors': return <SafetyComponentsModule data={projectData} onChange={handleDataChange} section="doors" />;
       
       // Geometry
       case 'clearances': return <ClearanceValidationModule data={projectData} onChange={handleDataChange} />;
@@ -639,9 +718,20 @@ export default function App() {
             <span className="text-sm font-bold tracking-widest text-primary uppercase">ISO 8100 ENGINE</span>
             <div className="h-4 w-px bg-outline-variant" />
             <span className="text-xs font-bold text-on-surface-variant uppercase tracking-widest">{modules.find(m => m.id === activeTab)?.label}</span>
+            <span className={`hidden lg:inline-flex items-center rounded-full border px-3 py-1 text-[10px] font-black uppercase tracking-[0.16em] ${activeSectionStatus.tone}`}>
+              {activeSectionStatus.label}
+              {activeSectionResults.length > 0 ? ` · ${activeSectionResults.length}` : ' · 0'}
+            </span>
           </div>
           
           <div className="flex items-center gap-4">
+            <button
+              onClick={validateActiveSection}
+              className="px-4 py-1.5 bg-surface-container border border-outline-variant/50 text-on-surface hover:text-primary hover:border-primary transition-colors rounded-sm flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest"
+            >
+              <CheckSquare size={14} />
+              Validate Section
+            </button>
             <button
               onClick={exportProjectData}
               className="px-4 py-1.5 bg-surface-container border border-outline-variant/50 text-on-surface hover:text-primary hover:border-primary transition-colors rounded-sm flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest"
@@ -668,6 +758,54 @@ export default function App() {
         {/* Scrollable Body */}
         <div className="flex-1 overflow-y-auto p-8 no-scrollbar bg-surface">
           <div className="max-w-7xl mx-auto">
+            {activeSectionResults.length === 0 ? (
+              <div className="mb-6 flex flex-col gap-3 rounded-sm border border-emerald-200 bg-emerald-50 p-4 lg:flex-row lg:items-center lg:justify-between">
+                <div>
+                  <p className="text-[10px] font-black uppercase tracking-[0.2em] text-emerald-700/80">Section Validation</p>
+                  <p className="mt-1 text-sm font-bold text-emerald-800">{activeSectionLabel} is currently clear.</p>
+                </div>
+                <button
+                  onClick={validateActiveSection}
+                  className="px-4 py-2 bg-white text-emerald-800 rounded-sm border border-emerald-200 hover:border-emerald-400 transition-colors text-[10px] font-black uppercase tracking-[0.18em]"
+                >
+                  Check Section
+                </button>
+              </div>
+            ) : (
+              <div className={`mb-6 rounded-sm border p-4 ${activeSectionStatus.tone}`}>
+                <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+                  <div>
+                    <p className="text-[10px] font-black uppercase tracking-[0.2em] opacity-80">Section Validation</p>
+                    <h3 className="mt-1 text-lg font-black tracking-tight">{activeSectionLabel}</h3>
+                    <p className="mt-2 text-sm opacity-80">
+                      {`${activeSectionResults.length} validation point${activeSectionResults.length > 1 ? 's' : ''} detected in this section. Resolve them here before moving on.`}
+                    </p>
+                  </div>
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+                    <div className="grid grid-cols-3 gap-2 text-center">
+                      <div className="rounded-sm border border-current/15 bg-black/5 px-3 py-2">
+                        <p className="text-[10px] font-bold uppercase opacity-70">Errors</p>
+                        <p className="text-lg font-black">{activeSectionResults.filter(r => r.type === 'error').length}</p>
+                      </div>
+                      <div className="rounded-sm border border-current/15 bg-black/5 px-3 py-2">
+                        <p className="text-[10px] font-bold uppercase opacity-70">Warnings</p>
+                        <p className="text-lg font-black">{activeSectionResults.filter(r => r.type === 'warning').length}</p>
+                      </div>
+                      <div className="rounded-sm border border-current/15 bg-black/5 px-3 py-2">
+                        <p className="text-[10px] font-bold uppercase opacity-70">State</p>
+                        <p className="text-lg font-black uppercase">{activeSectionStatus.label}</p>
+                      </div>
+                    </div>
+                    <button
+                      onClick={validateActiveSection}
+                      className="px-4 py-2 bg-surface-container-highest text-on-surface rounded-sm border border-outline-variant/30 hover:border-primary hover:text-primary transition-colors text-[10px] font-black uppercase tracking-[0.18em]"
+                    >
+                      Open Section Report
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
             {renderContent()}
           </div>
         </div>
@@ -695,6 +833,7 @@ export default function App() {
         onClose={() => setIsValidationOpen(false)} 
         results={validationResults} 
         onNavigate={setActiveTab}
+        title={validationModalTitle}
       />
 
       <SimpleModal 

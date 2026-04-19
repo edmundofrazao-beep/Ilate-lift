@@ -14,6 +14,59 @@ const statusClasses = {
 export const OverviewModule = ({ modules, onSelect }: { modules: ModuleStatus[]; onSelect: (id: string) => void }) => {
   const coverage = getCoverageSummary();
   const categories = Array.from(new Set(modules.map((module) => module.category || 'Other')));
+  const statusScore = { implemented: 2, partial: 1, placeholder: 0 } as const;
+  const highlightedStandards = STANDARDS_REGISTRY.slice(0, 6);
+  const highlightedRules = RULES_REGISTRY.slice(0, 4);
+
+  const workflowSections = [
+    {
+      title: 'Project Base',
+      description: 'Set the project assumptions, speed, travel, type and overall lift architecture before touching component checks.',
+      primary: 'global',
+      secondary: ['clearances', 'cwt'],
+    },
+    {
+      title: 'Traction and Suspension',
+      description: 'Close traction setup, sheaves, ropes, discard criteria and suspension compliance as one engineering block.',
+      primary: 'traction-params',
+      secondary: ['sheaves', 'suspension-verify'],
+    },
+    {
+      title: 'Safety Chain',
+      description: 'Work through door locking, safety gear, governor, buffers and safety circuits in the right order.',
+      primary: 'doors',
+      secondary: ['safety', 'osg', 'buffers', 'sil'],
+    },
+    {
+      title: 'Geometry and Final Proof',
+      description: 'Finish shaft, clearances, cabin and output documents only after the core engineering sections are stable.',
+      primary: 'clearances',
+      secondary: ['shaft', 'cabin', 'memory', 'export'],
+    },
+  ];
+
+  const actionQueue = [
+    {
+      title: 'Close project assumptions',
+      detail: 'Confirm project setup before opening the mechanical verification chain.',
+      target: 'global',
+    },
+    {
+      title: 'Finish traction backbone',
+      detail: 'Review traction setup, sheaves and suspension discard logic together.',
+      target: 'traction-params',
+    },
+    {
+      title: 'Close the safety chain',
+      detail: 'Door locking, safety gear, governor, buffers and safety circuits should be aligned before output.',
+      target: 'doors',
+    },
+    {
+      title: 'Generate final memory',
+      detail: 'Only move to calculation memory and PDF when the main sections are already clean.',
+      target: 'memory',
+    },
+  ];
 
   const priorityBlocks = [
     {
@@ -35,23 +88,23 @@ export const OverviewModule = ({ modules, onSelect }: { modules: ModuleStatus[];
 
   const nextBuildTargets = [
     {
-      title: 'Standards Registry',
-      detail: 'Central clause and standard backbone for the whole product.',
-      modules: ['overview'],
-    },
-    {
-      title: 'Rules Registry',
-      detail: 'Machine-readable checks linked to clauses, inputs and modules.',
-      modules: ['overview'],
-    },
-    {
-      title: 'Geometry Backbone',
-      detail: 'Make ISO 8100-1 the real source of truth for pit, headroom and clearances.',
+      title: 'ISO 8100-1 closure',
+      detail: 'Make clearances, pit, headroom and shaft geometry behave as a true source of truth.',
       modules: ['clearances', 'shaft', 'global'],
     },
     {
-      title: 'Accessibility Engine',
-      detail: 'Turn EN 81-70 from visual hints into rule-driven checks.',
+      title: 'Safety circuits evidence',
+      detail: 'Turn 4.6 into a fully closed engineering section, not just a SIL fragment.',
+      modules: ['sil', 'doors'],
+    },
+    {
+      title: 'Existing-building mode',
+      detail: 'Add EN 81-21 as a real project mode for constrained geometry and reduced clearances.',
+      modules: ['clearances', 'shaft'],
+    },
+    {
+      title: 'Accessibility-driven outputs',
+      detail: 'Convert EN 81-70 from visual hints into rule-driven cabin and user-facing checks.',
       modules: ['cabin'],
     },
   ];
@@ -68,8 +121,7 @@ export const OverviewModule = ({ modules, onSelect }: { modules: ModuleStatus[];
             <div>
               <h2 className="text-3xl font-black tracking-tight text-on-surface">ILATE Lift Compliance Cockpit</h2>
               <p className="mt-3 max-w-2xl text-sm leading-relaxed text-on-surface-variant">
-                The product now has an explicit standards backbone. The goal is to stop treating modules as isolated calculators and
-                start treating the app as a guided engineering workflow with normative traceability.
+                This overview should work as the starting point of the app. The goal is simple: show what to close next, send the user to the right section, and avoid treating the product as a bag of disconnected calculators.
               </p>
             </div>
           </div>
@@ -119,31 +171,99 @@ export const OverviewModule = ({ modules, onSelect }: { modules: ModuleStatus[];
         </div>
       </section>
 
+      <section className="grid grid-cols-1 gap-8 xl:grid-cols-[1.1fr_0.9fr]">
+        <div className="bg-surface-container-low border border-outline-variant/20 rounded-sm p-6">
+          <div className="flex items-center gap-3">
+            <Target size={18} className="text-primary" />
+            <h3 className="text-lg font-black">Start Here</h3>
+          </div>
+          <div className="mt-6 grid grid-cols-1 gap-4">
+            {workflowSections.map((section) => (
+              <div key={section.title} className="border border-outline-variant/20 bg-surface-container-lowest p-4">
+                <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                  <div className="space-y-2">
+                    <h4 className="text-sm font-bold text-on-surface">{section.title}</h4>
+                    <p className="text-sm leading-relaxed text-on-surface-variant">{section.description}</p>
+                    <div className="flex flex-wrap gap-2 pt-1">
+                      {section.secondary.map((id) => {
+                        const module = modules.find((entry) => entry.id === id);
+                        if (!module) return null;
+                        return (
+                          <button
+                            key={id}
+                            onClick={() => onSelect(id)}
+                            className="border border-outline-variant/30 px-2 py-1 text-[10px] font-bold uppercase tracking-[0.16em] text-on-surface-variant transition-colors hover:border-primary/40 hover:text-primary"
+                          >
+                            {module.label}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => onSelect(section.primary)}
+                    className="inline-flex items-center gap-2 rounded-sm border border-primary/30 bg-primary/10 px-4 py-2 text-[10px] font-black uppercase tracking-[0.18em] text-primary transition-colors hover:bg-primary/15"
+                  >
+                    Open Section
+                    <ArrowRight size={14} />
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div className="bg-surface-container-low border border-outline-variant/20 rounded-sm p-6">
+          <div className="flex items-center gap-3">
+            <Layers3 size={18} className="text-primary" />
+            <h3 className="text-lg font-black">Immediate Queue</h3>
+          </div>
+          <div className="mt-6 space-y-3">
+            {actionQueue.map((item, index) => (
+              <button
+                key={item.title}
+                onClick={() => onSelect(item.target)}
+                className="w-full border border-outline-variant/20 bg-surface-container-lowest p-4 text-left transition-all hover:border-primary/40"
+              >
+                <div className="flex items-start gap-4">
+                  <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-primary/30 bg-primary/10 text-[11px] font-black text-primary">
+                    {index + 1}
+                  </div>
+                  <div className="min-w-0">
+                    <h4 className="text-sm font-bold text-on-surface">{item.title}</h4>
+                    <p className="mt-2 text-sm leading-relaxed text-on-surface-variant">{item.detail}</p>
+                  </div>
+                </div>
+              </button>
+            ))}
+          </div>
+        </div>
+      </section>
+
       <section className="grid grid-cols-1 gap-8 xl:grid-cols-[1.3fr_0.9fr]">
         <div className="bg-surface-container-low border border-outline-variant/20 rounded-sm p-6">
           <div className="flex items-center gap-3">
             <BookOpen size={18} className="text-primary" />
             <h3 className="text-lg font-black">Standards Coverage</h3>
           </div>
-          <div className="mt-6 space-y-4">
-            {STANDARDS_REGISTRY.map((standard) => (
+          <div className="mt-6 grid grid-cols-1 gap-4 md:grid-cols-2">
+            {highlightedStandards.map((standard) => (
               <div key={standard.id} className="border border-outline-variant/20 bg-surface-container-lowest p-4">
-                <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-                  <div className="space-y-2">
-                    <div className="flex items-center gap-3">
-                      <span className="text-sm font-black text-on-surface">{standard.shortTitle}</span>
-                      <span className={`border px-2 py-0.5 text-[10px] font-bold uppercase ${statusClasses[standard.status]}`}>
-                        {standard.status}
-                      </span>
-                    </div>
-                    <p className="text-sm leading-relaxed text-on-surface-variant">{standard.role}</p>
-                  </div>
-                  <div className="text-[10px] font-bold uppercase tracking-[0.2em] text-on-surface-variant">
-                    {standard.priority}
-                  </div>
+                <div className="flex items-start justify-between gap-3">
+                  <span className="text-sm font-black text-on-surface">{standard.shortTitle}</span>
+                  <span className={`border px-2 py-0.5 text-[10px] font-bold uppercase ${statusClasses[standard.status]}`}>
+                    {standard.status}
+                  </span>
                 </div>
+                <p className="mt-3 text-sm leading-relaxed text-on-surface-variant">{standard.role}</p>
               </div>
             ))}
+          </div>
+          <div className="mt-4 rounded-sm border border-outline-variant/20 bg-surface-container-lowest p-4">
+            <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant">Coverage Note</p>
+            <p className="mt-2 text-sm leading-relaxed text-on-surface-variant">
+              The product is already anchored on ISO 8100-2. The remaining closure work is mostly geometry, alarms, accessibility, seismic logic and special project modes.
+            </p>
           </div>
         </div>
 
@@ -201,18 +321,33 @@ export const OverviewModule = ({ modules, onSelect }: { modules: ModuleStatus[];
       <section className="bg-surface-container-low border border-outline-variant/20 rounded-sm p-6">
         <div className="flex items-center gap-3">
           <Layers3 size={18} className="text-primary" />
-          <h3 className="text-lg font-black">Module Readiness</h3>
+          <h3 className="text-lg font-black">Section Readiness</h3>
         </div>
         <div className="mt-6 space-y-6">
           {categories.map((category) => {
             const categoryModules = modules.filter((module) => (module.category || 'Other') === category).filter((module) => module.id !== 'overview');
             if (categoryModules.length === 0) return null;
 
+            const readinessScore =
+              categoryModules.reduce((sum, module) => sum + statusScore[module.status], 0) / Math.max(categoryModules.length, 1);
+            const readinessLabel = readinessScore >= 1.75 ? 'stable' : readinessScore >= 1 ? 'in progress' : 'early';
+            const readinessTone =
+              readinessScore >= 1.75
+                ? 'bg-emerald-900/30 text-emerald-400 border-emerald-500/30'
+                : readinessScore >= 1
+                  ? 'bg-amber-900/30 text-amber-300 border-amber-500/30'
+                  : 'bg-surface-container-high text-on-surface-variant border-outline-variant/50';
+
             return (
               <div key={category}>
-                <h4 className="border-b border-outline-variant/20 pb-2 text-[11px] font-bold uppercase tracking-[0.22em] text-primary">
-                  {category}
-                </h4>
+                <div className="flex items-center justify-between gap-3 border-b border-outline-variant/20 pb-2">
+                  <h4 className="text-[11px] font-bold uppercase tracking-[0.22em] text-primary">
+                    {category}
+                  </h4>
+                  <span className={`border px-2 py-0.5 text-[10px] font-bold uppercase ${readinessTone}`}>
+                    {readinessLabel}
+                  </span>
+                </div>
                 <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
                   {categoryModules.map((module) => {
                     const mappedRules = getRulesForModule(module.id);
@@ -253,10 +388,10 @@ export const OverviewModule = ({ modules, onSelect }: { modules: ModuleStatus[];
       <section className="bg-surface-container-low border border-outline-variant/20 rounded-sm p-6">
         <div className="flex items-center gap-3">
           <BookOpen size={18} className="text-primary" />
-          <h3 className="text-lg font-black">Rules Registry Snapshot</h3>
+          <h3 className="text-lg font-black">Rules Snapshot</h3>
         </div>
         <div className="mt-6 grid grid-cols-1 gap-4 lg:grid-cols-2">
-          {RULES_REGISTRY.slice(0, 8).map((rule) => (
+          {highlightedRules.map((rule) => (
             <div key={rule.id} className="border border-outline-variant/20 bg-surface-container-lowest p-4">
               <div className="flex items-center justify-between gap-3">
                 <span className="text-sm font-bold text-on-surface">{rule.title}</span>
@@ -272,6 +407,11 @@ export const OverviewModule = ({ modules, onSelect }: { modules: ModuleStatus[];
               </p>
             </div>
           ))}
+        </div>
+        <div className="mt-4 rounded-sm border border-outline-variant/20 bg-surface-container-lowest p-4">
+          <p className="text-sm leading-relaxed text-on-surface-variant">
+            The full registry still exists underneath. This overview now only exposes a short operational sample so the page stays usable as a dashboard.
+          </p>
         </div>
       </section>
     </div>

@@ -55,25 +55,11 @@ export const TractionModule = ({ data, onChange, view = 'all' }: { data: Project
                 </div>
               </div>
 
-              <div className="mt-8 p-6 bg-slate-900 text-white rounded-sm">
-                <h4 className="text-xs font-bold uppercase mb-4 text-primary">Applied ISO 8100-2 Formulas</h4>
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between border-b border-white/5 pb-2">
-                    <span className="text-[10px] opacity-60">Traction Condition</span>
-                    <InlineMath math="\frac{T_1}{T_2} \le e^{f \cdot \alpha}" />
-                  </div>
-                  <div className="flex items-center justify-between border-b border-white/5 pb-2">
-                    <span className="text-[10px] opacity-60">Friction Coeff (Dynamic)</span>
-                    <InlineMath math="\mu = \frac{0.1}{1 + v/10}" />
-                  </div>
-                  <div className="flex items-center justify-between border-b border-white/5 pb-2">
-                    <span className="text-[10px] opacity-60">Specific Pressure</span>
-                    <InlineMath math="p = \frac{T_1 + T_2}{n \cdot d \cdot D \cdot \sin(\gamma/2)}" />
-                  </div>
-                  <div className="flex items-center justify-between border-b border-white/5 pb-2">
-                    <span className="text-[10px] opacity-60">Stalling Condition</span>
-                    <InlineMath math="\frac{T_1}{T_2} \ge e^{f_{stall} \cdot \alpha}" />
-                  </div>
+              <div className="mt-8 rounded-sm border border-outline-variant/20 bg-surface-container-lowest p-4">
+                <div className="flex flex-wrap items-center gap-3">
+                  <span className="text-[10px] font-bold uppercase tracking-[0.18em] text-primary">4.11 Core Checks</span>
+                  <code className="text-xs font-bold text-on-surface">T1/T2 ≤ e^(f·α)</code>
+                  <code className="text-xs font-bold text-on-surface">p = (T1 + T2) / (n·d·D·sin(γ/2))</code>
                 </div>
               </div>
             </div>
@@ -119,46 +105,24 @@ export const TractionModule = ({ data, onChange, view = 'all' }: { data: Project
         )}
       </div>
 
-      {/* Dedicated Engineering Notes Section */}
       <div className="space-y-6">
-        <CollapsibleSection title="ISO 8100-2:2026 Traction Formula Details" icon={Info}>
-          <div className="space-y-4 text-sm text-on-surface-variant leading-relaxed">
-            <p>
-              <strong>Clause 4.11.2:</strong> The traction verification ensures that the friction between the traction sheave and the suspension means is sufficient to prevent slipping during normal operation, emergency braking, and stalling.
-            </p>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-4">
-              <div className="p-4 bg-surface-container-low rounded border border-outline-variant/10">
-                <h5 className="font-bold text-primary mb-2 uppercase text-[10px]">Friction Coefficient (f)</h5>
-                <p className="text-xs mb-2">The friction coefficient $f$ depends on the groove shape and the material properties. For V-grooves:</p>
-                <InlineMath math="f = \mu \cdot \frac{4}{\sin(\gamma/2)}" />
-                <p className="text-[10px] mt-2 opacity-70">Where $\mu$ is the basic friction coefficient and $\gamma$ is the groove angle.</p>
-              </div>
-              <div className="p-4 bg-surface-container-low rounded border border-outline-variant/10">
-                <h5 className="font-bold text-primary mb-2 uppercase text-[10px]">Wrap Angle (α)</h5>
-                <p className="text-xs mb-2">The angle of wrap $\alpha$ is the contact arc between the rope and the sheave, expressed in radians.</p>
-                <InlineMath math="\alpha_{rad} = \alpha_{deg} \cdot \frac{\pi}{180}" />
-              </div>
-            </div>
-          </div>
-        </CollapsibleSection>
-
         <div className="bg-surface-container-low p-8 border border-outline-variant/10 rounded-sm">
         <h3 className="text-sm font-bold uppercase tracking-widest text-primary mb-6 flex items-center gap-3">
           <FileText size={18} className="text-primary" />
-          Engineering Notes & Design Considerations
+          Engineering Notes
         </h3>
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
           <div className="lg:col-span-3">
             <textarea 
               value={data.tractionNotes}
               onChange={(e) => onChange({ tractionNotes: e.target.value })}
-              placeholder="Enter detailed technical observations, sheave wear considerations, or justifications for normative deviations..."
+              placeholder="Record project observations, sheave choices, wear notes or exceptions."
               className="w-full h-48 bg-surface-container-lowest border border-outline-variant/20 rounded-sm p-4 text-sm focus:ring-1 focus:ring-primary outline-none resize-none font-sans leading-relaxed shadow-inner"
             />
           </div>
           <div className="space-y-4">
             <div className="p-4 bg-primary/5 border border-primary/10 rounded-sm">
-              <h4 className="text-[10px] font-bold uppercase text-primary mb-2">Recording Suggestions</h4>
+              <h4 className="text-[10px] font-bold uppercase text-primary mb-2">Use Notes For</h4>
               <ul className="text-[10px] space-y-2 opacity-70 list-disc pl-4">
                 <li>Groove details (V-groove, U-groove)</li>
                 <li>Sheave heat treatment</li>
@@ -167,7 +131,7 @@ export const TractionModule = ({ data, onChange, view = 'all' }: { data: Project
               </ul>
             </div>
             <p className="text-[10px] text-on-surface-variant opacity-50 italic leading-relaxed">
-              These notes are fundamental for project traceability and will be fully exported to the technical report.
+              These notes carry into the final report.
             </p>
           </div>
         </div>

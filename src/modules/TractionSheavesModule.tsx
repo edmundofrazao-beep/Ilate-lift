@@ -33,7 +33,12 @@ export const TractionSheavesModule = ({ data, onChange }: { data: ProjectData, o
             <div className="p-6 bg-surface-container-lowest border border-outline-variant/10 space-y-4">
               <LiftField label="Sheave Diameter (D)" name="sheaveDiameter" unit="mm" data={data} onChange={onChange} min={200} max={1000} step={10} />
               <LiftField label="Rope Diameter (d)" name="ropeDiameter" unit="mm" data={data} onChange={onChange} min={4} max={20} step={0.5} />
-              <LiftField label="Rope Wear Reduction" name="ropeWearPercentage" unit="%" data={data} onChange={onChange} min={0} max={15} step={1} suggestion="Simulate rope reduction over time" />
+              <div className="rounded-sm border border-primary/20 bg-primary/5 p-4">
+                <p className="text-[10px] font-bold uppercase text-primary">Service Wear Input</p>
+                <p className="mt-2 text-xs leading-relaxed text-on-surface-variant">
+                  Rope wear and discard criteria are managed only in <strong>Suspension Verification</strong>. Keep this module focused on sheave geometry and groove verification.
+                </p>
+              </div>
               
               <div className="space-y-1 group">
                 <div className="flex justify-between items-center text-[11px] font-bold text-on-surface-variant uppercase">

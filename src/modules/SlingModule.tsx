@@ -11,7 +11,7 @@ export const SlingModule = ({ data, onChange }: { data: ProjectData, onChange?: 
     <div className="space-y-8">
       <div className="bg-surface-container-low p-8 border-t-2 border-primary">
         <div className="flex items-center justify-between mb-8">
-          <h3 className="text-xl font-bold">Car Frame / Sling Verification (4.6)</h3>
+          <h3 className="text-xl font-bold">Car Frame / Sling Verification</h3>
           <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full uppercase ${isSlingOk ? 'bg-emerald-100 text-emerald-700' : 'bg-error-container/20 text-error'}`}>
             {isSlingOk ? 'Implemented - OK' : 'Implemented - NOK'}
           </span>
@@ -51,7 +51,7 @@ export const SlingModule = ({ data, onChange }: { data: ProjectData, onChange?: 
         </div>
 
         <div className="p-4 bg-primary/5 border border-primary/10 rounded-sm">
-          <h4 className="text-xs font-bold uppercase mb-2">Design Criteria (4.6.2)</h4>
+          <h4 className="text-xs font-bold uppercase mb-2">Design Criteria</h4>
           <p className="text-[10px] opacity-70 leading-relaxed">
             The car frame must be dimensioned to withstand the forces resulting from the safety gear operation and the impact on the buffers. 
             Calculations include dynamic forces from progressive safety gear braking, combined with eccentric load moment derived from the sling width.

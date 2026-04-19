@@ -92,7 +92,7 @@ export const GuideRailsModule = ({ data, onChange, view = 'all' }: { data: Proje
             </div>
             <h3 className="text-2xl font-black tracking-tight text-on-surface">Guide Rails Calculation (4.10)</h3>
             <p className="mt-3 max-w-2xl text-sm leading-relaxed text-on-surface-variant">
-              Bending, buckling, fastening and displacement logic are grouped here as a single inspection surface. This should feel like a rail verification cockpit, not just a table of formulas.
+              Work this page to size the rail, check the span and confirm stress plus deflection.
             </p>
           </div>
           <div className="rounded-sm border border-outline-variant/20 bg-surface-container-lowest p-6">

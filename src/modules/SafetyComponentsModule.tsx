@@ -86,7 +86,7 @@ export const SafetyComponentsModule = ({ data, onChange, section = 'all' }: { da
   const strokeUtilization = h_m > 0 ? (effectiveMinStroke / (data.bufferStroke)) * 100 : 0;
   const massUtilization = data.bufferMaxMass > data.bufferMinMass ? ((impactMass - data.bufferMinMass) / (data.bufferMaxMass - data.bufferMinMass)) * 100 : 0;
 
-  // 4.18 SIL Logic
+  // 4.6 Safety circuits / SIL logic
   const lambdaD = data.failureRate * (data.dangerousFraction / 100);
   const pfh = lambdaD * (1 - (data.diagnosticCoverage / 100));
   const silLimits = {
@@ -98,7 +98,11 @@ export const SafetyComponentsModule = ({ data, onChange, section = 'all' }: { da
   const isPfhOk = pfh <= currentLimit.max;
   const minDc = data.silLevel === 3 ? 90 : (data.silLevel === 2 ? 60 : 0);
   const isDcOk = data.diagnosticCoverage >= minDc;
-  const isSilOk = isPfhOk && isDcOk;
+  const minFaultTolerance = data.silLevel >= 3 ? 1 : 0;
+  const isFaultToleranceOk = data.faultTolerance >= minFaultTolerance;
+  const safetyChainContinuityOk = data.doorElectricalContinuity && data.doorElectricalSafetyCheck;
+  const dangerousFailureRate = lambdaD;
+  const isSilOk = isPfhOk && isDcOk && isFaultToleranceOk;
 
   // 4.7 ACOP Logic
   const acopMaxTripping = data.speed <= 1.0 ? 1.15 * data.speed + 0.25 : 1.15 * data.speed;
@@ -110,7 +114,7 @@ export const SafetyComponentsModule = ({ data, onChange, section = 'all' }: { da
     { label: 'Door Locking', ok: data.doorLockingForce >= 1000 && data.doorMinimumEngagement >= 7 && data.doorElectricalSafetyCheck },
     { label: 'Safety Gear', ok: isMassOk && isSpeedOk && isRetardationOk },
     { label: 'Buffers', ok: isBufferCompliant && isEnergyOk },
-    { label: 'SIL / PESSRAL', ok: isSilOk },
+    { label: 'Safety Circuits / SIL', ok: isSilOk && safetyChainContinuityOk },
   ];
 
   return (
@@ -124,7 +128,7 @@ export const SafetyComponentsModule = ({ data, onChange, section = 'all' }: { da
             </div>
             <h3 className="text-2xl font-black tracking-tight text-on-surface">Safety Verification Layer</h3>
             <p className="mt-3 max-w-2xl text-sm leading-relaxed text-on-surface-variant">
-              Door locking, safety gear, buffers, ACOP, UCMP and SIL checks are grouped here as the active safety control surface of the product.
+              Work this page as a safety chain: door locking, safety gear, buffers, ACOP/UCMP and safety circuits.
             </p>
           </div>
           <div className="rounded-sm border border-outline-variant/20 bg-surface-container-lowest p-6">
@@ -437,28 +441,13 @@ export const SafetyComponentsModule = ({ data, onChange, section = 'all' }: { da
                           </div>
 
                           <div className="space-y-6 mt-6">
-                          <CollapsibleSection title="ISO 8100-2:2026 Safety Gear Formula Details" icon={Info}>
-                            <div className="space-y-4 text-sm text-on-surface-variant leading-relaxed">
-                              <p>
-                                <strong>Clause 4.3:</strong> Progressive safety gear must decelerate the car with an average retardation between $0.2g$ and $1.0g$ for the most unfavorable case.
-                              </p>
-                              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-4">
-                                <div className="p-4 bg-surface-container-low rounded border border-outline-variant/10">
-                                  <h5 className="font-bold text-primary mb-2 uppercase text-[10px]">Average Retardation ($a$)</h5>
-                                  <p className="text-xs mb-2">The retardation is calculated from the braking force $F_b$ and the total mass $P+Q$:</p>
-                                  <InlineMath math="a = \frac{F_b}{P+Q} - g" />
-                                  <p className="text-[10px] mt-2 opacity-70">{"Where $g = 9.81 \\text{ m/s}^2$. The result is often expressed in $g_n$ units."}</p>
-                                </div>
-                                <div className="p-4 bg-surface-container-low rounded border border-outline-variant/10">
-                                  <h5 className="font-bold text-primary mb-2 uppercase text-[10px]">Permissible Range</h5>
-                                  <p className="text-xs mb-2">The normative limits for safe deceleration are:</p>
-                                  <InlineMath math="0.2g \le a \le 1.0g" />
-                                  <p className="text-[10px] mt-2 opacity-70">Values below $0.2g$ may fail to stop the car; above $1.0g$ may cause passenger injury.</p>
-                                </div>
-                              </div>
+                          <div className="rounded-sm border border-outline-variant/20 bg-surface-container-lowest p-4">
+                            <div className="flex flex-wrap items-center gap-3">
+                              <span className="text-[10px] font-bold uppercase tracking-[0.18em] text-primary">4.3 Formula</span>
+                              <code className="text-xs font-bold text-on-surface">a = [Fb / (P+Q)g] - 1</code>
+                              <span className="text-[10px] font-bold uppercase tracking-[0.18em] text-on-surface-variant">target: 0.2gn to 1.0gn</span>
                             </div>
-                          </CollapsibleSection>
-
+                          </div>
                           <div className="p-6 bg-surface-container-lowest border border-outline-variant/10 rounded-sm">
                             <h5 className="text-[10px] font-bold uppercase text-primary mb-4 flex items-center gap-2">
                               <CheckSquare size={12} />
@@ -470,7 +459,7 @@ export const SafetyComponentsModule = ({ data, onChange, section = 'all' }: { da
                                 {isMassOk && <CheckSquare size={14} className="text-white" />}
                               </div>
                               <span className={`text-xs font-medium ${isMassOk ? 'text-on-surface' : 'text-on-surface-variant'}`}>
-                                Total mass (P+Q) of {formatNumber(totalMass)}kg does not exceed the certified limit of {data.safetyGearMaxMass}kg.
+                                Total mass stays within the certified limit.
                               </span>
                             </div>
                             <div className="flex items-center gap-3">
@@ -478,7 +467,7 @@ export const SafetyComponentsModule = ({ data, onChange, section = 'all' }: { da
                                 {isRetardationOk && <CheckSquare size={14} className="text-white" />}
                               </div>
                               <span className={`text-xs font-medium ${isRetardationOk ? 'text-on-surface' : 'text-on-surface-variant'}`}>
-                                Calculated retardation of {formatNumber(retardationG)}gn is within the normative range (0.2gn - 1.0gn).
+                                Retardation stays inside the normative range.
                               </span>
                             </div>
                             <div className="flex items-center gap-3">
@@ -486,7 +475,7 @@ export const SafetyComponentsModule = ({ data, onChange, section = 'all' }: { da
                                 {data.safetyGearBrakingForce > 0 && <CheckSquare size={14} className="text-white" />}
                               </div>
                               <span className={`text-xs font-medium ${data.safetyGearBrakingForce > 0 ? 'text-on-surface' : 'text-on-surface-variant'}`}>
-                                Braking force (Fb) of {formatNumber(data.safetyGearBrakingForce)}N properly parameterized.
+                                Braking force is parameterized.
                               </span>
                             </div>
                           </div>
@@ -896,15 +885,15 @@ export const SafetyComponentsModule = ({ data, onChange, section = 'all' }: { da
           </section>
           )}
 
-          {/* 4.18 SIL-rated Circuits (PESSRAL) */}
+          {/* 4.6 Safety Circuits and SIL-rated Circuits */}
           {(section === 'all' || section === 'sil') && (
           <section className="space-y-6">
             <div className="flex items-center gap-4 border-b border-outline-variant/20 pb-2">
               <Zap className="text-primary" size={20} />
-              <h4 className="text-sm font-bold uppercase tracking-wider">4.18 SIL-rated Circuits (PESSRAL)</h4>
+              <h4 className="text-sm font-bold uppercase tracking-wider">4.6 Safety Circuits and SIL-rated Circuits</h4>
             </div>
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-              <InputGroup label="PESSRAL Configuration">
+              <InputGroup label="Safety Circuit Configuration">
                 <div className="space-y-1 col-span-2">
                   <label className="text-[11px] font-bold text-on-surface-variant uppercase">Target SIL Level</label>
                   <select 
@@ -920,9 +909,10 @@ export const SafetyComponentsModule = ({ data, onChange, section = 'all' }: { da
                 <LiftField label="Failure Rate (λ)" name="failureRate" unit="failures/h" data={data} onChange={onChange} min={0} max={0.1} step={0.001} />
                 <LiftField label="Dangerous Fraction (B)" name="dangerousFraction" unit="%" data={data} onChange={onChange} min={0} max={100} />
                 <LiftField label="Diagnostic Coverage (DC)" name="diagnosticCoverage" unit="%" data={data} onChange={onChange} min={0} max={100} />
+                <LiftField label="Fault Tolerance" name="faultTolerance" data={data} onChange={onChange} min={0} max={3} step={1} />
               </InputGroup>
               <div className="lg:col-span-2">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <div className={`p-6 border ${isPfhOk ? 'bg-emerald-50 border-emerald-200' : 'bg-error-container/10 border-error/20'}`}>
                     <p className="text-[10px] font-bold uppercase mb-1">Calculated PFH</p>
                     <p className="text-2xl font-black">{pfh.toExponential(2)}</p>
@@ -941,13 +931,79 @@ export const SafetyComponentsModule = ({ data, onChange, section = 'all' }: { da
                       <span className="text-[10px] font-bold uppercase opacity-70">DC Verification</span>
                     </div>
                   </div>
+                  <div className={`p-6 border ${isFaultToleranceOk && safetyChainContinuityOk ? 'bg-emerald-50 border-emerald-200' : 'bg-amber-50 border-amber-200'}`}>
+                    <p className="text-[10px] font-bold uppercase mb-1">Circuit Integrity</p>
+                    <p className="text-2xl font-black">{data.faultTolerance}</p>
+                    <p className="text-[10px] opacity-50">Min Fault Tolerance: {minFaultTolerance}</p>
+                    <div className="mt-4 space-y-2">
+                      <div className="flex items-center gap-2">
+                        {isFaultToleranceOk ? <CheckCircle2 size={14} className="text-emerald-600" /> : <AlertCircle size={14} className="text-amber-600" />}
+                        <span className="text-[10px] font-bold uppercase opacity-70">Architecture</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        {safetyChainContinuityOk ? <CheckCircle2 size={14} className="text-emerald-600" /> : <AlertCircle size={14} className="text-amber-600" />}
+                        <span className="text-[10px] font-bold uppercase opacity-70">Continuity</span>
+                      </div>
+                    </div>
+                  </div>
                 </div>
                 <div className="mt-6 p-6 bg-surface-container-low border border-outline-variant/10 rounded-sm">
-                  <h5 className="text-[10px] font-bold uppercase text-primary mb-4">ISO 8100-1 Clause 5.11.2 Requirements</h5>
-                  <div className="space-y-3 text-xs text-on-surface-variant">
-                    <p>• Programmable electronic systems in safety-related applications (PESSRAL) shall meet the requirements of SIL {data.silLevel}.</p>
-                    <p>• The probability of dangerous failure per hour (PFH) shall be less than {currentLimit.max.toExponential(0)}.</p>
-                    <p>• Fault tolerance and diagnostic coverage must be verified according to IEC 61508.</p>
+                  <h5 className="text-[10px] font-bold uppercase text-primary mb-4">Operational Reading</h5>
+                  <div className="grid grid-cols-1 xl:grid-cols-[0.95fr_1.05fr] gap-6">
+                    <div className="space-y-3 text-xs text-on-surface-variant">
+                      <p>• Safety-chain logic is treated here as the electrical verification layer of clause 4.6, with SIL-oriented validation added where programmable safety functions exist.</p>
+                      <p>• The probability of dangerous failure per hour (PFH) shall remain below {currentLimit.max.toExponential(0)} for the selected SIL target.</p>
+                      <p>• Fault tolerance, diagnostic coverage and continuity of the safety chain are evaluated together so the clause is not reduced to a single PFH number.</p>
+                    </div>
+                    <div className="rounded-sm border border-outline-variant/20 bg-surface-container-lowest p-4">
+                      <h6 className="text-[10px] font-bold uppercase text-primary mb-3">Safety Circuit Checklist</h6>
+                      <div className="space-y-3">
+                        <div className="flex items-center gap-3">
+                          <div className={`w-5 h-5 rounded flex items-center justify-center border ${safetyChainContinuityOk ? 'bg-emerald-600 border-emerald-600' : 'border-outline-variant'}`}>
+                            {safetyChainContinuityOk && <CheckSquare size={14} className="text-white" />}
+                          </div>
+                          <span className="text-xs font-medium">Door safety chain continuity and positive electrical verification are active.</span>
+                        </div>
+                        <div className="flex items-center gap-3">
+                          <div className={`w-5 h-5 rounded flex items-center justify-center border ${isPfhOk ? 'bg-emerald-600 border-emerald-600' : 'border-outline-variant'}`}>
+                            {isPfhOk && <CheckSquare size={14} className="text-white" />}
+                          </div>
+                          <span className="text-xs font-medium">Dangerous failure per hour remains inside the target SIL band.</span>
+                        </div>
+                        <div className="flex items-center gap-3">
+                          <div className={`w-5 h-5 rounded flex items-center justify-center border ${isDcOk ? 'bg-emerald-600 border-emerald-600' : 'border-outline-variant'}`}>
+                            {isDcOk && <CheckSquare size={14} className="text-white" />}
+                          </div>
+                          <span className="text-xs font-medium">Diagnostic coverage satisfies the minimum evidence threshold for the selected SIL level.</span>
+                        </div>
+                        <div className="flex items-center gap-3">
+                          <div className={`w-5 h-5 rounded flex items-center justify-center border ${isFaultToleranceOk ? 'bg-emerald-600 border-emerald-600' : 'border-outline-variant'}`}>
+                            {isFaultToleranceOk && <CheckSquare size={14} className="text-white" />}
+                          </div>
+                          <span className="text-xs font-medium">Fault tolerance architecture is coherent with the chosen integrity target.</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                <div className="mt-4 rounded-sm border border-outline-variant/20 bg-surface-container-lowest p-4">
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div>
+                      <p className="text-[10px] font-bold uppercase text-on-surface-variant">Dangerous failure rate</p>
+                      <p className="mt-1 text-lg font-black text-on-surface">{dangerousFailureRate.toExponential(2)}</p>
+                    </div>
+                    <div>
+                      <p className="text-[10px] font-bold uppercase text-on-surface-variant">Continuity state</p>
+                      <p className={`mt-1 text-lg font-black ${safetyChainContinuityOk ? 'text-emerald-600' : 'text-amber-600'}`}>
+                        {safetyChainContinuityOk ? 'closed / verified' : 'review chain'}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-[10px] font-bold uppercase text-on-surface-variant">Clause result</p>
+                      <p className={`mt-1 text-lg font-black ${isSilOk && safetyChainContinuityOk ? 'text-emerald-600' : 'text-amber-600'}`}>
+                        {isSilOk && safetyChainContinuityOk ? 'compliant path' : 'evidence missing'}
+                      </p>
+                    </div>
                   </div>
                 </div>
               </div>

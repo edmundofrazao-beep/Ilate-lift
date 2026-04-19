@@ -97,7 +97,7 @@ export const CalculationMemoryModule = ({ data }: { data: ProjectData }) => {
             </div>
             <h3 className="text-2xl font-black tracking-tight text-on-surface">Technical Memory Workspace</h3>
             <p className="mt-3 max-w-2xl text-sm leading-relaxed text-on-surface-variant">
-              This module should evolve into an editable and exportable engineering report. For now it consolidates the most important calculations in one executive technical view.
+              Use this page as the final technical summary before export.
             </p>
           </div>
           <div className="rounded-sm border border-outline-variant/20 bg-surface-container-lowest p-6">
@@ -189,18 +189,13 @@ export const CalculationMemoryModule = ({ data }: { data: ProjectData }) => {
       <section className="space-y-6">
         <h3 className="text-xl font-bold border-b border-slate-200 pb-2">1. Traction System Analysis (Clause 4.11)</h3>
         <div className="space-y-4">
-          <p className="text-sm leading-relaxed">
-            The traction verification is performed according to the Euler formula for friction drives. 
-            The static and dynamic loads on the traction sheave are calculated as follows:
-          </p>
+          <p className="text-sm leading-relaxed">Traction proof based on static and dynamic loading of the traction sheave.</p>
           <div className="bg-slate-50 p-6 rounded border border-slate-100 flex flex-col items-center gap-4">
             <BlockMath math={`T_1 = \\frac{(P + Q)}{r} \\cdot (g_n + a) = \\frac{(${data.carMass} + ${data.ratedLoad})}{${r}} \\cdot (9.81 + ${data.acceleration}) = ${formatNumber(T1)} \\text{ N}`} />
             <BlockMath math={`T_2 = \\frac{(P + 0.5Q)}{r} \\cdot (g_n - a) = \\frac{(${data.carMass} + 500)}{${r}} \\cdot (9.81 - ${data.acceleration}) = ${formatNumber(T2)} \\text{ N}`} />
             <BlockMath math={`\\text{Ratio } T_1/T_2 = ${formatNumber(tractionRatio)}`} />
           </div>
-          <p className="text-sm leading-relaxed">
-            The traction condition must satisfy the following criteria for loading, emergency braking, and stalling:
-          </p>
+          <p className="text-sm leading-relaxed">Three operating conditions are tracked: loading, braking and stalling.</p>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div className="bg-slate-50 p-4 rounded border border-slate-100">
               <p className="text-[10px] font-bold uppercase mb-2">4.11.2.1 Loading</p>
@@ -221,22 +216,16 @@ export const CalculationMemoryModule = ({ data }: { data: ProjectData }) => {
       <section className="space-y-6">
         <h3 className="text-xl font-bold border-b border-slate-200 pb-2">2. Suspension Means Verification (Clause 4.12)</h3>
         <div className="space-y-4">
-          <p className="text-sm leading-relaxed">
-            {'The equivalent number of pulleys $N_{equiv}$ is calculated to determine the required safety factor:'}
-          </p>
+          <p className="text-sm leading-relaxed">{'Equivalent pulley count $N_{equiv}$ drives the required safety factor.'}</p>
           <div className="bg-slate-50 p-6 rounded border border-slate-100 flex flex-col items-center gap-4">
             <BlockMath math={`N_{equiv} = N_{equiv(t)} + N_{equiv(p)} = ${data.N_equiv_t} + ${formatNumber(N_equiv_p)} = ${formatNumber(N_equiv)}`} />
             <BlockMath math={`N_{equiv(p)} = K_p \\cdot (N_{ps} + 4N_{pr}) = ${data.Kp} \\cdot (${data.numSimpleBends} + 4 \\cdot ${data.numReverseBends}) = ${formatNumber(N_equiv_p)}`} />
           </div>
-          <p className="text-sm leading-relaxed">
-            The minimum required safety factor according to Formula (36) is:
-          </p>
+          <p className="text-sm leading-relaxed">Required safety factor according to Formula 36:</p>
           <div className="bg-slate-50 p-6 rounded border border-slate-100 flex flex-col items-center gap-4">
             <BlockMath math="S_{f,req} = 10^{2.6834 - \frac{\log(N_{equiv} / 2.6834 \cdot 10^6)}{\log(D/d)}}" />
           </div>
-          <p className="text-sm leading-relaxed">
-            Total number of trips $S_T$ (Clause 4.12.3):
-          </p>
+          <p className="text-sm leading-relaxed">Total number of trips $S_T$:</p>
           <div className="bg-slate-50 p-6 rounded border border-slate-100 flex flex-col items-center gap-4">
             <BlockMath math={`S_T = N_{lift} \\cdot C_R \\cdot H \\cdot r = ${data.N_lift} \\cdot ${data.C_R} \\cdot ${data.travel} \\cdot ${r} = ${formatNumber(ST, 0)}`} />
           </div>
@@ -246,9 +235,7 @@ export const CalculationMemoryModule = ({ data }: { data: ProjectData }) => {
       <section className="space-y-6">
         <h3 className="text-xl font-bold border-b border-slate-200 pb-2">3. Guide Rails Analysis (Clause 4.10)</h3>
         <div className="space-y-4">
-          <p className="text-sm leading-relaxed">
-            Bending and buckling stresses are verified for the selected profile using the Omega method:
-          </p>
+          <p className="text-sm leading-relaxed">Bending, buckling, combined stress and deflection for the selected rail profile.</p>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="bg-slate-50 p-6 rounded border border-slate-100 flex flex-col items-center gap-4">
               <p className="text-[10px] font-bold uppercase">4.10.2 Bending</p>
@@ -261,16 +248,12 @@ export const CalculationMemoryModule = ({ data }: { data: ProjectData }) => {
               <p className="text-[10px] opacity-50">Limit: {data.materialYield} N/mm² (ω = {formatNumber(omega, 2)})</p>
             </div>
           </div>
-          <p className="text-sm leading-relaxed">
-            Combined stress verification (Clause 4.10.4):
-          </p>
+          <p className="text-sm leading-relaxed">Combined stress verification:</p>
           <div className="bg-slate-50 p-6 rounded border border-slate-100 flex flex-col items-center gap-4">
             <BlockMath math={`\\sigma = \\sigma_k + 0.9 \\cdot \\sigma_m = ${formatNumber(sigma_combined)} \\text{ N/mm}^2`} />
             <p className="text-xs font-bold text-primary">Compliance: {isCombinedOk ? 'YES' : 'NO'} (Limit: {data.materialYield} N/mm²)</p>
           </div>
-          <p className="text-sm leading-relaxed">
-            Deflection verification (Clause 4.10.6):
-          </p>
+          <p className="text-sm leading-relaxed">Deflection verification:</p>
           <div className="bg-slate-50 p-6 rounded border border-slate-100 flex flex-col items-center gap-4">
             <BlockMath math={`\\delta = ${formatNumber(delta)} \\text{ mm}`} />
             <div className="w-full space-y-2 mt-4">
@@ -300,9 +283,7 @@ export const CalculationMemoryModule = ({ data }: { data: ProjectData }) => {
         <div className="space-y-6">
           <div className="space-y-4">
             <h4 className="text-lg font-bold">4.3 Safety Gear</h4>
-            <p className="text-sm leading-relaxed">
-              Verification of certified mass, speed, and braking force:
-            </p>
+            <p className="text-sm leading-relaxed">Certified mass, speed and retardation summary.</p>
             <div className="bg-slate-50 p-6 rounded border border-slate-100 space-y-4">
               <div className="flex justify-between text-sm">
                 <span>Certified Mass (P+Q)</span>
@@ -326,9 +307,7 @@ export const CalculationMemoryModule = ({ data }: { data: ProjectData }) => {
 
           <div className="space-y-4">
             <h4 className="text-lg font-bold">4.5 Buffers</h4>
-            <p className="text-sm leading-relaxed">
-              Energy absorption and stroke verification according to Clause 4.5.2:
-            </p>
+            <p className="text-sm leading-relaxed">Energy absorption, stroke and mass compliance summary.</p>
             <div className="bg-slate-50 p-6 rounded border border-slate-100 flex flex-col items-center gap-4">
               <BlockMath math={`E_{total} = \\frac{1}{2} m v^2 + m g h = ${formatNumber(Etotal)} \\text{ J}`} />
               <BlockMath math={`h_{min} = ${data.bufferType === 'energy-accumulation' ? (data.bufferIsLinear ? '0.135' : '0.067') : '0.0674'} \\cdot v^2 = ${formatNumber(h_min)} \\text{ mm}`} />
@@ -356,10 +335,8 @@ export const CalculationMemoryModule = ({ data }: { data: ProjectData }) => {
           </div>
 
           <div className="space-y-4">
-            <h4 className="text-lg font-bold">4.18 SIL-rated Circuits</h4>
-            <p className="text-sm leading-relaxed">
-              Probability of Hardware Failure per Hour (PFH) calculation:
-            </p>
+            <h4 className="text-lg font-bold">4.6 Safety Circuits</h4>
+            <p className="text-sm leading-relaxed">PFH and diagnostic coverage summary for the selected SIL target.</p>
             <div className="bg-slate-50 p-6 rounded border border-slate-100 flex flex-col items-center gap-4">
               <BlockMath math={`\\lambda_D = \\lambda \\cdot B = ${data.failureRate} \\cdot ${data.dangerousFraction / 100} = ${lambdaD.toExponential(2)}`} />
               <BlockMath math={`PFH = \\lambda_D \\cdot (1 - DC) = ${pfh.toExponential(2)} \\text{ failures/h}`} />
@@ -372,9 +349,7 @@ export const CalculationMemoryModule = ({ data }: { data: ProjectData }) => {
       <section className="space-y-6">
         <h3 className="text-xl font-bold border-b border-slate-200 pb-2">5. Hydraulic Systems (Clause 4.15)</h3>
         <div className="space-y-4">
-          <p className="text-sm leading-relaxed">
-            Cylinder wall thickness and ram buckling are verified:
-          </p>
+          <p className="text-sm leading-relaxed">Cylinder wall thickness and ram buckling references.</p>
           <div className="bg-slate-50 p-6 rounded border border-slate-100 flex flex-col items-center gap-4">
             <BlockMath math="e_{wall} \ge \frac{2.3 \cdot 1.7 \cdot p}{R_{p0.2}} \cdot \frac{D_i}{2} + e_0" />
             <BlockMath math="F_s \le \frac{\pi^2 E J}{2l^2}" />
@@ -392,7 +367,7 @@ export const CalculationMemoryModule = ({ data }: { data: ProjectData }) => {
       )}
 
       <div className="mt-12 pt-8 border-t border-on-surface/10 text-[10px] text-on-surface-variant italic">
-        Note: Verification to be confirmed by the exact clause of ISO 8100-2:2026. Pre-dimensioning results.
+        Pre-dimensioning summary. Final manufacturer and clause confirmation still required.
       </div>
       </div>
     </div>

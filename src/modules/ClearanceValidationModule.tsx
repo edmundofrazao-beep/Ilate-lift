@@ -1,9 +1,6 @@
 import React from 'react';
-import { ProjectData, ModuleStatus } from '../types';
-import { safeNumber, formatNumber, degToRad, InputGroup, LiftField, SliderField, CollapsibleSection } from '../components/ui';
-import { ISO_RAIL_PROFILES, BELT_PROFILES } from '../constants';
-import { CheckCircle2, ShieldCheck, Zap, AlertTriangle, Info, ChevronRight, Calculator, FileText, Database, Activity, Package, Maximize, AlertCircle, PlayCircle, Settings, CheckSquare } from 'lucide-react';
-import { BlockMath, InlineMath } from 'react-katex';
+import { ProjectData } from '../types';
+import { LiftField } from '../components/ui';
 
 export const ClearanceValidationModule = ({ data, onChange }: { data: ProjectData, onChange: (newData: Partial<ProjectData>) => void }) => {
   const checks = [
@@ -34,29 +31,45 @@ export const ClearanceValidationModule = ({ data, onChange }: { data: ProjectDat
   return (
     <div className="space-y-8">
       <div className="bg-surface-container-low p-8 border-t-2 border-primary">
-        <div className="flex items-center justify-between mb-8">
-          <h3 className="text-xl font-bold">ISO 8100-1 Shaft Clearance Validation</h3>
-          <span className={`text-[10px] font-bold px-3 py-1 rounded-full uppercase ${allPass ? 'bg-emerald-100 text-emerald-700' : 'bg-error-container/20 text-error'}`}>
-            {allPass ? 'PASS' : 'ATTENTION'} {passCount}/{results.length}
-          </span>
+        <div className="mb-8 grid grid-cols-1 gap-4 xl:grid-cols-[1.05fr_0.95fr]">
+          <div className="rounded-sm border border-outline-variant/20 bg-gradient-to-br from-surface-container-high to-surface-container-lowest p-6">
+            <h3 className="text-2xl font-black tracking-tight text-on-surface">Clearances (ISO 8100-1)</h3>
+            <p className="mt-3 max-w-2xl text-sm leading-relaxed text-on-surface-variant">
+              Validate the shaft and refuge dimensions here. This page should answer one question fast: pass or review.
+            </p>
+          </div>
+          <div className="rounded-sm border border-outline-variant/20 bg-surface-container-lowest p-6">
+            <div className="flex items-center justify-between gap-4">
+              <div>
+                <p className="text-[10px] font-black uppercase tracking-[0.22em] text-white">Clearance State</p>
+                <p className="mt-2 text-sm text-on-surface-variant">Passed items: {passCount} / {results.length}</p>
+              </div>
+              <span className={`text-[10px] font-bold px-3 py-1 rounded-full uppercase ${allPass ? 'bg-emerald-100 text-emerald-700' : 'bg-error-container/20 text-error'}`}>
+                {allPass ? 'pass' : 'review'}
+              </span>
+            </div>
+          </div>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 gap-4">
           {results.map(r => (
-            <div key={r.key} className={`p-4 border flex flex-col gap-4 ${r.pass ? 'bg-surface-container-lowest border-outline-variant/10' : 'bg-error-container/10 border-error/20'}`}>
-              <div className="flex justify-between w-full">
-                <div className="space-y-1">
-                  <p className="text-[10px] font-bold text-primary uppercase">{r.clause}</p>
-                  <p className="text-xs font-medium">{r.note}</p>
+            <div key={r.key} className={`p-4 border ${r.pass ? 'bg-surface-container-lowest border-outline-variant/10' : 'bg-error-container/10 border-error/20'}`}>
+              <div className="grid grid-cols-1 gap-4 xl:grid-cols-[1fr_280px] xl:items-center">
+                <div className="flex items-start justify-between gap-4">
+                  <div className="space-y-1">
+                    <p className="text-[10px] font-bold text-primary uppercase">{r.clause}</p>
+                    <p className="text-xs font-medium">{r.note}</p>
+                    <p className="text-[10px] text-on-surface-variant uppercase tracking-[0.16em]">
+                      {r.value.toFixed(3)} {r.unit} {r.op} {r.limit.toFixed(3)} {r.unit}
+                    </p>
+                  </div>
+                  <span className={`shrink-0 rounded-full px-3 py-1 text-[10px] font-bold uppercase ${r.pass ? 'bg-emerald-100 text-emerald-700' : 'bg-error-container/20 text-error'}`}>
+                    {r.pass ? 'pass' : 'review'}
+                  </span>
                 </div>
-                <div className="text-right">
-                  <p className={`text-sm font-black ${r.pass ? 'text-emerald-600' : 'text-error'}`}>
-                    {r.value.toFixed(3)} {r.unit} {r.op} {r.limit.toFixed(3)} {r.unit}
-                  </p>
+                <div className="w-full">
+                  <LiftField label="Clearance" name={r.key as keyof ProjectData} unit="m" data={data} onChange={onChange} min={0} max={r.max} step={0.01} required />
                 </div>
-              </div>
-              <div className="w-full">
-                <LiftField label="Clearance" name={r.key as keyof ProjectData} unit="m" data={data} onChange={onChange} min={0} max={r.max} step={0.01} required />
               </div>
             </div>
           ))}
