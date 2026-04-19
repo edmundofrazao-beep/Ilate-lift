@@ -143,6 +143,7 @@ export default function App() {
     railIxRadius: 11.2,
     railWeight: 12.3,
     railProfile: 'ISO T89/B',
+    railPresetId: 'mf-t89b',
     railLubrication: 'oiled',
     numSimpleBends: 2,
     numReverseBends: 0,
@@ -151,6 +152,7 @@ export default function App() {
     safetyGearMaxMass: 2500,
     safetyGearBrakingForce: 35000,
     safetyGearCertifiedSpeed: 1.5,
+    safetyGearPresetId: '',
     safetyGearRailCondition: 'dry',
     ramDiameter: 100,
     cylinderWallThickness: 5,
@@ -160,6 +162,7 @@ export default function App() {
     bufferType: 'energy-accumulation',
     bufferMaxMass: 2500,
     bufferMinMass: 500,
+    bufferPresetId: '',
     bufferIsLinear: true,
     bufferManualOverride: false,
     bufferManualStroke: 150,
@@ -185,6 +188,7 @@ export default function App() {
     doorLimitSwitchType: 'NC',
     doorElectricalContinuity: true,
     osgMaxBrakingForce: 300,
+    osgPresetId: '',
     osgManufacturer: '',
     osgModel: '',
     osgSerialNumber: '',
@@ -215,6 +219,7 @@ export default function App() {
     acceleration: 0.5,
     deceleration: 0.5,
     ropeSpecificPressure: 1.2,
+    ropePresetId: '',
     beltWidth: 30,
     beltThickness: 3,
     numBelts: 4,
@@ -444,13 +449,6 @@ export default function App() {
     return allValidationResults.filter(result => result.moduleId && scopedIds.has(result.moduleId));
   }, [activeTab, allValidationResults]);
 
-  const activeSectionStatus = activeSectionResults.some(result => result.type === 'error')
-    ? { label: 'attention', tone: 'text-error bg-error-container/10 border-error/20' }
-    : activeSectionResults.some(result => result.type === 'warning')
-      ? { label: 'review', tone: 'text-amber-700 bg-amber-50 border-amber-200' }
-      : { label: 'ok', tone: 'text-emerald-700 bg-emerald-50 border-emerald-200' };
-  const activeSectionLabel = modules.find(m => m.id === activeTab)?.label || 'Current Section';
-
   const modules: ModuleStatus[] = [
     // Project Definition
     { id: 'overview', label: 'Overview', icon: LayoutDashboard, status: 'implemented', category: 'Project Setup' },
@@ -504,6 +502,13 @@ export default function App() {
     { id: 'memory', label: 'Calculation Memory', icon: History, status: 'implemented', category: 'Tools and Documentation' },
     { id: 'export', label: 'PDF Export', icon: FileText, status: 'implemented', category: 'Tools and Documentation' },
   ];
+
+  const activeSectionStatus = activeSectionResults.some(result => result.type === 'error')
+    ? { label: 'attention', tone: 'text-error bg-error-container/10 border-error/20' }
+    : activeSectionResults.some(result => result.type === 'warning')
+      ? { label: 'review', tone: 'text-amber-700 bg-amber-50 border-amber-200' }
+      : { label: 'ok', tone: 'text-emerald-700 bg-emerald-50 border-emerald-200' };
+  const activeSectionLabel = modules.find(m => m.id === activeTab)?.label || 'Current Section';
 
   const exportProjectData = () => {
     const dataStr = JSON.stringify(projectData, null, 2);

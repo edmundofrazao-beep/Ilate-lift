@@ -1,7 +1,7 @@
 import React, { useMemo } from 'react';
 import { ProjectData, ModuleStatus } from '../types';
 import { safeNumber, formatNumber, degToRad, InputGroup, LiftField, SliderField, CollapsibleSection } from '../components/ui';
-import { ISO_RAIL_PROFILES, BELT_PROFILES } from '../constants';
+import { BELT_PROFILES, ROPE_PRESETS } from '../constants';
 import { CheckCircle2, ShieldCheck, Zap, AlertTriangle, Info, ChevronRight, Calculator, FileText, Database, Activity, Package, Maximize, AlertCircle, PlayCircle, Settings, CheckSquare, History } from 'lucide-react';
 import { BlockMath, InlineMath } from 'react-katex';
 import { computeLiftCalculations } from '../lib/calculations';
@@ -64,7 +64,7 @@ export const RopesModule = ({ data, onChange, view = 'all' }: { data: ProjectDat
               value={data.suspensionType}
               onChange={(e) => {
                 const type = e.target.value as any;
-                onChange({ suspensionType: type, ropeType: '' });
+                onChange({ suspensionType: type, ropePresetId: '', ropeType: '' });
               }}
               className="w-full bg-transparent text-xl font-black outline-none cursor-pointer text-primary"
             >
@@ -77,11 +77,13 @@ export const RopesModule = ({ data, onChange, view = 'all' }: { data: ProjectDat
           <div className="p-4 bg-surface-container-lowest border border-outline-variant/10 md:col-span-2">
             <p className="text-[10px] font-bold text-on-surface-variant uppercase mb-1">Suspension Preset</p>
             <select 
-              value={data.ropeType}
+              value={data.ropePresetId || (data.suspensionType === 'belt' ? '' : data.ropeType)}
               onChange={(e) => {
                 const belt = BELT_PROFILES.find(b => b.id === e.target.value);
+                const rope = ROPE_PRESETS.find((preset) => preset.id === e.target.value);
                 if (belt) {
                   onChange({ 
+                    ropePresetId: belt.id,
                     ropeType: belt.label,
                     beltWidth: belt.width,
                     beltThickness: belt.thickness,
@@ -90,8 +92,16 @@ export const RopesModule = ({ data, onChange, view = 'all' }: { data: ProjectDat
                     ropeBreakingLoad: belt.mbf,
                     ropeDiameter: belt.thickness // For D/d calculation
                   });
+                } else if (rope) {
+                  onChange({
+                    ropePresetId: rope.id,
+                    ropeType: `${rope.manufacturer} ${rope.model}`,
+                    ropeDiameter: rope.diameter,
+                    ropeGrade: rope.grade,
+                    ropeBreakingLoad: rope.breakingLoad,
+                  });
                 } else {
-                  onChange({ ropeType: e.target.value });
+                  onChange({ ropePresetId: '', ropeType: e.target.value });
                 }
               }}
               className="w-full bg-transparent text-xl font-black outline-none cursor-pointer text-primary"
@@ -106,6 +116,11 @@ export const RopesModule = ({ data, onChange, view = 'all' }: { data: ProjectDat
               )}
               {data.suspensionType !== 'belt' && (
                 <optgroup label="Ropes">
+                  {ROPE_PRESETS.map((rope) => (
+                    <option key={rope.id} value={rope.id}>
+                      {rope.label}
+                    </option>
+                  ))}
                   <option value="Steel Wire">Steel (Standard)</option>
                   <option value="Coated">Coated (Synthetic)</option>
                 </optgroup>
@@ -119,13 +134,13 @@ export const RopesModule = ({ data, onChange, view = 'all' }: { data: ProjectDat
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mt-8">
           {data.suspensionType !== 'belt' && (
           <InputGroup label="Suspension Parameters">
-            <LiftField label="Number of Ropes (n)" name="numRopes" data={data} onChange={onChange} min={1} required suggestion="Increase number of ropes to improve safety factor." />
-            <LiftField label="Diameter (d)" name="ropeDiameter" unit="mm" data={data} onChange={onChange} min={4} max={20} required suggestion="D/d ratio must be ≥ 40 for steel ropes." />
+            <LiftField label="Number of Ropes (n)" name="numRopes" data={data} onChange={(newData) => onChange({ ropePresetId: '', ...newData })} min={1} required suggestion="Increase number of ropes to improve safety factor." />
+            <LiftField label="Diameter (d)" name="ropeDiameter" unit="mm" data={data} onChange={(newData) => onChange({ ropePresetId: '', ...newData })} min={4} max={20} required suggestion="D/d ratio must be ≥ 40 for steel ropes." />
             <div className="space-y-1">
               <label className="text-[11px] font-bold text-on-surface-variant uppercase">Rope Grade (ISO 4344)</label>
               <select 
                 value={data.ropeGrade}
-                onChange={(e) => onChange({ ropeGrade: parseInt(e.target.value) })}
+                onChange={(e) => onChange({ ropePresetId: '', ropeGrade: parseInt(e.target.value) })}
                 className="w-full bg-surface-container-low border border-outline-variant/20 rounded-sm px-3 py-2 text-sm focus:ring-1 focus:ring-primary outline-none"
               >
                 <option value="1570">1570 N/mm²</option>
@@ -140,7 +155,7 @@ export const RopesModule = ({ data, onChange, view = 'all' }: { data: ProjectDat
                 {isBreakingLoadOk ? <CheckSquare size={14} className="text-emerald-500" /> : <AlertTriangle size={14} className="text-error" />}
               </div>
             </div>
-            <LiftField label="Actual Breaking Load" name="ropeBreakingLoad" unit="N" data={data} onChange={onChange} min={1000} required suggestion={`Should be >= ${formatNumber(iso4344_Fmin)} N per ISO 4344.`} />
+            <LiftField label="Actual Breaking Load" name="ropeBreakingLoad" unit="N" data={data} onChange={(newData) => onChange({ ropePresetId: '', ...newData })} min={1000} required suggestion={`Should be >= ${formatNumber(iso4344_Fmin)} N per ISO 4344.`} />
             <div className="space-y-1">
               <label className="text-[11px] font-bold text-on-surface-variant uppercase">Groove Type</label>
               <select 
@@ -161,10 +176,10 @@ export const RopesModule = ({ data, onChange, view = 'all' }: { data: ProjectDat
 
           {data.suspensionType === 'belt' && (
           <InputGroup label="Belt Specific Parameters">
-            <LiftField label="Belt Width" name="beltWidth" unit="mm" data={data} onChange={onChange} min={1} max={100} />
-            <LiftField label="Belt Thickness" name="beltThickness" unit="mm" data={data} onChange={onChange} min={1} max={20} />
-            <LiftField label="Number of Belts" name="numBelts" data={data} onChange={onChange} min={1} max={10} />
-            <LiftField label="Tensile Strength / Belt" name="beltTensileStrength" unit="N" data={data} onChange={onChange} min={1000} max={100000} />
+            <LiftField label="Belt Width" name="beltWidth" unit="mm" data={data} onChange={(newData) => onChange({ ropePresetId: '', ...newData })} min={1} max={100} />
+            <LiftField label="Belt Thickness" name="beltThickness" unit="mm" data={data} onChange={(newData) => onChange({ ropePresetId: '', ...newData })} min={1} max={20} />
+            <LiftField label="Number of Belts" name="numBelts" data={data} onChange={(newData) => onChange({ ropePresetId: '', ...newData })} min={1} max={10} />
+            <LiftField label="Tensile Strength / Belt" name="beltTensileStrength" unit="N" data={data} onChange={(newData) => onChange({ ropePresetId: '', ...newData })} min={1000} max={100000} />
             <LiftField label="Simple Pulleys (Nps)" name="numSimpleBends" data={data} onChange={onChange} min={0} max={20} required />
             <LiftField label="Reverse Pulleys (Npr)" name="numReverseBends" data={data} onChange={onChange} min={0} max={10} required suggestion="Reverse bends significantly reduce rope lifetime." />
           </InputGroup>

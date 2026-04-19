@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { ProjectData, ModuleStatus } from '../types';
 import { safeNumber, formatNumber, degToRad, InputGroup, LiftField, SliderField, CollapsibleSection } from '../components/ui';
-import { ISO_RAIL_PROFILES, BELT_PROFILES, SAFETY_GEAR_PRESETS } from '../constants';
+import { BELT_PROFILES, BUFFER_PRESETS, SAFETY_GEAR_PRESETS } from '../constants';
 import { computeLiftCalculations } from '../lib/calculations';
 import { CheckCircle2, ShieldCheck, Zap, AlertTriangle, Info, ChevronRight, Calculator, FileText, Database, Activity, Package, Maximize, AlertCircle, PlayCircle, Settings, CheckSquare, Lock, Unlock, XCircle } from 'lucide-react';
 import { BlockMath, InlineMath } from 'react-katex';
@@ -286,10 +286,13 @@ export const SafetyComponentsModule = ({ data, onChange, section = 'all' }: { da
                   <div className="space-y-1">
                     <label className="text-[11px] font-bold text-on-surface-variant uppercase">Component Presets</label>
                     <select 
+                      value={data.safetyGearPresetId || ''}
                       onChange={(e) => {
-                        const preset = SAFETY_GEAR_PRESETS.find(p => p.name === e.target.value);
+                        const preset = SAFETY_GEAR_PRESETS.find((item) => item.id === e.target.value);
                         if (preset) {
                           onChange({ 
+                            safetyGearPresetId: preset.id,
+                            safetyGearType: preset.type as ProjectData['safetyGearType'],
                             safetyGearMaxMass: preset.maxMass,
                             safetyGearBrakingForce: preset.brakingForce,
                             safetyGearCertifiedSpeed: preset.certifiedSpeed
@@ -299,14 +302,14 @@ export const SafetyComponentsModule = ({ data, onChange, section = 'all' }: { da
                       className="w-full bg-surface-container-low border border-outline-variant/20 rounded-sm px-3 py-2 text-sm outline-none"
                     >
                       <option value="">Select a preset...</option>
-                      {SAFETY_GEAR_PRESETS.map(p => (
-                        <option key={p.name} value={p.name}>{p.name}</option>
+                      {SAFETY_GEAR_PRESETS.map((preset) => (
+                        <option key={preset.id} value={preset.id}>{preset.name}</option>
                       ))}
                     </select>
                   </div>
-                  <LiftField label="Max Certified Mass (P+Q)" name="safetyGearMaxMass" unit="kg" data={data} onChange={onChange} min={0} max={10000} />
-                  <LiftField label="Braking Force (Fb)" name="safetyGearBrakingForce" unit="N" data={data} onChange={onChange} min={0} max={100000} />
-                  <LiftField label="Certified Speed" name="safetyGearCertifiedSpeed" unit="m/s" data={data} onChange={onChange} min={0} max={10} step={0.01} />
+                  <LiftField label="Max Certified Mass (P+Q)" name="safetyGearMaxMass" unit="kg" data={data} onChange={(newData) => onChange({ safetyGearPresetId: '', ...newData })} min={0} max={10000} />
+                  <LiftField label="Braking Force (Fb)" name="safetyGearBrakingForce" unit="N" data={data} onChange={(newData) => onChange({ safetyGearPresetId: '', ...newData })} min={0} max={100000} />
+                  <LiftField label="Certified Speed" name="safetyGearCertifiedSpeed" unit="m/s" data={data} onChange={(newData) => onChange({ safetyGearPresetId: '', ...newData })} min={0} max={10} step={0.01} />
                   <div className="pt-4 border-t border-outline-variant/10 space-y-4">
                     <h5 className="text-[10px] font-bold uppercase text-primary">Overspeed Governor Link</h5>
                     <LiftField label="OSG Max Braking Force (F_max)" name="osgMaxBrakingForce" unit="N" data={data} onChange={onChange} min={0} max={10000} />
@@ -516,12 +519,40 @@ export const SafetyComponentsModule = ({ data, onChange, section = 'all' }: { da
                 </div>
                 <div className="space-y-4">
                   <div className="space-y-1">
+                    <label className="text-[11px] font-bold text-on-surface-variant uppercase">Buffer Presets</label>
+                    <select
+                      value={data.bufferPresetId || ''}
+                      onChange={(e) => {
+                        const preset = BUFFER_PRESETS.find((item) => item.id === e.target.value);
+                        if (!preset) return;
+                        onChange({
+                          bufferPresetId: preset.id,
+                          bufferType: preset.type as ProjectData['bufferType'],
+                          bufferIsLinear: preset.isLinear,
+                          bufferStroke: preset.stroke,
+                          bufferMinMass: preset.minMass,
+                          bufferMaxMass: preset.maxMass,
+                          bufferManualOverride: false,
+                        });
+                      }}
+                      className="w-full bg-surface-container-low border border-outline-variant/20 rounded-sm px-3 py-2 text-sm outline-none"
+                    >
+                      <option value="">Select a preset...</option>
+                      {BUFFER_PRESETS.map((preset) => (
+                        <option key={preset.id} value={preset.id}>
+                          {preset.manufacturer} {preset.model} ({preset.speedRange})
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="space-y-1">
                     <label className="text-[11px] font-bold text-on-surface-variant uppercase">Buffer Type</label>
                     <select 
                       value={data.bufferType}
                       onChange={(e) => {
                         const type = e.target.value as any;
                         onChange({ 
+                          bufferPresetId: '',
                           bufferType: type,
                           bufferIsLinear: true // Reset to linear on type change for safety
                         });
@@ -537,7 +568,7 @@ export const SafetyComponentsModule = ({ data, onChange, section = 'all' }: { da
                       type="checkbox"
                       id="bufferLinear"
                       checked={data.bufferIsLinear}
-                      onChange={(e) => onChange({ bufferIsLinear: e.target.checked })}
+                      onChange={(e) => onChange({ bufferPresetId: '', bufferIsLinear: e.target.checked })}
                       className="rounded-sm border-outline-variant/20 text-primary focus:ring-primary"
                     />
                     <label htmlFor="bufferLinear" className="text-[11px] font-bold text-on-surface-variant uppercase cursor-pointer">Linear Characteristic</label>
@@ -558,15 +589,15 @@ export const SafetyComponentsModule = ({ data, onChange, section = 'all' }: { da
                     <label htmlFor="bufferOverride" className="text-[11px] font-bold text-on-surface-variant uppercase cursor-pointer">Manual Stroke Override</label>
                   </div>
                   
-                  <LiftField label="Buffer Stroke (h)" name="bufferStroke" unit="mm" data={data} onChange={onChange} min={50} max={1000} disabled={!data.bufferManualOverride && false /* we will allow generic input, but override lets us set h_min manual bypass in calculation */} />
+                    <LiftField label="Buffer Stroke (h)" name="bufferStroke" unit="mm" data={data} onChange={(newData) => onChange({ bufferPresetId: '', ...newData })} min={50} max={1000} disabled={!data.bufferManualOverride && false /* we will allow generic input, but override lets us set h_min manual bypass in calculation */} />
                   
                   {data.bufferManualOverride && (
-                    <LiftField label="Manufacturer Min Stroke" name="bufferManualStroke" unit="mm" data={data} onChange={onChange} min={50} max={1000} suggestion="Use manufacturer provided minimum stroke" />
+                    <LiftField label="Manufacturer Min Stroke" name="bufferManualStroke" unit="mm" data={data} onChange={(newData) => onChange({ bufferPresetId: '', ...newData })} min={50} max={1000} suggestion="Use manufacturer provided minimum stroke" />
                   )}
                   
                   <div className="grid grid-cols-2 gap-2 mt-4">
-                    <LiftField label="Min Mass" name="bufferMinMass" unit="kg" data={data} onChange={onChange} min={0} max={5000} />
-                    <LiftField label="Max Mass" name="bufferMaxMass" unit="kg" data={data} onChange={onChange} min={0} max={5000} />
+                    <LiftField label="Min Mass" name="bufferMinMass" unit="kg" data={data} onChange={(newData) => onChange({ bufferPresetId: '', ...newData })} min={0} max={5000} />
+                    <LiftField label="Max Mass" name="bufferMaxMass" unit="kg" data={data} onChange={(newData) => onChange({ bufferPresetId: '', ...newData })} min={0} max={5000} />
                   </div>
                 </div>
               </div>

@@ -1,6 +1,7 @@
 import React from 'react';
 import { ProjectData } from '../types';
 import { LiftField, formatNumber } from '../components/ui';
+import { OSG_PRESETS } from '../constants';
 import { Settings, ShieldCheck, CheckSquare, Info } from 'lucide-react';
 import { BlockMath, InlineMath } from 'react-katex';
 
@@ -35,11 +36,38 @@ export const OverspeedGovernorModule = ({ data, onChange }: { data: ProjectData,
               OSG Parameters
             </h4>
             <div className="p-6 bg-surface-container-lowest border border-outline-variant/10 space-y-4">
+              <div className="space-y-1">
+                <label className="text-[10px] font-bold text-on-surface-variant uppercase">OSG Preset</label>
+                <select
+                  value={data.osgPresetId || ''}
+                  onChange={(e) => {
+                    const preset = OSG_PRESETS.find((item) => item.id === e.target.value);
+                    if (!preset) return;
+                    onChange({
+                      osgPresetId: preset.id,
+                      osgManufacturer: preset.manufacturer,
+                      osgModel: preset.model,
+                      osgTrippingSpeed: preset.trippingSpeed,
+                      osgTensileForce: preset.tensileForce,
+                      osgMaxBrakingForce: preset.maxBrakingForce,
+                      osgBreakingLoad: preset.ropeBreakingLoad,
+                    });
+                  }}
+                  className="w-full bg-surface-container border border-outline-variant/20 rounded-sm px-3 py-2 text-sm outline-none"
+                >
+                  <option value="">Select preset...</option>
+                  {OSG_PRESETS.map((preset) => (
+                    <option key={preset.id} value={preset.id}>
+                      {preset.manufacturer} {preset.model} ({preset.speedRange})
+                    </option>
+                  ))}
+                </select>
+              </div>
               <LiftField label="Rated Speed (v)" name="speed" unit="m/s" data={data} onChange={onChange} />
-              <LiftField label="Tripping Speed (vt)" name="osgTrippingSpeed" unit="m/s" data={data} onChange={onChange} min={0} max={5} step={0.01} />
-              <LiftField label="Tensile Force (Ft)" name="osgTensileForce" unit="N" data={data} onChange={onChange} min={0} max={3000} step={10} />
-              <LiftField label="Max Braking Force (F_max)" name="osgMaxBrakingForce" unit="N" data={data} onChange={onChange} min={0} max={5000} step={10} />
-              <LiftField label="Rope Breaking Load" name="osgBreakingLoad" unit="N" data={data} onChange={onChange} min={0} max={20000} step={100} />
+              <LiftField label="Tripping Speed (vt)" name="osgTrippingSpeed" unit="m/s" data={data} onChange={(newData) => onChange({ osgPresetId: '', ...newData })} min={0} max={5} step={0.01} />
+              <LiftField label="Tensile Force (Ft)" name="osgTensileForce" unit="N" data={data} onChange={(newData) => onChange({ osgPresetId: '', ...newData })} min={0} max={3000} step={10} />
+              <LiftField label="Max Braking Force (F_max)" name="osgMaxBrakingForce" unit="N" data={data} onChange={(newData) => onChange({ osgPresetId: '', ...newData })} min={0} max={5000} step={10} />
+              <LiftField label="Rope Breaking Load" name="osgBreakingLoad" unit="N" data={data} onChange={(newData) => onChange({ osgPresetId: '', ...newData })} min={0} max={20000} step={100} />
             </div>
 
             <div className="p-6 bg-surface-container-lowest border border-outline-variant/10 space-y-4">
@@ -52,7 +80,7 @@ export const OverspeedGovernorModule = ({ data, onChange }: { data: ProjectData,
                    <input 
                      type="text" 
                      value={data.osgManufacturer || ''} 
-                     onChange={e => onChange({ osgManufacturer: e.target.value })}
+                    onChange={e => onChange({ osgPresetId: '', osgManufacturer: e.target.value })}
                      className="w-full bg-surface-container border border-outline-variant/20 rounded-sm px-3 py-2 text-sm outline-none"
                      placeholder="e.g. Wittur, PFB"
                    />
@@ -63,7 +91,7 @@ export const OverspeedGovernorModule = ({ data, onChange }: { data: ProjectData,
                      <input 
                        type="text" 
                        value={data.osgModel || ''} 
-                       onChange={e => onChange({ osgModel: e.target.value })}
+                    onChange={e => onChange({ osgPresetId: '', osgModel: e.target.value })}
                        className="w-full bg-surface-container border border-outline-variant/20 rounded-sm px-3 py-2 text-sm outline-none"
                      />
                    </div>
@@ -72,7 +100,7 @@ export const OverspeedGovernorModule = ({ data, onChange }: { data: ProjectData,
                      <input 
                        type="text" 
                        value={data.osgSerialNumber || ''} 
-                       onChange={e => onChange({ osgSerialNumber: e.target.value })}
+                    onChange={e => onChange({ osgSerialNumber: e.target.value })}
                        className="w-full bg-surface-container border border-outline-variant/20 rounded-sm px-3 py-2 text-sm outline-none"
                      />
                    </div>
@@ -133,6 +161,12 @@ export const OverspeedGovernorModule = ({ data, onChange }: { data: ProjectData,
                 <div className="flex justify-between pt-2 mt-2 border-t border-outline-variant/10">
                   <span className="text-[10px] text-on-surface-variant uppercase font-bold">Rope Break Load</span>
                   <span className="text-[10px] font-mono">{formatNumber(data.osgBreakingLoad)} N</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-[10px] text-on-surface-variant uppercase font-bold">Suggested Range</span>
+                  <span className="text-[10px] font-mono">
+                    {OSG_PRESETS.find((preset) => preset.id === data.osgPresetId)?.speedRange || 'N/A'}
+                  </span>
                 </div>
               </div>
             </div>

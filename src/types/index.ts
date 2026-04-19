@@ -39,6 +39,7 @@ export interface ProjectData {
   railIxRadius: number; // ix (mm)
   railWeight: number; // q1 (kg/m)
   railProfile: string;
+  railPresetId: string;
   railLubrication: 'dry' | 'oiled' | 'machined';
   // Rope Advanced Properties
   numSimpleBends: number; // Nps
@@ -50,6 +51,7 @@ export interface ProjectData {
   safetyGearMaxMass: number; // P+Q max (kg)
   safetyGearBrakingForce: number; // Fb (N)
   safetyGearCertifiedSpeed: number; // m/s
+  safetyGearPresetId: string;
   safetyGearRailCondition: 'dry' | 'oiled' | 'machined';
   // Hydraulic Advanced
   ramDiameter: number; // d (mm)
@@ -61,6 +63,7 @@ export interface ProjectData {
   bufferType: 'energy-accumulation' | 'energy-dissipation';
   bufferMaxMass: number; // kg
   bufferMinMass: number; // kg
+  bufferPresetId: string;
   bufferIsLinear: boolean;
   bufferForceCurveExponent: number; // For non-linear buffers (Clause 4.5.3)
   bufferManualOverride: boolean;
@@ -91,6 +94,7 @@ export interface ProjectData {
   doorLimitSwitchType: 'NO' | 'NC';
   doorElectricalContinuity: boolean;
   osgMaxBrakingForce: number; // F_max (N)
+  osgPresetId: string;
   osgManufacturer: string;
   osgModel: string;
   osgSerialNumber: string;
@@ -123,6 +127,7 @@ export interface ProjectData {
   acceleration: number; // m/s2
   deceleration: number; // m/s2
   ropeSpecificPressure: number; // MPa
+  ropePresetId: string;
   beltWidth: number; // mm
   beltThickness: number; // mm
   numBelts: number;

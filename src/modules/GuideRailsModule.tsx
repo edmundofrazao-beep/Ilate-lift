@@ -1,7 +1,7 @@
 import React from 'react';
 import { ProjectData, ModuleStatus } from '../types';
 import { safeNumber, formatNumber, degToRad, InputGroup, LiftField, SliderField, CollapsibleSection } from '../components/ui';
-import { ISO_RAIL_PROFILES, BELT_PROFILES } from '../constants';
+import { GUIDE_RAIL_PRESETS, BELT_PROFILES } from '../constants';
 import { CheckCircle2, ShieldCheck, Zap, AlertTriangle, Info, ChevronRight, Calculator, FileText, Database, Activity, Package, Maximize, AlertCircle, PlayCircle, Settings, CheckSquare, XCircle, Settings2 } from 'lucide-react';
 import { BlockMath, InlineMath } from 'react-katex';
 import { computeLiftCalculations } from '../lib/calculations';
@@ -132,12 +132,13 @@ export const GuideRailsModule = ({ data, onChange, view = 'all' }: { data: Proje
           <div className="p-4 bg-surface-container-low border border-outline-variant/10 rounded-sm">
             <p className="text-[10px] font-bold uppercase opacity-50 mb-1">Rail Preset Selection</p>
             <select 
-              value={data.railProfile}
+              value={data.railPresetId || (data.railProfile === 'Custom' ? 'Custom' : '')}
               onChange={(e) => {
-                const profile = ISO_RAIL_PROFILES.find(p => p.name === e.target.value);
+                const profile = GUIDE_RAIL_PRESETS.find((preset) => preset.id === e.target.value);
                 if (profile) {
                   onChange({ 
-                    railProfile: profile.name,
+                    railPresetId: profile.id,
+                    railProfile: profile.profile,
                     railArea: profile.A,
                     railIy: profile.Iy,
                     railIx: profile.Ix,
@@ -146,17 +147,23 @@ export const GuideRailsModule = ({ data, onChange, view = 'all' }: { data: Proje
                     railIyRadius: profile.iy,
                     railIxRadius: profile.ix,
                     railWeight: profile.q,
-                    guideType: profile.name
+                    guideType: `${profile.manufacturer} ${profile.model}`
                   });
                 } else {
-                  onChange({ railProfile: e.target.value });
+                  onChange({
+                    railPresetId: '',
+                    railProfile: e.target.value === 'Custom' ? 'Custom' : data.railProfile,
+                    guideType: e.target.value === 'Custom' ? 'Custom' : data.guideType
+                  });
                 }
               }}
               className="w-full bg-transparent text-xl font-black outline-none cursor-pointer text-primary"
             >
               <option value="">Select Profile...</option>
-              {ISO_RAIL_PROFILES.map(p => (
-                <option key={p.name} value={p.name}>{p.name}</option>
+              {GUIDE_RAIL_PRESETS.map((preset) => (
+                <option key={preset.id} value={preset.id}>
+                  {preset.manufacturer} {preset.model} ({preset.profile})
+                </option>
               ))}
               <option value="Custom">Custom Profile</option>
             </select>
