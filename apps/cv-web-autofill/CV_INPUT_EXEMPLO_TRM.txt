@@ -1,0 +1,73 @@
+CAMPO_NOME:
+EDMUNDO FRAZÃO
+
+CAMPO_TITULO:
+Técnico de Auditorias Energéticas | Eficiência Energética | Utilidades Industriais
+
+CAMPO_SUBTITULO:
+Auditorias Energéticas | Análise de Consumos | Sistemas Energéticos | Otimização Energética
+
+CAMPO_CONTACTOS:
+São Mamede de Infesta, Portugal | +351 963 392 369 | edmundo.frazao@pm.me | OET nº 29369
+
+CAMPO_IDIOMAS:
+Português | Inglês | Francês
+
+CAMPO_SUMARIO:
+Engenheiro Eletrotécnico com mais de 15 anos de experiência na análise técnica de sistemas industriais, auditorias técnicas e avaliação de desempenho operacional de equipamentos e infraestruturas energéticas.
+
+Experiência no levantamento técnico de sistemas e equipamentos, análise de consumos energéticos e identificação de oportunidades de melhoria da eficiência energética em instalações industriais.
+
+Competência na avaliação de desempenho energético de sistemas industriais, monitorização de indicadores energéticos (EnPI), definição de baseline energética e apoio à implementação de medidas de melhoria energética.
+
+Perfil orientado para auditorias energéticas industriais, análise de utilidades e melhoria contínua do desempenho energético em contexto industrial.
+
+CAMPO_COMP_TECNICAS:
+- Auditorias energéticas em instalações industriais
+- Levantamento técnico de sistemas e equipamentos energéticos
+- Análise de consumos energéticos e desempenho operacional
+- Identificação de oportunidades de melhoria de eficiência energética
+- Sistemas de utilidades industriais (HVAC, ventilação, vapor, ar comprimido, redes energéticas)
+- Sistemas elétricos industriais e infraestruturas técnicas
+- Monitorização de indicadores de desempenho energético (EnPI)
+- Definição de baseline energética e análise de desempenho energético
+- Sistemas de Gestão de Energia segundo ISO 50001
+- Auditorias energéticas segundo ISO 50002
+- Enquadramento regulatório energético (SGCIE)
+- Avaliação de eficiência energética em equipamentos industriais
+- Interação técnica com equipas de manutenção, operação e sustentabilidade
+- Microsoft Excel e ferramentas técnicas de análise
+
+CAMPO_FORMACAO:
+Licenciatura em Engenharia Eletrotécnica - Sistemas Elétricos de Energia, ISEP
+Inscrito na Ordem dos Engenheiros Técnicos nº 29369
+
+CAMPO_CERTIFICACOES:
+Lean Six Sigma - Green Belt
+Especialização: ISO 50001 (Sistemas de Gestão de Energia)
+Especialização: ISO 50002 (Auditorias Energéticas)
+Especialização: ISO 50004 (Implementação de Sistemas de Gestão de Energia)
+Especialização: ISO 50006 (Indicadores de Desempenho Energético)
+
+CAMPO_EXPERIENCIA:
+
+INSPECTOR DE INSTALAÇÕES DE ELEVAÇÃO — GATECI (2022–2025)
+- Realização de inspeções técnicas e auditorias de conformidade em equipamentos industriais.
+- Avaliação técnica de sistemas eletromecânicos e desempenho operacional de instalações.
+- Identificação de não conformidades e oportunidades de melhoria técnica.
+- Elaboração de relatórios técnicos e acompanhamento de ações corretivas.
+
+QUALITY MANAGER — WÄRTSILÄ (2013–2022)
+- Coordenação de atividades de monitorização técnica e desempenho de sistemas industriais.
+- Análise do desempenho operacional de equipamentos industriais e sistemas energéticos.
+- Acompanhamento de indicadores técnicos e operacionais para melhoria da eficiência de sistemas.
+- Identificação de oportunidades de otimização operacional e energética em processos industriais.
+- Articulação com equipas técnicas para melhoria da eficiência e fiabilidade operacional.
+
+TECHNICAL SUPPORT ENGINEER — WEG (2009–2013)
+- Suporte técnico especializado em sistemas elétricos e equipamentos industriais.
+- Participação em testes de aceitação e validação técnica de equipamentos.
+- Apoio técnico à operação e manutenção de sistemas industriais.
+
+CAMPO_REFERENCIAS:
+Disponíveis mediante pedido.

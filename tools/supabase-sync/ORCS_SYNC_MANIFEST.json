@@ -1,0 +1,26 @@
+{
+  "captured_at": "2026-04-13T14:26:03Z",
+  "source_of_truth": {
+    "orcs_runtime_data": "Supabase public.orcs_budgets",
+    "general_system_items": "Supabase public.items",
+    "orcs_operation_library": "Live client constant ORCS_OPERATION_LIBRARY",
+    "orcs_team_rates": "Live client constant ORCS_TEAM_RATES",
+    "orcs_type_profiles": "Live client constant ORCS_TYPE_PROFILES"
+  },
+  "supabase_tables": {
+    "orcs_budgets": 660,
+    "items": 94
+  },
+  "files": [
+    "orcs_budgets_2026-04-13T14-26-03Z.json",
+    "orcs_budgets_2026-04-13T14-26-03Z.manifest.json",
+    "ORCS_OPERATION_LIBRARY.js.txt",
+    "ORCS_TEAM_RATES.js.txt",
+    "ORCS_TYPE_PROFILES.js.txt"
+  ],
+  "notes": [
+    "ORCS budget proposals are persisted in Supabase public.orcs_budgets under payload.*.",
+    "The editable operation library and team rates used by the ORCS UI are currently embedded in the live client HTML, not stored in Supabase.",
+    "The general Sistema Geral objectives/projects are persisted in Supabase public.items."
+  ]
+}

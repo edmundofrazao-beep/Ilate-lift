@@ -1,0 +1,67 @@
+{
+            reparacao: {
+                label: 'Reparação',
+                title: 'Saída esperada para reparação',
+                subtitle: 'Defeito delimitado, custo direto controlado e proposta sem deriva de escopo.',
+                focus: 'Fechar bem o defeito, o alcance e os materiais para não transformar reparação em modernização encapotada.',
+                bullets: [
+                    'Base técnica curta e muito precisa.',
+                    'Operações e kits estritamente ligados ao defeito.',
+                    'Proposta final pronta para revisão e exportação.'
+                ],
+                ring: 'ring-orange-500/40',
+                border: 'border-orange-400'
+            },
+            parcial: {
+                label: 'Parcial',
+                title: 'Saída esperada para parcial',
+                subtitle: 'Substituição focada num sistema com fronteiras claras.',
+                focus: 'Fechar bem o sistema, subsistema e interfaces afetadas antes de calcular materiais e equipas.',
+                bullets: [
+                    'Base técnica coerente com o sistema alvo.',
+                    'Logística, compatibilidades e invisíveis explicitados.',
+                    'Proposta final segmentada e defensável.'
+                ],
+                ring: 'ring-sky-500/40',
+                border: 'border-sky-400'
+            },
+            integral: {
+                label: 'Integral',
+                title: 'Saída esperada para integral',
+                subtitle: 'Modernização pesada com várias frentes e dependências.',
+                focus: 'Montar a estrutura completa de operações, coordenação e risco comercial sem perder visibilidade de extras.',
+                bullets: [
+                    'Base técnica completa por frentes de intervenção.',
+                    'Custos, equipas e logística montados com visão global.',
+                    'Proposta final preparada para revisão técnica e comercial.'
+                ],
+                ring: 'ring-violet-500/40',
+                border: 'border-violet-400'
+            },
+            preventiva: {
+                label: 'Preventiva',
+                title: 'Saída esperada para preventiva',
+                subtitle: 'Ação recorrente, programada e coerente com manutenção.',
+                focus: 'Manter rotina, frequência e operação alinhadas sem inflacionar a intervenção com substituições pesadas indevidas.',
+                bullets: [
+                    'Base técnica alinhada com plano recorrente.',
+                    'Operações previsíveis e checklist clara.',
+                    'Proposta final orientada a continuidade e controlo.'
+                ],
+                ring: 'ring-emerald-500/40',
+                border: 'border-emerald-400'
+            },
+            instalacao: {
+                label: 'Instalação nova',
+                title: 'Saída esperada para instalação nova',
+                subtitle: 'Escopo novo, sem dependência de equipamento existente.',
+                focus: 'Fechar enquadramento, fornecimento, instalação e coordenação desde a base, sem herdar lógica de reparação.',
+                bullets: [
+                    'Base técnica construída de raiz.',
+                    'Fornecimento, instalação e logística claramente separados.',
+                    'Proposta final pronta para validação completa.'
+                ],
+                ring: 'ring-amber-500/40',
+                border: 'border-amber-400'
+            }
+        }

@@ -1,0 +1,212 @@
+[
+  {
+    "id": 40001,
+    "title": "AIProjeto e Produtos",
+    "level": "architecture",
+    "parentId": null,
+    "status": "Review",
+    "domain": "App",
+    "progress": 62,
+    "date": "2026-04-20"
+  },
+  {
+    "id": 40002,
+    "title": "Operação, Legal e Hub ILATE",
+    "level": "architecture",
+    "parentId": null,
+    "status": "Drafting",
+    "domain": "Operations",
+    "progress": 41,
+    "date": "2026-05-20"
+  },
+  {
+    "id": 41001,
+    "title": "Objetivo 1 — Consolidar AIProjeto",
+    "level": "project",
+    "parentId": 40001,
+    "status": "Review",
+    "domain": "App",
+    "progress": 78,
+    "date": "2026-04-15"
+  },
+  {
+    "id": 41002,
+    "title": "Objetivo 2 — ILATE bot operacional",
+    "level": "project",
+    "parentId": 40001,
+    "status": "Drafting",
+    "domain": "Core",
+    "progress": 46,
+    "date": "2026-04-24"
+  },
+  {
+    "id": 41003,
+    "title": "Objetivo 3 — ORCS e hosting fechado",
+    "level": "project",
+    "parentId": 40001,
+    "status": "Drafting",
+    "domain": "Integration",
+    "progress": 38,
+    "date": "2026-05-05"
+  },
+  {
+    "id": 42001,
+    "title": "Objetivo 4 — Blindagem legal e estrutura",
+    "level": "project",
+    "parentId": 40002,
+    "status": "Drafting",
+    "domain": "Legal",
+    "progress": 22,
+    "date": "2026-05-10"
+  },
+  {
+    "id": 42002,
+    "title": "Objetivo 5 — ilate.pt como hub operacional",
+    "level": "project",
+    "parentId": 40002,
+    "status": "Review",
+    "domain": "Operations",
+    "progress": 64,
+    "date": "2026-04-18"
+  },
+  {
+    "id": 41101,
+    "title": "Corrigir wizard ORCS sem recuo de etapa",
+    "level": "task",
+    "parentId": 41001,
+    "status": "Published",
+    "domain": "App",
+    "progress": 100,
+    "date": "2026-04-13"
+  },
+  {
+    "id": 41102,
+    "title": "Fechar workbook portátil e testes UI no Codex",
+    "level": "task",
+    "parentId": 41001,
+    "status": "Published",
+    "domain": "App",
+    "progress": 100,
+    "date": "2026-04-13"
+  },
+  {
+    "id": 41103,
+    "title": "Blueprint da pipeline modular e reaproveitamento SINA",
+    "level": "task",
+    "parentId": 41001,
+    "status": "Review",
+    "domain": "Integration",
+    "progress": 70,
+    "date": "2026-04-20"
+  },
+  {
+    "id": 41201,
+    "title": "Regressão curta e pacote de validação do bot",
+    "level": "task",
+    "parentId": 41002,
+    "status": "Drafting",
+    "domain": "Core",
+    "progress": 35,
+    "date": "2026-04-22"
+  },
+  {
+    "id": 41202,
+    "title": "Estrutura runtime e carregamento de conhecimento",
+    "level": "task",
+    "parentId": 41002,
+    "status": "Review",
+    "domain": "Core",
+    "progress": 55,
+    "date": "2026-04-24"
+  },
+  {
+    "id": 41301,
+    "title": "Confirmar acesso FTP e publicar correções do Sistema Geral",
+    "level": "task",
+    "parentId": 41003,
+    "status": "Review",
+    "domain": "Integration",
+    "progress": 60,
+    "date": "2026-04-13"
+  },
+  {
+    "id": 41302,
+    "title": "Fechar rota ORCS e critérios de hosting",
+    "level": "task",
+    "parentId": 41003,
+    "status": "Drafting",
+    "domain": "Integration",
+    "progress": 30,
+    "date": "2026-05-05"
+  },
+  {
+    "id": 42101,
+    "title": "Estruturar programa de blindagem legal e societária",
+    "level": "task",
+    "parentId": 42001,
+    "status": "Drafting",
+    "domain": "Legal",
+    "progress": 20,
+    "date": "2026-05-06"
+  },
+  {
+    "id": 42102,
+    "title": "Mapa de risco e priorização regulatória",
+    "level": "task",
+    "parentId": 42001,
+    "status": "Drafting",
+    "domain": "Legal",
+    "progress": 18,
+    "date": "2026-05-10"
+  },
+  {
+    "id": 42201,
+    "title": "Sistema Geral como hub operacional único",
+    "level": "task",
+    "parentId": 42002,
+    "status": "Review",
+    "domain": "Operations",
+    "progress": 65,
+    "date": "2026-04-18"
+  },
+  {
+    "id": 42202,
+    "title": "Cronograma executivo e objetivos vivos no live site",
+    "level": "task",
+    "parentId": 42002,
+    "status": "Review",
+    "domain": "Operations",
+    "progress": 60,
+    "date": "2026-04-18"
+  },
+  {
+    "id": 42203,
+    "title": "Integração futura com Kanban, Timeline e Calendar",
+    "level": "task",
+    "parentId": 42002,
+    "status": "Drafting",
+    "domain": "Operations",
+    "progress": 25,
+    "date": "2026-05-20"
+  },
+  {
+    "id": 4130101,
+    "title": "Backup de index.html e .items_data.json antes de publicar",
+    "level": "subtask",
+    "parentId": 41301,
+    "status": "Published",
+    "domain": "Integration",
+    "progress": 100,
+    "date": "2026-04-13"
+  },
+  {
+    "id": 4220201,
+    "title": "Persistir arquitetura, objetivo e subtarefas abertas após guardar",
+    "level": "subtask",
+    "parentId": 42202,
+    "status": "Review",
+    "domain": "Operations",
+    "progress": 60,
+    "date": "2026-04-13"
+  }
+]

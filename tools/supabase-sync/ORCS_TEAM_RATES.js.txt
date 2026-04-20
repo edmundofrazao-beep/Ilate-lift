@@ -1,0 +1,13 @@
+{
+            'Oficial': 35,
+            'Especialista': 47,
+            'Engenheiro': 60,
+            'Oficial + Ajudante': 60,
+            'Especialista + Oficial': 82,
+            'Engenheiro + Oficial': 95,
+            'Engenheiro + Especialista': 102,
+            '2 Oficiais': 70,
+            'Especialista + 2 Oficiais': 117,
+            'Especialista + Engenheiro': 107,
+            'Fornecedor': 0
+        }

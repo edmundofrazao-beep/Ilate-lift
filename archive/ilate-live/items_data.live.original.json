@@ -1,0 +1,152 @@
+[
+  {
+    "id": 30001,
+    "title": "Investigações",
+    "date": "2026-04-02",
+    "domain": "Core",
+    "status": "Drafting",
+    "progress": 18,
+    "level": "architecture",
+    "parentId": null
+  },
+  {
+    "id": 30002,
+    "title": "Linked",
+    "date": "2026-04-02",
+    "domain": "Core",
+    "status": "In Progress",
+    "progress": 72,
+    "level": "architecture",
+    "parentId": null
+  },
+  {
+    "id": 31001,
+    "title": "MAGLIFT",
+    "date": "2026-04-02",
+    "domain": "Core",
+    "status": "Drafting",
+    "progress": 12,
+    "level": "project",
+    "parentId": 30001
+  },
+  {
+    "id": 31002,
+    "title": "Ziehl-Abegg",
+    "date": "2026-04-02",
+    "domain": "Core",
+    "status": "Drafting",
+    "progress": 24,
+    "level": "project",
+    "parentId": 30001
+  },
+  {
+    "id": 32001,
+    "title": "LinkedIn",
+    "date": "2026-04-02",
+    "domain": "Operations",
+    "status": "Review",
+    "progress": 78,
+    "level": "project",
+    "parentId": 30002
+  },
+  {
+    "id": 32002,
+    "title": "Regulamento 2023/1230",
+    "date": "2026-04-02",
+    "domain": "Legal",
+    "status": "Review",
+    "progress": 74,
+    "level": "project",
+    "parentId": 30002
+  },
+  {
+    "id": 31101,
+    "title": "Consolidar pasta MAGLIFT no projeto",
+    "date": "2026-04-02",
+    "domain": "Core",
+    "status": "Published",
+    "progress": 100,
+    "level": "task",
+    "parentId": 31001
+  },
+  {
+    "id": 31102,
+    "title": "Inventário documental MAGLIFT",
+    "date": "2026-04-03",
+    "domain": "Core",
+    "status": "Drafting",
+    "progress": 15,
+    "level": "task",
+    "parentId": 31001
+  },
+  {
+    "id": 31201,
+    "title": "Investigação oficial de retrofit Ziehl-Abegg",
+    "date": "2026-04-03",
+    "domain": "Core",
+    "status": "Drafting",
+    "progress": 24,
+    "level": "task",
+    "parentId": 31002
+  },
+  {
+    "id": 32101,
+    "title": "Calendário junho-julho 2026",
+    "date": "2026-04-02",
+    "domain": "Operations",
+    "status": "Published",
+    "progress": 100,
+    "level": "task",
+    "parentId": 32001
+  },
+  {
+    "id": 32102,
+    "title": "Publicações 08/07 e 15/07",
+    "date": "2026-04-02",
+    "domain": "Operations",
+    "status": "Published",
+    "progress": 100,
+    "level": "task",
+    "parentId": 32001
+  },
+  {
+    "id": 32201,
+    "title": "Calendário regulatório com horas críticas",
+    "date": "2026-04-02",
+    "domain": "Legal",
+    "status": "Published",
+    "progress": 100,
+    "level": "task",
+    "parentId": 32002
+  },
+  {
+    "id": 32202,
+    "title": "Inserção editorial de julho no regulamento",
+    "date": "2026-04-02",
+    "domain": "Legal",
+    "status": "Published",
+    "progress": 100,
+    "level": "task",
+    "parentId": 32002
+  },
+  {
+    "id": 3210201,
+    "title": "08 Julho 2026 — 08:30",
+    "date": "2026-07-08",
+    "domain": "Operations",
+    "status": "Published",
+    "progress": 100,
+    "level": "subtask",
+    "parentId": 32102
+  },
+  {
+    "id": 3210202,
+    "title": "15 Julho 2026 — 08:30",
+    "date": "2026-07-15",
+    "domain": "Operations",
+    "status": "Published",
+    "progress": 100,
+    "level": "subtask",
+    "parentId": 32102
+  }
+]

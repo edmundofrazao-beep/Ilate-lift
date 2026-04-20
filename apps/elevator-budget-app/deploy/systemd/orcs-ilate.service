@@ -1,0 +1,15 @@
+[Unit]
+Description=ILATE ORCS Streamlit
+After=network.target
+
+[Service]
+Type=simple
+User=www-data
+WorkingDirectory=/opt/AIProjeto
+EnvironmentFile=/opt/AIProjeto/.env
+ExecStart=/opt/AIProjeto/.venv/bin/python -m streamlit run /opt/AIProjeto/elevator_budget_app/app.py --server.address 127.0.0.1 --server.port 8501 --server.headless true
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

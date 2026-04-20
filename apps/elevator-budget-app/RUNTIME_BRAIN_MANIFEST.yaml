@@ -1,0 +1,59 @@
+name: ILATE ORCS Runtime Brain
+version: 2026-03-27
+mode: full_runtime_replication
+
+purpose:
+  - replicate the complete app brain
+  - preserve runtime behavior
+  - keep custom chat deployment separate
+
+runtime:
+  app_entry: elevator_budget_app/app.py
+  assistant_entry: elevator_budget_app/assistant.py
+  launcher: elevator_budget_app/launch_orcs_mac.sh
+  local_runner: elevator_budget_app/run_orcs_server.sh
+  local_healthcheck: elevator_budget_app/smoke_orcs_server.sh
+
+python:
+  requirements: elevator_budget_app/requirements.txt
+  env_example: .env.example
+  required_env:
+    - OPENAI_API_KEY
+
+code_roots:
+  - elevator_budget_app/
+  - 03_runtime_tools/
+
+knowledge_roots:
+  - knowledge/
+
+data_roots:
+  - data/
+
+critical_assets:
+  - data/faiss_index.bin
+  - data/faiss_metadata.csv
+  - data/catalogs/
+  - data/rules/
+  - knowledge/diagnostic_engine.py
+  - knowledge/maintenance_engine.py
+  - knowledge/budget_engine.py
+
+known_formats:
+  yaml:
+    - knowledge/*.yaml
+    - data/rules/**/*.yaml
+  json:
+    - data/catalogs/**/*.json
+    - data/extracted/*.json
+  csv:
+    - data/*.csv
+    - data/extracted/*.csv
+  binary:
+    - data/faiss_index.bin
+
+notes:
+  - custom chat deploy is a separate package and does not replicate this runtime
+  - ssh remains frozen in the current workflow
+  - ilate.pt remains frozen as runtime target
+  - normative 2026 expansion stays frozen beyond the precedence update until official complete texts are available

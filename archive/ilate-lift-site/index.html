@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="pt">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>ILATE Lift</title>
+    <meta
+      name="description"
+      content="Nova base do ILATE Lift, publicada a partir do GitHub e pronta para desenvolvimento contínuo."
+    />
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <div class="page-shell">
+      <header class="topbar">
+        <div class="brand-lockup">
+          <p class="brand-kicker">ILATE.pt</p>
+          <h1>ILATE Lift</h1>
+        </div>
+        <a class="back-link" href="/">Voltar ao Hub</a>
+      </header>
+
+      <main class="content-grid">
+        <section class="hero-card">
+          <p class="eyebrow">Nova Base</p>
+          <h2>Lift reconstruído a partir do GitHub</h2>
+          <p class="hero-copy">
+            Esta página substitui a versão anterior e passa a ser a base oficial do módulo
+            <strong>ILATE Lift</strong>. O deploy deve ser controlado por GitHub Actions.
+          </p>
+          <div class="hero-actions">
+            <a class="primary-action" href="https://github.com/edmundofrazao-beep/ILATE" target="_blank" rel="noreferrer">
+              Abrir repositório
+            </a>
+            <button class="secondary-action" id="show-status" type="button">
+              Ver estado
+            </button>
+          </div>
+        </section>
+
+        <aside class="status-card">
+          <p class="card-label">Estado</p>
+          <ul class="status-list">
+            <li><span>Deploy</span><strong>GitHub-managed</strong></li>
+            <li><span>Rota</span><strong>/lift/</strong></li>
+            <li><span>Modo</span><strong>Base limpa</strong></li>
+          </ul>
+        </aside>
+
+        <section class="panel-card">
+          <p class="card-label">Próximos blocos</p>
+          <ol class="checklist">
+            <li>Definir arquitetura e navegação próprias do Lift.</li>
+            <li>Ligar cálculo, memória e export numa base nova.</li>
+            <li>Manter esta rota isolada de CV e ORCS.</li>
+          </ol>
+        </section>
+
+        <section class="panel-card">
+          <p class="card-label">Notas</p>
+          <div id="runtime-status" class="runtime-note">
+            A página está operacional e pronta para receber desenvolvimento via commits no GitHub.
+          </div>
+        </section>
+      </main>
+    </div>
+
+    <script src="./app.js"></script>
+  </body>
+</html>

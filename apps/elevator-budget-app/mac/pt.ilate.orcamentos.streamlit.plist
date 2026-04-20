@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>pt.ilate.orcamentos.streamlit</string>
+
+  <key>ProgramArguments</key>
+  <array>
+    <string>/Library/Frameworks/Python.framework/Versions/3.14/bin/python3</string>
+    <string>-m</string>
+    <string>streamlit</string>
+    <string>run</string>
+    <string>/Users/edmundofrazao/Library/CloudStorage/OneDrive-Personale/-- ILATE  --/AIProjeto/elevator_budget_app/app.py</string>
+    <string>--server.headless</string>
+    <string>true</string>
+    <string>--server.port</string>
+    <string>8501</string>
+  </array>
+
+  <key>WorkingDirectory</key>
+  <string>/Users/edmundofrazao/Library/CloudStorage/OneDrive-Personale/-- ILATE  --/AIProjeto</string>
+
+  <key>RunAtLoad</key>
+  <true/>
+
+  <key>KeepAlive</key>
+  <true/>
+
+  <key>StandardOutPath</key>
+  <string>/Users/edmundofrazao/Library/CloudStorage/OneDrive-Personale/-- ILATE  --/AIProjeto/elevator_budget_app/.launcher/launchd-streamlit.log</string>
+
+  <key>StandardErrorPath</key>
+  <string>/Users/edmundofrazao/Library/CloudStorage/OneDrive-Personale/-- ILATE  --/AIProjeto/elevator_budget_app/.launcher/launchd-streamlit.err.log</string>
+</dict>
+</plist>
