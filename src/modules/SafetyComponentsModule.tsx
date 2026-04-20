@@ -8,6 +8,8 @@ import { BlockMath, InlineMath } from 'react-katex';
 
 export const SafetyComponentsModule = ({ data, onChange, section = 'all' }: { data: ProjectData, onChange: (newData: Partial<ProjectData>) => void, section?: 'all' | 'safety' | 'buffers' | 'sil' | 'acop' | 'doors' }) => {
   const [bufferTarget, setBufferTarget] = useState<'car' | 'cwt'>('car');
+  const lightResultCard = 'text-slate-950';
+  const lightMutedText = 'text-slate-700/75';
 
   // OSG Verification Logic
   const minTripping = 1.15 * data.speed;
@@ -205,17 +207,17 @@ export const SafetyComponentsModule = ({ data, onChange, section = 'all' }: { da
 
               <div className="lg:col-span-2 space-y-4">
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <div className={`p-4 border ${data.doorLockingForce >= 1000 ? 'bg-emerald-50 border-emerald-200' : 'bg-error-container/10 border-error/20'}`}>
+                  <div className={`p-4 border ${lightResultCard} ${data.doorLockingForce >= 1000 ? 'bg-emerald-50 border-emerald-200' : 'bg-error-container/10 border-error/20'}`}>
                     <p className="text-[10px] font-bold uppercase mb-1">Mechanical Strength</p>
                     <p className="text-xl font-black">{formatNumber(data.doorLockingForce)} N</p>
-                    <p className="mt-2 text-[10px] opacity-70 italic">Required: ≥ 1000N</p>
+                    <p className={`mt-2 text-[10px] italic ${lightMutedText}`}>Required: ≥ 1000N</p>
                   </div>
-                  <div className={`p-4 border ${data.doorMinimumEngagement >= 7 ? 'bg-emerald-50 border-emerald-200' : 'bg-error-container/10 border-error/20'}`}>
+                  <div className={`p-4 border ${lightResultCard} ${data.doorMinimumEngagement >= 7 ? 'bg-emerald-50 border-emerald-200' : 'bg-error-container/10 border-error/20'}`}>
                     <p className="text-[10px] font-bold uppercase mb-1">Lock Engagement</p>
                     <p className="text-xl font-black">{formatNumber(data.doorMinimumEngagement)} mm</p>
-                    <p className="mt-2 text-[10px] opacity-70 italic">Required: ≥ 7mm</p>
+                    <p className={`mt-2 text-[10px] italic ${lightMutedText}`}>Required: ≥ 7mm</p>
                   </div>
-                  <div className={`p-4 border ${(data.doorMinimumEngagement >= 7 && data.doorElectricalSafetyCheck) ? 'bg-emerald-50 border-emerald-200' : 'bg-error-container/10 border-error/20'}`}>
+                  <div className={`p-4 border ${lightResultCard} ${(data.doorMinimumEngagement >= 7 && data.doorElectricalSafetyCheck) ? 'bg-emerald-50 border-emerald-200' : 'bg-error-container/10 border-error/20'}`}>
                     <div className="flex justify-between items-start mb-1">
                       <p className="text-[10px] font-bold uppercase">Interlocking Status</p>
                       {(data.doorMinimumEngagement >= 7 && data.doorElectricalSafetyCheck) ? <Lock size={16} className="text-emerald-500" /> : <Unlock size={16} className="text-error" />}
@@ -223,7 +225,7 @@ export const SafetyComponentsModule = ({ data, onChange, section = 'all' }: { da
                     <p className={`text-sm font-bold mt-1 ${(data.doorMinimumEngagement >= 7 && data.doorElectricalSafetyCheck) ? 'text-emerald-700' : 'text-error'}`}>
                       {(data.doorMinimumEngagement >= 7 && data.doorElectricalSafetyCheck) ? 'LOCKED & SECURE' : 'UNSECURED'}
                     </p>
-                    <p className="mt-2 text-[10px] opacity-70 italic whitespace-nowrap overflow-hidden text-ellipsis">Requires ≥7mm + Elec Check</p>
+                    <p className={`mt-2 text-[10px] italic whitespace-nowrap overflow-hidden text-ellipsis ${lightMutedText}`}>Requires ≥7mm + Elec Check</p>
                   </div>
                 </div>
 
@@ -354,17 +356,17 @@ export const SafetyComponentsModule = ({ data, onChange, section = 'all' }: { da
                 <>
                   <div className="space-y-6">
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                          <div className={`p-4 border ${isMassOk ? 'bg-emerald-50 border-emerald-200' : 'bg-error-container bg-opacity-10 border-error border-opacity-20'}`}>
+                          <div className={`p-4 border ${lightResultCard} ${isMassOk ? 'bg-emerald-50 border-emerald-200' : 'bg-error-container bg-opacity-10 border-error border-opacity-20'}`}>
                             <p className="text-[10px] font-bold uppercase mb-1">Total Mass (P+Q)</p>
                             <p className="text-xl font-black">{formatNumber(totalMass)} kg</p>
-                            <p className="text-[10px] opacity-50">Limit: {data.safetyGearMaxMass} kg</p>
+                            <p className={`text-[10px] ${lightMutedText}`}>Limit: {data.safetyGearMaxMass} kg</p>
                           </div>
-                          <div className={`p-4 border ${isSpeedOk ? 'bg-emerald-50 border-emerald-200' : 'bg-error-container bg-opacity-10 border-error border-opacity-20'}`}>
+                          <div className={`p-4 border ${lightResultCard} ${isSpeedOk ? 'bg-emerald-50 border-emerald-200' : 'bg-error-container bg-opacity-10 border-error border-opacity-20'}`}>
                             <p className="text-[10px] font-bold uppercase mb-1">Certified Speed</p>
                             <p className="text-xl font-black">{formatNumber(data.osgTrippingSpeed)} m/s</p>
-                            <p className="text-[10px] opacity-50">Limit: {data.safetyGearCertifiedSpeed} m/s</p>
+                            <p className={`text-[10px] ${lightMutedText}`}>Limit: {data.safetyGearCertifiedSpeed} m/s</p>
                           </div>
-                          <div className={`p-4 border ${isRetardationOk ? 'bg-emerald-50 border-emerald-200' : 'bg-error-container/10 border-error/20'}`}>
+                          <div className={`p-4 border ${lightResultCard} ${isRetardationOk ? 'bg-emerald-50 border-emerald-200' : 'bg-error-container/10 border-error/20'}`}>
                             <div className="flex items-center justify-between mb-3">
                               <p className="text-[10px] font-bold uppercase tracking-wider">Resultant Retardation (gn)</p>
                               <div className="flex items-center gap-2">
@@ -389,7 +391,7 @@ export const SafetyComponentsModule = ({ data, onChange, section = 'all' }: { da
                                      retardationG > 1.0 ? '❌ STATUS: Excessive Retardation' : 
                                      '✅ STATUS: Safe Deceleration'}
                                   </p>
-                                  <p className="text-[10px] opacity-60 mt-0.5 leading-tight">
+                                  <p className={`text-[10px] mt-0.5 leading-tight ${lightMutedText}`}>
                                     {retardationG < 0.2 ? 'Braking force is too low to guarantee a safe stop.' : 
                                      retardationG > 1.0 ? 'Deceleration exceeds 1.0g, risking passenger injury.' : 
                                      'Retardation is within the normative range (0.2g - 1.0g).'}
@@ -398,7 +400,7 @@ export const SafetyComponentsModule = ({ data, onChange, section = 'all' }: { da
                               </div>
 
                               <div className="space-y-3">
-                                <div className="p-3 bg-surface-container-low/50 rounded-sm border border-outline-variant/10">
+                                <div className="p-3 bg-surface-container-low/50 rounded-sm border border-outline-variant/10 text-on-surface">
                                   <p className="text-[9px] font-bold opacity-50 uppercase mb-2">Calculation Breakdown</p>
                                   <div className="space-y-1.5">
                                     <div className="flex justify-between text-[10px]">
@@ -604,7 +606,7 @@ export const SafetyComponentsModule = ({ data, onChange, section = 'all' }: { da
               <div className="lg:col-span-2">
                 <div className="space-y-6">
                       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                        <div className={`p-6 border ${isStrokeOk ? 'bg-emerald-50 border-emerald-200' : 'bg-error-container/10 border-error/20'}`}>
+                        <div className={`p-6 border ${lightResultCard} ${isStrokeOk ? 'bg-emerald-50 border-emerald-200' : 'bg-error-container/10 border-error/20'}`}>
                           <div className="flex items-center justify-between mb-2">
                             <p className="text-[10px] font-bold uppercase">Stroke Utilization</p>
                             <div className="flex items-center gap-1">
@@ -614,7 +616,7 @@ export const SafetyComponentsModule = ({ data, onChange, section = 'all' }: { da
                             </div>
                           </div>
                           <p className="text-2xl font-black">{formatNumber(data.bufferStroke)} mm</p>
-                          <p className="text-[10px] opacity-50">Min Required: {formatNumber(data.bufferManualOverride ? data.bufferManualStroke : h_min)} mm ({formatNumber(strokeUtilization)}%)</p>
+                          <p className={`text-[10px] ${lightMutedText}`}>Min Required: {formatNumber(data.bufferManualOverride ? data.bufferManualStroke : h_min)} mm ({formatNumber(strokeUtilization)}%)</p>
                           <div className="mt-2 h-1 bg-surface-container-low rounded-full overflow-hidden">
                             <div 
                               className={`h-full ${isStrokeOk ? 'bg-emerald-500' : 'bg-error'}`} 
@@ -622,10 +624,10 @@ export const SafetyComponentsModule = ({ data, onChange, section = 'all' }: { da
                             />
                           </div>
                         </div>
-                        <div className={`p-6 border ${a_avg <= 1.0 ? 'bg-emerald-50 border-emerald-200' : 'bg-amber-50 border-amber-200'}`}>
+                        <div className={`p-6 border ${lightResultCard} ${a_avg <= 1.0 ? 'bg-emerald-50 border-emerald-200' : 'bg-amber-50 border-amber-200'}`}>
                           <p className="text-[10px] font-bold uppercase mb-1">Avg Deceleration</p>
                           <p className="text-2xl font-black">{formatNumber(a_avg)} gn</p>
-                          <p className="text-[10px] opacity-50">Limit: 1.0 gn (ISO 8100-2)</p>
+                          <p className={`text-[10px] ${lightMutedText}`}>Limit: 1.0 gn (ISO 8100-2)</p>
                           <div className="mt-2 h-1 bg-surface-container-low rounded-full overflow-hidden">
                             <div 
                               className={`h-full ${a_avg <= 1.0 ? 'bg-emerald-500' : 'bg-amber-500'}`} 
@@ -633,10 +635,10 @@ export const SafetyComponentsModule = ({ data, onChange, section = 'all' }: { da
                             />
                           </div>
                         </div>
-                        <div className={`p-6 border ${isBufferMassOk ? 'bg-emerald-50 border-emerald-200' : 'bg-error-container/10 border-error/20'}`}>
+                        <div className={`p-6 border ${lightResultCard} ${isBufferMassOk ? 'bg-emerald-50 border-emerald-200' : 'bg-error-container/10 border-error/20'}`}>
                           <p className="text-[10px] font-bold uppercase mb-1">Mass Compliance</p>
                           <p className="text-2xl font-black">{formatNumber(impactMass)} <span className="text-xs font-normal opacity-50">kg</span></p>
-                          <p className="text-[10px] opacity-50">Range: {data.bufferMinMass} - {data.bufferMaxMass} kg</p>
+                          <p className={`text-[10px] ${lightMutedText}`}>Range: {data.bufferMinMass} - {data.bufferMaxMass} kg</p>
                           <div className="mt-2 h-1 bg-surface-container-low rounded-full overflow-hidden">
                             <div 
                               className={`h-full ${isBufferMassOk ? 'bg-emerald-500' : 'bg-error'}`} 
@@ -647,7 +649,7 @@ export const SafetyComponentsModule = ({ data, onChange, section = 'all' }: { da
                       </div>
 
                       {data.bufferType === 'energy-dissipation' && (
-                        <div className={`p-6 border ${isEnergyOk ? 'bg-emerald-50 border-emerald-200' : 'bg-error-container/10 border-error/20'}`}>
+                        <div className={`p-6 border ${lightResultCard} ${isEnergyOk ? 'bg-emerald-50 border-emerald-200' : 'bg-error-container/10 border-error/20'}`}>
                           <div className="flex items-center justify-between mb-4">
                             <h5 className="text-[10px] font-bold uppercase text-primary">Energy Dissipation Capacity</h5>
                             <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${isEnergyOk ? 'bg-emerald-100 text-emerald-700' : 'bg-error-container text-error'}`}>
@@ -656,14 +658,14 @@ export const SafetyComponentsModule = ({ data, onChange, section = 'all' }: { da
                           </div>
                           <div className="grid grid-cols-2 gap-8">
                             <div>
-                              <p className="text-[10px] opacity-50 uppercase mb-1">Total Impact Energy</p>
+                              <p className={`text-[10px] uppercase mb-1 ${lightMutedText}`}>Total Impact Energy</p>
                               <p className="text-xl font-black">{formatNumber(Etotal)} J</p>
-                              <p className="text-[9px] opacity-40 mt-1">Ek + Ep (0.5mv² + mgh)</p>
+                              <p className={`text-[9px] mt-1 ${lightMutedText}`}>Ek + Ep (0.5mv² + mgh)</p>
                             </div>
                             <div>
-                              <p className="text-[10px] opacity-50 uppercase mb-1">Absorption Limit (1.0gn)</p>
+                              <p className={`text-[10px] uppercase mb-1 ${lightMutedText}`}>Absorption Limit (1.0gn)</p>
                               <p className="text-xl font-black">{formatNumber(Ecap)} J</p>
-                              <p className="text-[9px] opacity-40 mt-1">
+                              <p className={`text-[9px] mt-1 ${lightMutedText}`}>
                                 {data.bufferIsLinear ? 'Work = m(a+g)h' : 'Numerical Integration of Force-Stroke Curve'}
                               </p>
                             </div>
@@ -679,7 +681,7 @@ export const SafetyComponentsModule = ({ data, onChange, section = 'all' }: { da
                                 style={{ width: `${Math.min(Ek / Ecap * 100, 100)}%` }}
                               />
                             </div>
-                            <p className="text-[9px] opacity-40 mt-2 italic">
+                            <p className={`text-[9px] mt-2 italic ${lightMutedText}`}>
                               Comparison: Kinetic energy (Ek) represents {formatNumber(Ek)} J of the total {formatNumber(Etotal)} J impact energy.
                             </p>
                           </div>
@@ -700,7 +702,7 @@ export const SafetyComponentsModule = ({ data, onChange, section = 'all' }: { da
                           <p className="text-xl font-black">{formatNumber(Ek)} J</p>
                           <p className="text-[9px] opacity-40 mt-1">0.5 · m · v²</p>
                         </div>
-                        <div className={`p-4 border ${isMassOk ? 'bg-surface-container-low border-outline-variant/10' : 'bg-error-container/10 border-error/20'}`}>
+                        <div className={`p-4 border ${isBufferMassOk ? 'bg-surface-container-low border-outline-variant/10' : 'bg-error-container/10 border-error/20'}`}>
                           <p className="text-[10px] font-bold uppercase mb-1 opacity-50">Impact Mass ({bufferTarget === 'car' ? 'P+Q' : 'Mcwt'})</p>
                           <p className="text-xl font-black">{formatNumber(impactMass)} kg</p>
                           <p className="text-[10px] opacity-50">Certified Range: {data.bufferMinMass} - {data.bufferMaxMass} kg</p>
@@ -806,11 +808,11 @@ export const SafetyComponentsModule = ({ data, onChange, section = 'all' }: { da
                 </div>
               </div>
               <div className="lg:col-span-2 space-y-4">
-                <div className={`p-6 border ${isAcopOk ? 'bg-emerald-50 border-emerald-200' : 'bg-error-container/10 border-error/20'}`}>
+                <div className={`p-6 border ${lightResultCard} ${isAcopOk ? 'bg-emerald-50 border-emerald-200' : 'bg-error-container/10 border-error/20'}`}>
                   <p className="text-[10px] font-bold uppercase mb-1">ACOP Tripping Speed Verification</p>
                   <p className="text-2xl font-black">{formatNumber(data.acopTrippingSpeed)} m/s</p>
-                  <p className="text-[10px] opacity-50">Limit: {formatNumber(acopMaxTripping)} m/s (ISO 8100-2:2026)</p>
-                  <div className="mt-4 p-4 bg-white/50 rounded border border-black/5">
+                  <p className={`text-[10px] ${lightMutedText}`}>Limit: {formatNumber(acopMaxTripping)} m/s (ISO 8100-2:2026)</p>
+                  <div className="mt-4 rounded border border-slate-200 bg-white p-4 text-slate-900">
                     <h5 className="text-[10px] font-bold uppercase text-primary mb-2">Normative Limit (Clause 4.7)</h5>
                     <p className="text-xs leading-relaxed">
                       <strong>ISO 8100-2:2026 Clause 4.7.2.1:</strong> For rated speeds <InlineMath math="v \le 1.0\text{ m/s}" />, <InlineMath math="v_{t\_acop} \le 1.15v + 0.25\text{ m/s}" />.<br/>
@@ -879,11 +881,11 @@ export const SafetyComponentsModule = ({ data, onChange, section = 'all' }: { da
                 </div>
               </div>
               <div className="lg:col-span-2 space-y-4">
-                <div className={`p-6 border ${isUcmpOk ? 'bg-emerald-50 border-emerald-200' : 'bg-error-container/10 border-error/20'}`}>
+                <div className={`p-6 border ${lightResultCard} ${isUcmpOk ? 'bg-emerald-50 border-emerald-200' : 'bg-error-container/10 border-error/20'}`}>
                   <p className="text-[10px] font-bold uppercase mb-1">UCMP Stopping Distance Verification</p>
                   <p className="text-2xl font-black">{formatNumber(data.ucmpDetectionDist)} mm</p>
-                  <p className="text-[10px] opacity-50">Max Permissible Movement: 1200 mm (ISO 8100-1:2026)</p>
-                  <div className="mt-4 p-4 bg-white/50 rounded border border-black/5">
+                  <p className={`text-[10px] ${lightMutedText}`}>Max Permissible Movement: 1200 mm (ISO 8100-1:2026)</p>
+                  <div className="mt-4 rounded border border-slate-200 bg-white p-4 text-slate-900">
                     <h5 className="text-[10px] font-bold uppercase text-primary mb-2">Normative Requirement (Clause 4.8)</h5>
                     <p className="text-xs leading-relaxed">
                       <strong>ISO 8100-2:2026 Clause 4.8.2:</strong> The car shall stop within a distance of <InlineMath math="1.20\text{ m}" /> from the landing level. 
@@ -944,28 +946,28 @@ export const SafetyComponentsModule = ({ data, onChange, section = 'all' }: { da
               </InputGroup>
               <div className="lg:col-span-2">
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <div className={`p-6 border ${isPfhOk ? 'bg-emerald-50 border-emerald-200' : 'bg-error-container/10 border-error/20'}`}>
+                  <div className={`p-6 border ${lightResultCard} ${isPfhOk ? 'bg-emerald-50 border-emerald-200' : 'bg-error-container/10 border-error/20'}`}>
                     <p className="text-[10px] font-bold uppercase mb-1">Calculated PFH</p>
                     <p className="text-2xl font-black">{pfh.toExponential(2)}</p>
-                    <p className="text-[10px] opacity-50">Limit: {currentLimit.max.toExponential(0)} failures/h</p>
+                    <p className={`text-[10px] ${lightMutedText}`}>Limit: {currentLimit.max.toExponential(0)} failures/h</p>
                     <div className="mt-4 flex items-center gap-2">
                       {isPfhOk ? <CheckCircle2 size={14} className="text-emerald-600" /> : <XCircle size={14} className="text-error" />}
                       <span className="text-[10px] font-bold uppercase opacity-70">PFH Verification</span>
                     </div>
                   </div>
-                  <div className={`p-6 border ${isDcOk ? 'bg-emerald-50 border-emerald-200' : 'bg-amber-50 border-amber-200'}`}>
+                  <div className={`p-6 border ${lightResultCard} ${isDcOk ? 'bg-emerald-50 border-emerald-200' : 'bg-amber-50 border-amber-200'}`}>
                     <p className="text-[10px] font-bold uppercase mb-1">Diagnostic Coverage</p>
                     <p className="text-2xl font-black">{data.diagnosticCoverage}%</p>
-                    <p className="text-[10px] opacity-50">Min Required: {minDc}%</p>
+                    <p className={`text-[10px] ${lightMutedText}`}>Min Required: {minDc}%</p>
                     <div className="mt-4 flex items-center gap-2">
                       {isDcOk ? <CheckCircle2 size={14} className="text-emerald-600" /> : <AlertCircle size={14} className="text-amber-600" />}
                       <span className="text-[10px] font-bold uppercase opacity-70">DC Verification</span>
                     </div>
                   </div>
-                  <div className={`p-6 border ${isFaultToleranceOk && safetyChainContinuityOk ? 'bg-emerald-50 border-emerald-200' : 'bg-amber-50 border-amber-200'}`}>
+                  <div className={`p-6 border ${lightResultCard} ${isFaultToleranceOk && safetyChainContinuityOk ? 'bg-emerald-50 border-emerald-200' : 'bg-amber-50 border-amber-200'}`}>
                     <p className="text-[10px] font-bold uppercase mb-1">Circuit Integrity</p>
                     <p className="text-2xl font-black">{data.faultTolerance}</p>
-                    <p className="text-[10px] opacity-50">Min Fault Tolerance: {minFaultTolerance}</p>
+                    <p className={`text-[10px] ${lightMutedText}`}>Min Fault Tolerance: {minFaultTolerance}</p>
                     <div className="mt-4 space-y-2">
                       <div className="flex items-center gap-2">
                         {isFaultToleranceOk ? <CheckCircle2 size={14} className="text-emerald-600" /> : <AlertCircle size={14} className="text-amber-600" />}

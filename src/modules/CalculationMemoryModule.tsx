@@ -6,6 +6,7 @@ import { CheckCircle2, ShieldCheck, Zap, AlertTriangle, Info, ChevronRight, Calc
 import { BlockMath, InlineMath } from 'react-katex';
 
 export const CalculationMemoryModule = ({ data }: { data: ProjectData }) => {
+  const isHydraulic = data.type === 'hydraulic';
   const g = 9.81;
   const r = parseInt(data.suspension.split(':')[0]);
   const T1 = ((data.carMass + data.ratedLoad) / r) * (g + data.acceleration);
@@ -43,6 +44,15 @@ export const CalculationMemoryModule = ({ data }: { data: ProjectData }) => {
   const isBufferMassOk = impactMass >= data.bufferMinMass && impactMass <= data.bufferMaxMass;
   const a_avg = h_m > 0 ? (v_impact * v_impact) / (2 * h_m * g) : 0;
   const isEnergyOk = a_avg <= 1.0;
+  const hydraulicInternalDiameter = data.ramDiameter + 10;
+  const hydraulicRequiredWallThickness = ((2.3 * 1.7 * data.maxPressure) / Math.max(data.materialYield, 1)) * (hydraulicInternalDiameter / 2) + 0.5;
+  const hydraulicBucklingInertia = (Math.PI * Math.pow(data.ramDiameter, 4)) / 64;
+  const hydraulicEulerBuckling = (Math.PI * Math.PI * data.materialE * hydraulicBucklingInertia) / Math.max(Math.pow(data.ramLength, 2), 1);
+  const hydraulicFullLoadForce = (data.carMass + data.ratedLoad) * g * 1.4;
+  const hydraulicPressureReserve = data.ruptureValvePressure - data.maxPressure;
+  const isHydraulicWallOk = data.cylinderWallThickness >= hydraulicRequiredWallThickness;
+  const isHydraulicBucklingOk = hydraulicFullLoadForce < hydraulicEulerBuckling / 2;
+  const isHydraulicValveOk = data.ruptureValvePressure >= data.maxPressure * 1.5 && data.ruptureValveFlow > 0;
 
   // Safety Gear Calculations
   const totalMass = data.carMass + data.ratedLoad;
@@ -79,12 +89,19 @@ export const CalculationMemoryModule = ({ data }: { data: ProjectData }) => {
   const delta_x = (data.railIx > 0 && E > 0) ? ((Fh * 0.5) * Math.pow(l, 3)) / (48 * E * data.railIx) : 0;
   const delta = Math.sqrt(Math.pow(delta_y, 2) + Math.pow(delta_x, 2));
   const isDeflectionOk = delta < 5;
-  const summaryRows = [
-    { label: 'Traction Ratio', value: formatNumber(tractionRatio), status: tractionRatio > 0 ? 'tracked' : 'pending' },
-    { label: 'Equivalent Pulley Count', value: formatNumber(N_equiv), status: 'computed' },
-    { label: 'PFH', value: pfh.toExponential(2), status: isSilOk ? 'ok' : 'review' },
-    { label: 'Combined Rail Stress', value: `${formatNumber(sigma_combined)} N/mm²`, status: isCombinedOk ? 'ok' : 'review' },
-  ];
+  const summaryRows = isHydraulic
+    ? [
+        { label: 'Hydraulic Full Load', value: `${formatNumber(hydraulicFullLoadForce, 0)} N`, status: 'computed' },
+        { label: 'Wall Thickness Reserve', value: `${formatNumber(data.cylinderWallThickness - hydraulicRequiredWallThickness, 2)} mm`, status: isHydraulicWallOk ? 'ok' : 'review' },
+        { label: 'Rupture Valve Margin', value: `${formatNumber(hydraulicPressureReserve, 2)} MPa`, status: isHydraulicValveOk ? 'ok' : 'review' },
+        { label: 'Buffer Avg. Deceleration', value: `${formatNumber(a_avg, 2)} gn`, status: isEnergyOk ? 'ok' : 'review' },
+      ]
+    : [
+        { label: 'Traction Ratio', value: formatNumber(tractionRatio), status: tractionRatio > 0 ? 'tracked' : 'pending' },
+        { label: 'Equivalent Pulley Count', value: formatNumber(N_equiv), status: 'computed' },
+        { label: 'PFH', value: pfh.toExponential(2), status: isSilOk ? 'ok' : 'review' },
+        { label: 'Combined Rail Stress', value: `${formatNumber(sigma_combined)} N/mm²`, status: isCombinedOk ? 'ok' : 'review' },
+      ];
 
   return (
     <div className="space-y-6">
@@ -95,9 +112,11 @@ export const CalculationMemoryModule = ({ data }: { data: ProjectData }) => {
               <FileText size={12} />
               Calculation memory
             </div>
-            <h3 className="text-2xl font-black tracking-tight text-on-surface">Technical Memory Workspace</h3>
+            <h3 className="text-2xl font-black tracking-tight text-on-surface">{isHydraulic ? 'Hydraulic Technical Memory' : 'Technical Memory Workspace'}</h3>
             <p className="mt-3 max-w-2xl text-sm leading-relaxed text-on-surface-variant">
-              Use this page as the final technical summary before export.
+              {isHydraulic
+                ? 'Use this page as the hydraulic calculation memory before export. It should summarise cylinder, rupture-valve, buffer and safety closure without traction noise.'
+                : 'Use this page as the final technical summary before export.'}
             </p>
           </div>
           <div className="rounded-sm border border-outline-variant/20 bg-surface-container-lowest p-6">
@@ -124,8 +143,10 @@ export const CalculationMemoryModule = ({ data }: { data: ProjectData }) => {
 
       <div id="calculation-memory-report" className="space-y-8 max-w-5xl mx-auto bg-white p-12 shadow-sm border border-outline-variant/10 font-serif text-slate-900">
       <div className="text-center border-b-2 border-slate-900 pb-8 mb-8">
-        <h2 className="text-3xl font-black uppercase tracking-tighter">Technical Calculation Report</h2>
-        <p className="text-sm italic mt-2">Project Alpha-7 | ISO 8100-2:2026 Engineering Compliance</p>
+        <h2 className="text-3xl font-black uppercase tracking-tighter">{isHydraulic ? 'Hydraulic Calculation Report' : 'Technical Calculation Report'}</h2>
+        <p className="text-sm italic mt-2">
+          Project Alpha-7 | {isHydraulic ? 'Hydraulic Workspace' : 'Traction Workspace'} | ISO 8100-2:2026 Engineering Compliance
+        </p>
       </div>
 
       <section className="space-y-6">
@@ -145,95 +166,156 @@ export const CalculationMemoryModule = ({ data }: { data: ProjectData }) => {
           </div>
           <div className="p-2 bg-slate-50 rounded border border-slate-100">
             <p className="opacity-50">Suspension</p>
-            <p className="text-slate-900">{data.suspension}</p>
+            <p className="text-slate-900">{isHydraulic ? 'Hydraulic Direct Drive' : data.suspension}</p>
           </div>
           <div className="p-2 bg-slate-50 rounded border border-slate-100">
             <p className="opacity-50">Travel (H)</p>
             <p className="text-slate-900">{data.travel} m</p>
           </div>
-          <div className="p-2 bg-slate-50 rounded border border-slate-100">
-            <p className="opacity-50">Sheave (D)</p>
-            <p className="text-slate-900">{data.sheaveDiameter} mm</p>
-          </div>
-          <div className="p-2 bg-slate-50 rounded border border-slate-100">
-            <p className="opacity-50">Rope (d)</p>
-            <p className="text-slate-900">{data.ropeDiameter} mm</p>
-          </div>
-          <div className="p-2 bg-slate-50 rounded border border-slate-100">
-            <p className="opacity-50">Num Ropes (n)</p>
-            <p className="text-slate-900">{data.numRopes}</p>
-          </div>
-          <div className="p-2 bg-slate-50 rounded border border-slate-100">
-            <p className="opacity-50">Groove Type</p>
-            <p className="text-slate-900">{data.grooveType}</p>
-          </div>
-          <div className="p-2 bg-slate-50 rounded border border-slate-100">
-            <p className="opacity-50">Spec. Pressure</p>
-            <p className="text-slate-900">{data.ropeSpecificPressure} MPa</p>
-          </div>
-          <div className="p-2 bg-slate-50 rounded border border-slate-100">
-            <p className="opacity-50">Belt Width/Thick</p>
-            <p className="text-slate-900">{data.beltWidth}x{data.beltThickness} mm</p>
-          </div>
-          <div className="p-2 bg-slate-50 rounded border border-slate-100">
-            <p className="opacity-50">Num Belts</p>
-            <p className="text-slate-900">{data.numBelts}</p>
-          </div>
-          <div className="p-2 bg-slate-50 rounded border border-slate-100">
-            <p className="opacity-50">Belt Strength</p>
-            <p className="text-slate-900">{data.beltTensileStrength} N</p>
-          </div>
+          {isHydraulic ? (
+            <>
+              <div className="p-2 bg-slate-50 rounded border border-slate-100">
+                <p className="opacity-50">Ram Diameter</p>
+                <p className="text-slate-900">{data.ramDiameter} mm</p>
+              </div>
+              <div className="p-2 bg-slate-50 rounded border border-slate-100">
+                <p className="opacity-50">Ram Length</p>
+                <p className="text-slate-900">{data.ramLength} mm</p>
+              </div>
+              <div className="p-2 bg-slate-50 rounded border border-slate-100">
+                <p className="opacity-50">Wall Thickness</p>
+                <p className="text-slate-900">{data.cylinderWallThickness} mm</p>
+              </div>
+              <div className="p-2 bg-slate-50 rounded border border-slate-100">
+                <p className="opacity-50">Operating Pressure</p>
+                <p className="text-slate-900">{data.maxPressure} MPa</p>
+              </div>
+              <div className="p-2 bg-slate-50 rounded border border-slate-100">
+                <p className="opacity-50">Rupture Valve Flow</p>
+                <p className="text-slate-900">{data.ruptureValveFlow} L/min</p>
+              </div>
+              <div className="p-2 bg-slate-50 rounded border border-slate-100">
+                <p className="opacity-50">Rupture Valve Pressure</p>
+                <p className="text-slate-900">{data.ruptureValvePressure} MPa</p>
+              </div>
+            </>
+          ) : (
+            <>
+              <div className="p-2 bg-slate-50 rounded border border-slate-100">
+                <p className="opacity-50">Sheave (D)</p>
+                <p className="text-slate-900">{data.sheaveDiameter} mm</p>
+              </div>
+              <div className="p-2 bg-slate-50 rounded border border-slate-100">
+                <p className="opacity-50">Rope (d)</p>
+                <p className="text-slate-900">{data.ropeDiameter} mm</p>
+              </div>
+              <div className="p-2 bg-slate-50 rounded border border-slate-100">
+                <p className="opacity-50">Num Ropes (n)</p>
+                <p className="text-slate-900">{data.numRopes}</p>
+              </div>
+              <div className="p-2 bg-slate-50 rounded border border-slate-100">
+                <p className="opacity-50">Groove Type</p>
+                <p className="text-slate-900">{data.grooveType}</p>
+              </div>
+              <div className="p-2 bg-slate-50 rounded border border-slate-100">
+                <p className="opacity-50">Spec. Pressure</p>
+                <p className="text-slate-900">{data.ropeSpecificPressure} MPa</p>
+              </div>
+              <div className="p-2 bg-slate-50 rounded border border-slate-100">
+                <p className="opacity-50">Belt Width/Thick</p>
+                <p className="text-slate-900">{data.beltWidth}x{data.beltThickness} mm</p>
+              </div>
+              <div className="p-2 bg-slate-50 rounded border border-slate-100">
+                <p className="opacity-50">Num Belts</p>
+                <p className="text-slate-900">{data.numBelts}</p>
+              </div>
+              <div className="p-2 bg-slate-50 rounded border border-slate-100">
+                <p className="opacity-50">Belt Strength</p>
+                <p className="text-slate-900">{data.beltTensileStrength} N</p>
+              </div>
+            </>
+          )}
         </div>
       </section>
 
-      <section className="space-y-6">
-        <h3 className="text-xl font-bold border-b border-slate-200 pb-2">1. Traction System Analysis (Clause 4.11)</h3>
-        <div className="space-y-4">
-          <p className="text-sm leading-relaxed">Traction proof based on static and dynamic loading of the traction sheave.</p>
-          <div className="bg-slate-50 p-6 rounded border border-slate-100 flex flex-col items-center gap-4">
-            <BlockMath math={`T_1 = \\frac{(P + Q)}{r} \\cdot (g_n + a) = \\frac{(${data.carMass} + ${data.ratedLoad})}{${r}} \\cdot (9.81 + ${data.acceleration}) = ${formatNumber(T1)} \\text{ N}`} />
-            <BlockMath math={`T_2 = \\frac{(P + 0.5Q)}{r} \\cdot (g_n - a) = \\frac{(${data.carMass} + 500)}{${r}} \\cdot (9.81 - ${data.acceleration}) = ${formatNumber(T2)} \\text{ N}`} />
-            <BlockMath math={`\\text{Ratio } T_1/T_2 = ${formatNumber(tractionRatio)}`} />
+      {isHydraulic ? (
+        <section className="space-y-6">
+          <h3 className="text-xl font-bold border-b border-slate-200 pb-2">1. Hydraulic Power Unit and Ram (Clause 4.15)</h3>
+          <div className="space-y-4">
+            <p className="text-sm leading-relaxed">Cylinder wall thickness, pressure reserve and buckling stability for the current hydraulic configuration.</p>
+            <div className="bg-slate-50 p-6 rounded border border-slate-100 flex flex-col items-center gap-4">
+              <BlockMath math={`e_{req} = \\left(\\frac{2.3 \\cdot 1.7 \\cdot ${data.maxPressure}}{${Math.max(data.materialYield, 1)}}\\right) \\cdot \\frac{${hydraulicInternalDiameter}}{2} + 0.5 = ${formatNumber(hydraulicRequiredWallThickness)}\\text{ mm}`} />
+              <BlockMath math={`F_{buckling} = \\frac{\\pi^2 \\cdot E \\cdot I}{l^2} = ${formatNumber(hydraulicEulerBuckling, 0)}\\text{ N}`} />
+              <BlockMath math={`F_{hyd} = (P + Q) \\cdot g \\cdot 1.4 = ${formatNumber(hydraulicFullLoadForce, 0)}\\text{ N}`} />
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="bg-slate-50 p-4 rounded border border-slate-100">
+                <p className="text-[10px] font-bold uppercase mb-2">Wall Thickness Status</p>
+                <p className={`text-sm font-black ${isHydraulicWallOk ? 'text-emerald-700' : 'text-red-700'}`}>{isHydraulicWallOk ? 'OK' : 'Review Required'}</p>
+              </div>
+              <div className="bg-slate-50 p-4 rounded border border-slate-100">
+                <p className="text-[10px] font-bold uppercase mb-2">Buckling Status</p>
+                <p className={`text-sm font-black ${isHydraulicBucklingOk ? 'text-emerald-700' : 'text-red-700'}`}>{isHydraulicBucklingOk ? 'OK' : 'Review Required'}</p>
+              </div>
+              <div className="bg-slate-50 p-4 rounded border border-slate-100">
+                <p className="text-[10px] font-bold uppercase mb-2">Rupture Valve Status</p>
+                <p className={`text-sm font-black ${isHydraulicValveOk ? 'text-emerald-700' : 'text-red-700'}`}>{isHydraulicValveOk ? 'OK' : 'Review Required'}</p>
+              </div>
+            </div>
           </div>
-          <p className="text-sm leading-relaxed">Three operating conditions are tracked: loading, braking and stalling.</p>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div className="bg-slate-50 p-4 rounded border border-slate-100">
-              <p className="text-[10px] font-bold uppercase mb-2">4.11.2.1 Loading</p>
-              <InlineMath math="\frac{T_1}{T_2} \le e^{f_{load}\alpha}" />
+        </section>
+      ) : (
+        <>
+          <section className="space-y-6">
+            <h3 className="text-xl font-bold border-b border-slate-200 pb-2">1. Traction System Analysis (Clause 4.11)</h3>
+            <div className="space-y-4">
+              <p className="text-sm leading-relaxed">Traction proof based on static and dynamic loading of the traction sheave.</p>
+              <div className="bg-slate-50 p-6 rounded border border-slate-100 flex flex-col items-center gap-4">
+                <BlockMath math={`T_1 = \\frac{(P + Q)}{r} \\cdot (g_n + a) = \\frac{(${data.carMass} + ${data.ratedLoad})}{${r}} \\cdot (9.81 + ${data.acceleration}) = ${formatNumber(T1)} \\text{ N}`} />
+                <BlockMath math={`T_2 = \\frac{(P + 0.5Q)}{r} \\cdot (g_n - a) = \\frac{(${data.carMass} + 500)}{${r}} \\cdot (9.81 - ${data.acceleration}) = ${formatNumber(T2)} \\text{ N}`} />
+                <BlockMath math={`\\text{Ratio } T_1/T_2 = ${formatNumber(tractionRatio)}`} />
+              </div>
+              <p className="text-sm leading-relaxed">Three operating conditions are tracked: loading, braking and stalling.</p>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="bg-slate-50 p-4 rounded border border-slate-100">
+                  <p className="text-[10px] font-bold uppercase mb-2">4.11.2.1 Loading</p>
+                  <InlineMath math="\frac{T_1}{T_2} \le e^{f_{load}\alpha}" />
+                </div>
+                <div className="bg-slate-50 p-4 rounded border border-slate-100">
+                  <p className="text-[10px] font-bold uppercase mb-2">4.11.2.2 Braking</p>
+                  <InlineMath math="\frac{T_1}{T_2} \le e^{f_{brake}\alpha}" />
+                </div>
+                <div className="bg-slate-50 p-4 rounded border border-slate-100">
+                  <p className="text-[10px] font-bold uppercase mb-2">4.11.2.3 Stalling</p>
+                  <InlineMath math="\frac{T_1}{T_2} \ge e^{f_{stall}\alpha}" />
+                </div>
+              </div>
             </div>
-            <div className="bg-slate-50 p-4 rounded border border-slate-100">
-              <p className="text-[10px] font-bold uppercase mb-2">4.11.2.2 Braking</p>
-              <InlineMath math="\frac{T_1}{T_2} \le e^{f_{brake}\alpha}" />
+          </section>
+
+          <section className="space-y-6">
+            <h3 className="text-xl font-bold border-b border-slate-200 pb-2">2. Suspension Means Verification (Clause 4.12)</h3>
+            <div className="space-y-4">
+              <p className="text-sm leading-relaxed">{'Equivalent pulley count $N_{equiv}$ drives the required safety factor.'}</p>
+              <div className="bg-slate-50 p-6 rounded border border-slate-100 flex flex-col items-center gap-4">
+                <BlockMath math={`N_{equiv} = N_{equiv(t)} + N_{equiv(p)} = ${data.N_equiv_t} + ${formatNumber(N_equiv_p)} = ${formatNumber(N_equiv)}`} />
+                <BlockMath math={`N_{equiv(p)} = K_p \\cdot (N_{ps} + 4N_{pr}) = ${data.Kp} \\cdot (${data.numSimpleBends} + 4 \\cdot ${data.numReverseBends}) = ${formatNumber(N_equiv_p)}`} />
+              </div>
+              <p className="text-sm leading-relaxed">Required safety factor according to Formula 36:</p>
+              <div className="bg-slate-50 p-6 rounded border border-slate-100 flex flex-col items-center gap-4">
+                <BlockMath math="S_{f,req} = 10^{2.6834 - \frac{\log(N_{equiv} / 2.6834 \cdot 10^6)}{\log(D/d)}}" />
+              </div>
+              <p className="text-sm leading-relaxed">Total number of trips $S_T$:</p>
+              <div className="bg-slate-50 p-6 rounded border border-slate-100 flex flex-col items-center gap-4">
+                <BlockMath math={`S_T = N_{lift} \\cdot C_R \\cdot H \\cdot r = ${data.N_lift} \\cdot ${data.C_R} \\cdot ${data.travel} \\cdot ${r} = ${formatNumber(ST, 0)}`} />
+              </div>
             </div>
-            <div className="bg-slate-50 p-4 rounded border border-slate-100">
-              <p className="text-[10px] font-bold uppercase mb-2">4.11.2.3 Stalling</p>
-              <InlineMath math="\frac{T_1}{T_2} \ge e^{f_{stall}\alpha}" />
-            </div>
-          </div>
-        </div>
-      </section>
+          </section>
+        </>
+      )}
 
       <section className="space-y-6">
-        <h3 className="text-xl font-bold border-b border-slate-200 pb-2">2. Suspension Means Verification (Clause 4.12)</h3>
-        <div className="space-y-4">
-          <p className="text-sm leading-relaxed">{'Equivalent pulley count $N_{equiv}$ drives the required safety factor.'}</p>
-          <div className="bg-slate-50 p-6 rounded border border-slate-100 flex flex-col items-center gap-4">
-            <BlockMath math={`N_{equiv} = N_{equiv(t)} + N_{equiv(p)} = ${data.N_equiv_t} + ${formatNumber(N_equiv_p)} = ${formatNumber(N_equiv)}`} />
-            <BlockMath math={`N_{equiv(p)} = K_p \\cdot (N_{ps} + 4N_{pr}) = ${data.Kp} \\cdot (${data.numSimpleBends} + 4 \\cdot ${data.numReverseBends}) = ${formatNumber(N_equiv_p)}`} />
-          </div>
-          <p className="text-sm leading-relaxed">Required safety factor according to Formula 36:</p>
-          <div className="bg-slate-50 p-6 rounded border border-slate-100 flex flex-col items-center gap-4">
-            <BlockMath math="S_{f,req} = 10^{2.6834 - \frac{\log(N_{equiv} / 2.6834 \cdot 10^6)}{\log(D/d)}}" />
-          </div>
-          <p className="text-sm leading-relaxed">Total number of trips $S_T$:</p>
-          <div className="bg-slate-50 p-6 rounded border border-slate-100 flex flex-col items-center gap-4">
-            <BlockMath math={`S_T = N_{lift} \\cdot C_R \\cdot H \\cdot r = ${data.N_lift} \\cdot ${data.C_R} \\cdot ${data.travel} \\cdot ${r} = ${formatNumber(ST, 0)}`} />
-          </div>
-        </div>
-      </section>
-
-      <section className="space-y-6">
-        <h3 className="text-xl font-bold border-b border-slate-200 pb-2">3. Guide Rails Analysis (Clause 4.10)</h3>
+        <h3 className="text-xl font-bold border-b border-slate-200 pb-2">{isHydraulic ? '2. Guide Rails and Structural Checks (Clause 4.10)' : '3. Guide Rails Analysis (Clause 4.10)'}</h3>
         <div className="space-y-4">
           <p className="text-sm leading-relaxed">Bending, buckling, combined stress and deflection for the selected rail profile.</p>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -279,7 +361,7 @@ export const CalculationMemoryModule = ({ data }: { data: ProjectData }) => {
       </section>
 
       <section className="space-y-6">
-        <h3 className="text-xl font-bold border-b border-slate-200 pb-2">4. Safety Components (Clause 4.3, 4.5, 4.7, 4.8)</h3>
+        <h3 className="text-xl font-bold border-b border-slate-200 pb-2">{isHydraulic ? '3. Safety Components and Buffers' : '4. Safety Components (Clause 4.3, 4.5, 4.7, 4.8)'}</h3>
         <div className="space-y-6">
           <div className="space-y-4">
             <h4 className="text-lg font-bold">4.3 Safety Gear</h4>
@@ -346,20 +428,22 @@ export const CalculationMemoryModule = ({ data }: { data: ProjectData }) => {
         </div>
       </section>
 
-      <section className="space-y-6">
-        <h3 className="text-xl font-bold border-b border-slate-200 pb-2">5. Hydraulic Systems (Clause 4.15)</h3>
-        <div className="space-y-4">
-          <p className="text-sm leading-relaxed">Cylinder wall thickness and ram buckling references.</p>
-          <div className="bg-slate-50 p-6 rounded border border-slate-100 flex flex-col items-center gap-4">
-            <BlockMath math="e_{wall} \ge \frac{2.3 \cdot 1.7 \cdot p}{R_{p0.2}} \cdot \frac{D_i}{2} + e_0" />
-            <BlockMath math="F_s \le \frac{\pi^2 E J}{2l^2}" />
+      {isHydraulic && (
+        <section className="space-y-6">
+          <h3 className="text-xl font-bold border-b border-slate-200 pb-2">4. Hydraulic Formula Reference</h3>
+          <div className="space-y-4">
+            <p className="text-sm leading-relaxed">Cylinder wall thickness and ram buckling references used in the hydraulic workspace.</p>
+            <div className="bg-slate-50 p-6 rounded border border-slate-100 flex flex-col items-center gap-4">
+              <BlockMath math="e_{wall} \ge \frac{2.3 \cdot 1.7 \cdot p}{R_{p0.2}} \cdot \frac{D_i}{2} + e_0" />
+              <BlockMath math="F_s \le \frac{\pi^2 E J}{2l^2}" />
+            </div>
           </div>
-        </div>
-      </section>
+        </section>
+      )}
 
       {data.tractionNotes && (
         <section className="space-y-4">
-          <h3 className="text-xl font-bold border-b border-slate-200 pb-2">6. Engineering Observations</h3>
+          <h3 className="text-xl font-bold border-b border-slate-200 pb-2">{isHydraulic ? '5. Engineering Observations' : '6. Engineering Observations'}</h3>
           <p className="text-sm leading-relaxed whitespace-pre-wrap italic text-slate-600 bg-amber-50 p-6 rounded border border-amber-100">
             {data.tractionNotes}
           </p>

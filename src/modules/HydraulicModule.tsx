@@ -6,7 +6,7 @@ import { CheckCircle2, ShieldCheck, Zap, AlertTriangle, Info, ChevronRight, Calc
 import { BlockMath, InlineMath } from 'react-katex';
 import { RuptureValveModule } from './RuptureValveModule';
 
-export const HydraulicModule = ({ data }: { data: ProjectData }) => {
+export const HydraulicModule = ({ data, onChange }: { data: ProjectData, onChange: (newData: Partial<ProjectData>) => void }) => {
   // Wall thickness (Formula 38)
   // e_wall >= (2.3 * 1.7 * p / Rp0.2) * (Di / 2) + e0
   const Di = data.ramDiameter + 10; // Simplified assumption
@@ -85,7 +85,7 @@ export const HydraulicModule = ({ data }: { data: ProjectData }) => {
             </div>
           </div>
         </div>
-        {data.type === 'hydraulic' && <RuptureValveModule data={data} onChange={() => {}} />}
+        {data.type === 'hydraulic' && <RuptureValveModule data={data} onChange={onChange} />}
       </div>
     </div>
   );

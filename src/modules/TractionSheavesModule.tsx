@@ -8,13 +8,14 @@ import { computeLiftCalculations } from '../lib/calculations';
 export const TractionSheavesModule = ({ data, onChange }: { data: ProjectData, onChange: (newData: Partial<ProjectData>) => void }) => {
   const calc = computeLiftCalculations(data);
   const { p_groove, p_allow } = calc.traction;
+  const isBeltSuspension = data.suspensionType === 'belt';
+  const referenceThickness = isBeltSuspension ? Math.max(data.beltThickness || 1, 1) : Math.max(data.ropeDiameter || 1, 1);
 
   const isHardnessOk = data.sheaveHardness >= 200;
   const isPressureOk = p_groove <= p_allow;
 
   const handleRatioChange = (val: number) => {
-    // If user changes D/d ratio, we adjust sheave Diameter
-    onChange({ sheaveDiameter: val * data.ropeDiameter });
+    onChange({ sheaveDiameter: val * referenceThickness });
   };
 
   return (
@@ -32,25 +33,31 @@ export const TractionSheavesModule = ({ data, onChange }: { data: ProjectData, o
             </h4>
             <div className="p-6 bg-surface-container-lowest border border-outline-variant/10 space-y-4">
               <LiftField label="Sheave Diameter (D)" name="sheaveDiameter" unit="mm" data={data} onChange={onChange} min={200} max={1000} step={10} />
-              <LiftField label="Rope Diameter (d)" name="ropeDiameter" unit="mm" data={data} onChange={onChange} min={4} max={20} step={0.5} />
+              {isBeltSuspension ? (
+                <LiftField label="Belt Thickness (reference d)" name="beltThickness" unit="mm" data={data} onChange={onChange} min={2} max={10} step={0.5} />
+              ) : (
+                <LiftField label="Rope Diameter (d)" name="ropeDiameter" unit="mm" data={data} onChange={onChange} min={4} max={20} step={0.5} />
+              )}
               <div className="rounded-sm border border-primary/20 bg-primary/5 p-4">
                 <p className="text-[10px] font-bold uppercase text-primary">Service Wear Input</p>
                 <p className="mt-2 text-xs leading-relaxed text-on-surface-variant">
-                  Rope wear and discard criteria are managed only in <strong>Suspension Verification</strong>. Keep this module focused on sheave geometry and groove verification.
+                  {isBeltSuspension
+                    ? <>Belt replacement logic stays in <strong>Suspension Verification</strong>. Keep this module focused on sheave geometry and interface compatibility.</>
+                    : <>Rope wear and discard criteria are managed only in <strong>Suspension Verification</strong>. Keep this module focused on sheave geometry and groove verification.</>}
                 </p>
               </div>
               
               <div className="space-y-1 group">
                 <div className="flex justify-between items-center text-[11px] font-bold text-on-surface-variant uppercase">
                   <label>D/d Ratio (Nominal)</label>
-                  {data.sheaveDiameter / data.ropeDiameter < 40 && <span className="text-[9px] text-error font-bold animate-pulse">Required: ≥ 40</span>}
+                  {data.sheaveDiameter / referenceThickness < 40 && <span className="text-[9px] text-error font-bold animate-pulse">Required: ≥ 40</span>}
                 </div>
                 <input 
                   type="number"
                   min={40}
                   max={60}
                   step={1}
-                  value={isNaN(data.sheaveDiameter / data.ropeDiameter) ? '' : formatNumber(data.sheaveDiameter / data.ropeDiameter, 0)}
+                  value={isNaN(data.sheaveDiameter / referenceThickness) ? '' : formatNumber(data.sheaveDiameter / referenceThickness, 0)}
                   onChange={(e) => handleRatioChange(parseFloat(e.target.value) || 40)}
                   className="w-full bg-surface-container-lowest border border-outline-variant/20 rounded-sm px-3 py-2 text-sm focus:ring-1 focus:ring-primary outline-none transition-all"
                 />
@@ -60,13 +67,13 @@ export const TractionSheavesModule = ({ data, onChange }: { data: ProjectData, o
                     min={40}
                     max={60}
                     step={1}
-                    value={isNaN(data.sheaveDiameter / data.ropeDiameter) ? 40 : data.sheaveDiameter / data.ropeDiameter}
-                    onChange={(e) => handleRatioChange(parseFloat(e.target.value))}
+                  value={isNaN(data.sheaveDiameter / referenceThickness) ? 40 : data.sheaveDiameter / referenceThickness}
+                  onChange={(e) => handleRatioChange(parseFloat(e.target.value))}
                     className="w-full h-1 bg-surface-container-low rounded-lg appearance-none cursor-pointer accent-primary"
                   />
                 </div>
                 <p className="text-[9px] text-error/80 italic font-medium mt-1 leading-tight">
-                  Suggestion: Must be &ge; 40 by standard.
+                  Suggestion: keep D/d at or above 40 for pre-dimensioning.
                 </p>
               </div>
             </div>
@@ -107,6 +114,14 @@ export const TractionSheavesModule = ({ data, onChange }: { data: ProjectData, o
                   <LiftField label="Undercut Angle (β)" name="undercutAngle" unit="°" data={data} onChange={onChange} min={40} max={105} step={1} />
                 </>
               )}
+              {data.suspensionType === 'belt' && (
+                <div className="rounded-sm border border-primary/20 bg-primary/5 p-4">
+                  <p className="text-[10px] font-bold uppercase text-primary">Belt geometry note</p>
+                  <p className="mt-2 text-xs leading-relaxed text-on-surface-variant">
+                    Belt suspension is active, so classical rope groove-angle inputs are intentionally suppressed here. What matters now is the reference thickness, sheave diameter and the selected belt family.
+                  </p>
+                </div>
+              )}
             </div>
           </div>
 
@@ -120,7 +135,7 @@ export const TractionSheavesModule = ({ data, onChange }: { data: ProjectData, o
               <p className="text-[10px] font-bold uppercase mb-1">Effective D/d Ratio</p>
               <p className="text-xl font-black">{formatNumber(calc.traction.DdRatio, 1)}</p>
               <p className="mt-2 text-[10px] opacity-70">
-                Required: ≥ 40 (Nominal D/d is {formatNumber(data.sheaveDiameter/data.ropeDiameter, 1)})
+                Required: ≥ 40 (Nominal D/d is {formatNumber(data.sheaveDiameter / referenceThickness, 1)})
               </p>
             </div>
 
@@ -147,12 +162,16 @@ export const TractionSheavesModule = ({ data, onChange }: { data: ProjectData, o
               </h5>
               <div className="text-xs space-y-2 opacity-80">
                 <p>Verify groove pressure according to:</p>
-                {data.grooveType === 'V' ? (
+                {!isBeltSuspension && data.grooveType === 'V' ? (
                   <InlineMath math="p = \frac{T_1 + T_2}{n \cdot d \cdot D \cdot \sin(\gamma/2)}" />
-                ) : data.grooveType === 'semi-circular' ? (
+                ) : !isBeltSuspension && data.grooveType === 'semi-circular' ? (
                   <InlineMath math="p = \frac{8 \cdot (T_1 + T_2) \cdot \cos(\beta/2)}{n \cdot d \cdot D \cdot (\pi - \beta - \sin(\beta))}" />
-                ) : (
+                ) : !isBeltSuspension ? (
                   <InlineMath math="p = \frac{8 \cdot (T_1 + T_2)}{n \cdot d \cdot D \cdot \pi}" />
+                ) : (
+                  <p className="text-xs leading-relaxed text-on-surface-variant">
+                    Belt mode uses the reference belt thickness as the bending diameter input and keeps the interface pressure check aligned with the selected belt/sheave pair.
+                  </p>
                 )}
                 <p className="mt-2 text-[10px] italic">p_allow varies by material ({data.sheaveMaterial}) and rope speed v.</p>
                 <p className="mt-4">Ensure minimum bending radius:</p>

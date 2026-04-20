@@ -4,6 +4,7 @@ import { InputGroup, LiftField } from '../components/ui';
 import { AlertCircle } from 'lucide-react';
 
 export const GlobalProjectModule = ({ data, onChange }: { data: ProjectData, onChange: (newData: Partial<ProjectData>) => void }) => {
+  const isHydraulic = data.type === 'hydraulic';
   return (
     <div className="space-y-6">
       <div className="rounded-sm border border-outline-variant/20 bg-surface-container-low p-6">
@@ -42,6 +43,7 @@ export const GlobalProjectModule = ({ data, onChange }: { data: ProjectData, onC
             <select 
               value={data.suspension}
               onChange={(e) => onChange({ suspension: e.target.value as any })}
+              disabled={isHydraulic}
               className="w-full bg-surface-container-lowest border border-outline-variant/20 rounded-sm px-3 py-2 text-sm focus:ring-1 focus:ring-primary outline-none"
             >
               <option value="1:1">1:1</option>
@@ -51,11 +53,13 @@ export const GlobalProjectModule = ({ data, onChange }: { data: ProjectData, onC
           </div>
           <LiftField label="Rated Load (Q)" name="ratedLoad" unit="kg" data={data} onChange={onChange} min={50} max={5000} required suggestion="Rated load defines the minimum car area and safety gear capacity." />
           <LiftField label="Car Mass (P)" name="carMass" unit="kg" data={data} onChange={onChange} min={100} max={8000} required suggestion="Car mass includes sling, cabin, and accessories." />
-          <LiftField label="Rated Speed (v)" name="speed" unit="m/s" data={data} onChange={onChange} min={0.1} max={10} step={0.1} required suggestion="Speed determines buffer type and safety gear requirements." />
+          <LiftField label="Rated Speed (v)" name="speed" unit="m/s" data={data} onChange={onChange} min={0.1} max={isHydraulic ? 1.0 : 10} step={0.1} required suggestion={isHydraulic ? 'Hydraulic flow is capped at 1.0 m/s in this workspace.' : 'Speed determines buffer type and safety gear requirements.'} />
           <div className="rounded-sm border border-primary/20 bg-primary/5 p-4">
-            <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-primary">Counterweight Guidance</p>
+            <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-primary">{isHydraulic ? 'Hydraulic Rule' : 'Counterweight Guidance'}</p>
             <p className="mt-2 text-xs leading-relaxed text-on-surface-variant">
-              Counterweight mass is managed in the dedicated <strong>Counterweight</strong> section so balance strategy stays in one place.
+              {isHydraulic
+                ? <>Hydraulic projects in this workspace do not use compensation means and are capped at <strong>1.0 m/s</strong>. Keep the project base aligned with that envelope.</>
+                : <>Counterweight mass is managed in the dedicated <strong>Counterweight</strong> section so balance strategy stays in one place.</>}
             </p>
           </div>
         </InputGroup>

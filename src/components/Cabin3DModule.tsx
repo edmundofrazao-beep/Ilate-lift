@@ -8,6 +8,7 @@ import { downloadFile } from '../lib/exporters';
 import { OBJExporter } from 'three/addons/exporters/OBJExporter.js';
 
 interface Cabin3DProps {
+  projectType?: 'electric' | 'hydraulic';
   width: number;
   depth: number;
   height: number;
@@ -35,18 +36,101 @@ const Handrail = ({ position, width }: { position: [number, number, number]; wid
 
 const ControlPanel = ({ position }: { position: [number, number, number] }) => (
   <group position={position}>
-    <Box args={[0.02, 1.2, 0.3]}>
+    <Box args={[0.03, 1.24, 0.34]} radius={0.01} smoothness={4}>
       <meshStandardMaterial color="#1e293b" metalness={0.8} />
     </Box>
+    <mesh position={[0.02, 0.44, 0]}>
+      <boxGeometry args={[0.01, 0.16, 0.22]} />
+      <meshStandardMaterial color="#0f172a" />
+    </mesh>
     {Array.from({ length: 10 }).map((_, i) => (
-      <mesh key={i} position={[0.015, -0.4 + i * 0.1, 0]} rotation={[0, 0, Math.PI / 2]}>
+      <mesh key={i} position={[0.022, -0.42 + i * 0.095, 0]} rotation={[0, 0, Math.PI / 2]}>
         <cylinderGeometry args={[0.02, 0.02, 0.01, 16]} />
         <meshStandardMaterial color={i === 0 ? '#ef4444' : '#f1f5f9'} emissive={i === 0 ? '#ef4444' : '#000'} emissiveIntensity={0.5} />
       </mesh>
     ))}
-    <mesh position={[0.015, 0.4, 0]}>
-      <planeGeometry args={[0.2, 0.1]} />
-      <meshStandardMaterial color="#0ea5e9" emissive="#0ea5e9" emissiveIntensity={1} />
+    <mesh position={[0.022, 0.4, 0]}>
+      <boxGeometry args={[0.01, 0.12, 0.22]} />
+      <meshStandardMaterial color="#0ea5e9" emissive="#0ea5e9" emissiveIntensity={0.8} />
+    </mesh>
+  </group>
+);
+
+const CabinDoorAssembly = ({ width, height, depth }: { width: number; height: number; depth: number }) => {
+  const openingWidth = width * 0.78;
+  const panelWidth = openingWidth / 2 - 0.02;
+  const panelHeight = height * 0.78;
+  const frameDepth = depth / 2 - 0.015;
+
+  return (
+    <group position={[0, panelHeight / 2 + 0.12, frameDepth]}>
+      <mesh position={[0, 0, -0.02]}>
+        <boxGeometry args={[openingWidth + 0.12, panelHeight + 0.18, 0.035]} />
+        <meshStandardMaterial color="#111827" metalness={0.8} roughness={0.22} />
+      </mesh>
+      <mesh position={[-panelWidth / 2 - 0.015, 0, 0]}>
+        <boxGeometry args={[panelWidth, panelHeight, 0.02]} />
+        <meshStandardMaterial color="#cbd5e1" metalness={0.88} roughness={0.14} />
+      </mesh>
+      <mesh position={[panelWidth / 2 + 0.015, 0, 0]}>
+        <boxGeometry args={[panelWidth, panelHeight, 0.02]} />
+        <meshStandardMaterial color="#dbe4f0" metalness={0.88} roughness={0.14} />
+      </mesh>
+      <mesh position={[-0.03, 0, 0.011]}>
+        <boxGeometry args={[0.01, panelHeight * 0.92, 0.01]} />
+        <meshStandardMaterial color="#64748b" />
+      </mesh>
+      <mesh position={[0.03, 0, 0.011]}>
+        <boxGeometry args={[0.01, panelHeight * 0.92, 0.01]} />
+        <meshStandardMaterial color="#64748b" />
+      </mesh>
+      <mesh position={[0, panelHeight / 2 + 0.06, -0.01]}>
+        <boxGeometry args={[openingWidth + 0.04, 0.06, 0.08]} />
+        <meshStandardMaterial color="#475569" metalness={0.65} roughness={0.28} />
+      </mesh>
+    </group>
+  );
+};
+
+const MirrorPanel = ({ width, height, depth }: { width: number; height: number; depth: number }) => (
+  <group position={[0, height * 0.7, -depth / 2 + 0.028]}>
+    <mesh position={[0, 0, -0.005]}>
+      <boxGeometry args={[width * 0.82, height * 0.42, 0.02]} />
+      <meshStandardMaterial color="#475569" metalness={0.4} roughness={0.35} />
+    </mesh>
+    <mesh>
+      <planeGeometry args={[width * 0.78, height * 0.38]} />
+      <meshStandardMaterial color="#cbd5e1" metalness={1} roughness={0} />
+    </mesh>
+  </group>
+);
+
+const BaseSkirting = ({ width, depth }: { width: number; depth: number }) => (
+  <group position={[0, 0.06, 0]}>
+    <mesh position={[0, 0, -depth / 2 + 0.02]}>
+      <boxGeometry args={[width * 0.96, 0.12, 0.03]} />
+      <meshStandardMaterial color="#64748b" metalness={0.5} roughness={0.4} />
+    </mesh>
+    <mesh position={[-width / 2 + 0.015, 0, 0]} rotation={[0, Math.PI / 2, 0]}>
+      <boxGeometry args={[depth * 0.96, 0.12, 0.03]} />
+      <meshStandardMaterial color="#64748b" metalness={0.5} roughness={0.4} />
+    </mesh>
+    <mesh position={[width / 2 - 0.015, 0, 0]} rotation={[0, Math.PI / 2, 0]}>
+      <boxGeometry args={[depth * 0.96, 0.12, 0.03]} />
+      <meshStandardMaterial color="#64748b" metalness={0.5} roughness={0.4} />
+    </mesh>
+  </group>
+);
+
+const CeilingTray = ({ width, depth, height }: { width: number; depth: number; height: number }) => (
+  <group position={[0, height - 0.04, 0]}>
+    <mesh>
+      <boxGeometry args={[width * 0.94, 0.05, depth * 0.94]} />
+      <meshStandardMaterial color="#e2e8f0" metalness={0.2} roughness={0.3} />
+    </mesh>
+    <mesh position={[0, -0.02, 0]}>
+      <boxGeometry args={[width * 0.72, 0.02, depth * 0.72]} />
+      <meshStandardMaterial color="#0f172a" metalness={0.45} roughness={0.28} />
     </mesh>
   </group>
 );
@@ -86,6 +170,7 @@ const SceneExporter = ({ onExport }: { onExport: (scene: THREE.Scene) => void })
 };
 
 export const Cabin3DModule: React.FC<Cabin3DProps> = ({
+  projectType = 'electric',
   width = 1.2,
   depth = 1.4,
   height = 2.4,
@@ -107,9 +192,11 @@ export const Cabin3DModule: React.FC<Cabin3DProps> = ({
     Handrail: 'EN 81-70: handrail required on at least one side wall, height 900 mm ± 25 mm.',
     'Control Panel': 'EN 81-70: buttons between 900 mm and 1100 mm with tactile and Braille support.',
     Mirror: 'EN 81-70: mirror support for reversing wheelchair users when geometry requires it.',
+    'Door System': 'Two-panel telescopic cabin door with lintel/operator zone and stainless finish, represented here as a more realistic front assembly.',
     'IoT Gateway': 'ISO 8100-20: secure telemetry and encrypted communications path.',
     'Seismic Snags': 'EN 81-77: retaining elements preventing guide-shoe escape during seismic action.',
     'Ventilation Grille': 'Cabin comfort and airflow element, visually integrated into the technical fit-out.',
+    Skirting: 'Protective lower wall skirting and kick zone to make the cabin envelope read more like a physical product.',
   };
 
   const checklist = [
@@ -117,6 +204,7 @@ export const Cabin3DModule: React.FC<Cabin3DProps> = ({
     { label: 'Control device zone', ok: true },
     { label: 'Secure telemetry point', ok: showCybersecurity },
     { label: 'Seismic retainers', ok: showSeismic },
+    ...(projectType === 'hydraulic' ? [{ label: 'Hydraulic service interface', ok: true }] : []),
   ];
 
   return (
@@ -124,9 +212,11 @@ export const Cabin3DModule: React.FC<Cabin3DProps> = ({
       <div className="absolute left-4 top-4 z-10 flex max-w-[320px] flex-col gap-3">
         <div className="rounded border border-white/10 bg-black/80 p-4 shadow-xl backdrop-blur-md">
           <div className="mb-3 flex items-center justify-between gap-3">
-            <h4 className="text-[11px] font-black uppercase tracking-[0.2em] text-primary">Cabin Interior Explorer</h4>
+            <h4 className="text-[11px] font-black uppercase tracking-[0.2em] text-primary">
+              {projectType === 'hydraulic' ? 'Hydraulic Cabin Explorer' : 'Cabin Interior Explorer'}
+            </h4>
             <div className="rounded-full border border-primary/20 bg-primary/10 px-2 py-1 text-[9px] font-black uppercase tracking-[0.18em] text-primary">
-              immersive
+              {projectType === 'hydraulic' ? 'hydraulic mode' : 'immersive'}
             </div>
           </div>
           <div className="space-y-2">
@@ -142,6 +232,12 @@ export const Cabin3DModule: React.FC<Cabin3DProps> = ({
               <Zap size={12} className="text-amber-400" />
               <span className="text-[10px] font-bold uppercase text-white/70">EN 81-77 Seismic</span>
             </div>
+            {projectType === 'hydraulic' && (
+              <div className="flex items-center gap-2">
+                <Sparkles size={12} className="text-primary" />
+                <span className="text-[10px] font-bold uppercase text-white/70">Hydraulic Service Layout</span>
+              </div>
+            )}
           </div>
         </div>
 
@@ -188,7 +284,9 @@ export const Cabin3DModule: React.FC<Cabin3DProps> = ({
             <Layers3 size={12} className="text-primary" />
             <h4 className="text-[11px] font-black uppercase tracking-[0.2em] text-white">Feature Inspector</h4>
           </div>
-          <div className="rounded-full border border-white/10 px-2 py-1 text-[9px] font-black uppercase tracking-[0.16em] text-white/60">Cabin mode</div>
+          <div className="rounded-full border border-white/10 px-2 py-1 text-[9px] font-black uppercase tracking-[0.16em] text-white/60">
+            {projectType === 'hydraulic' ? 'Hydraulic cabin' : 'Cabin mode'}
+          </div>
         </div>
         <div className="space-y-3">
           {checklist.map((item) => (
@@ -203,7 +301,9 @@ export const Cabin3DModule: React.FC<Cabin3DProps> = ({
           ))}
         </div>
         <div className="mt-4 border-t border-white/10 pt-4 text-[10px] leading-relaxed text-white/45">
-          Hover interior components to reveal the associated engineering or compliance note.
+          {projectType === 'hydraulic'
+            ? 'Hydraulic mode keeps the same cabin envelope, but should guide the user through service and safety layout without traction-specific assumptions.'
+            : 'Hover interior components to reveal the associated engineering or compliance note.'}
         </div>
       </div>
 
@@ -240,14 +340,21 @@ export const Cabin3DModule: React.FC<Cabin3DProps> = ({
               <meshStandardMaterial color="#f8fafc" emissive="#fff" emissiveIntensity={0.1} />
             </mesh>
 
+            <CeilingTray width={width} depth={depth} height={height} />
             <CeilingLights width={width} depth={depth} height={height} />
+            <group onPointerOver={() => setHoveredFeature('Door System')} onPointerOut={() => setHoveredFeature(null)}>
+              <CabinDoorAssembly width={width} height={height} depth={depth} />
+            </group>
+            <group onPointerOver={() => setHoveredFeature('Skirting')} onPointerOut={() => setHoveredFeature(null)}>
+              <BaseSkirting width={width} depth={depth} />
+            </group>
 
-            <mesh position={[0, height * 0.5, depth / 2 - 0.02]}>
+            <mesh position={[0, height * 0.5, depth / 2 - 0.045]}>
               <boxGeometry args={[width * 0.78, height * 0.78, 0.03]} />
               <meshStandardMaterial color="#0f172a" metalness={0.65} roughness={0.25} />
             </mesh>
 
-            <mesh position={[0, 0.08, depth / 2 - 0.03]}>
+            <mesh position={[0, 0.08, depth / 2 - 0.05]}>
               <boxGeometry args={[width * 0.92, 0.12, 0.03]} />
               <meshStandardMaterial color="#475569" metalness={0.55} roughness={0.4} />
             </mesh>
@@ -267,10 +374,9 @@ export const Cabin3DModule: React.FC<Cabin3DProps> = ({
             </Html>
 
             {showAccessibility && (
-              <mesh position={[0, height * 0.7, -depth / 2 + 0.03]} onPointerOver={() => setHoveredFeature('Mirror')} onPointerOut={() => setHoveredFeature(null)}>
-                <planeGeometry args={[width * 0.8, height * 0.4]} />
-                <meshStandardMaterial color="#cbd5e1" metalness={1} roughness={0} />
-              </mesh>
+              <group onPointerOver={() => setHoveredFeature('Mirror')} onPointerOut={() => setHoveredFeature(null)}>
+                <MirrorPanel width={width} height={height} depth={depth} />
+              </group>
             )}
 
             {showAccessibility && <Handrail position={[-width / 2 + 0.08, 0.9, 0]} width={depth * 0.8} />}

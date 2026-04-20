@@ -11,62 +11,112 @@ const statusClasses = {
   placeholder: 'bg-surface-container-high text-on-surface-variant border-outline-variant/50',
 };
 
-export const OverviewModule = ({ modules, onSelect }: { modules: ModuleStatus[]; onSelect: (id: string) => void }) => {
+export const OverviewModule = ({ modules, onSelect, workspace = 'electric' }: { modules: ModuleStatus[]; onSelect: (id: string) => void; workspace?: 'electric' | 'hydraulic' }) => {
   const coverage = getCoverageSummary();
   const categories = Array.from(new Set(modules.map((module) => module.category || 'Other')));
   const statusScore = { implemented: 2, partial: 1, placeholder: 0 } as const;
   const highlightedStandards = STANDARDS_REGISTRY.slice(0, 6);
   const highlightedRules = RULES_REGISTRY.slice(0, 4);
 
-  const workflowSections = [
-    {
-      title: 'Project Base',
-      description: 'Set the project assumptions, speed, travel, type and overall lift architecture before touching component checks.',
-      primary: 'global',
-      secondary: ['clearances', 'cwt'],
-    },
-    {
-      title: 'Traction and Suspension',
-      description: 'Close traction setup, sheaves, ropes, discard criteria and suspension compliance as one engineering block.',
-      primary: 'traction-params',
-      secondary: ['sheaves', 'suspension-verify'],
-    },
-    {
-      title: 'Safety Chain',
-      description: 'Work through door locking, safety gear, governor, buffers and safety circuits in the right order.',
-      primary: 'doors',
-      secondary: ['safety', 'osg', 'buffers', 'sil'],
-    },
-    {
-      title: 'Geometry and Final Proof',
-      description: 'Finish shaft, clearances, cabin and output documents only after the core engineering sections are stable.',
-      primary: 'clearances',
-      secondary: ['shaft', 'cabin', 'memory', 'export'],
-    },
-  ];
+  const workflowSections = workspace === 'hydraulic'
+    ? [
+        {
+          title: 'Hydraulic Base',
+          description: 'Set the project assumptions, speed cap, travel and geometry before touching hydraulic proofs and safety checks.',
+          primary: 'global',
+          secondary: ['clearances', 'hydraulic'],
+        },
+        {
+          title: 'Hydraulic Power Chain',
+          description: 'Close cylinder, pressure, buckling, rupture valve and buffer logic as one hydraulic engineering block.',
+          primary: 'hydraulic',
+          secondary: ['rupture-valve', 'buffers'],
+        },
+        {
+          title: 'Safety and Control',
+          description: 'Door locking, safety gear, circuits, alarms and seismic conditions must be aligned before output.',
+          primary: 'doors',
+          secondary: ['safety', 'sil', 'alarms', 'seismic'],
+        },
+        {
+          title: 'Geometry and Output',
+          description: 'Finish shaft, cabin, memory and export only after the hydraulic chain is already coherent.',
+          primary: 'clearances',
+          secondary: ['shaft', 'cabin', 'memory', 'export'],
+        },
+      ]
+    : [
+        {
+          title: 'Project Base',
+          description: 'Set the project assumptions, speed, travel, type and overall lift architecture before touching component checks.',
+          primary: 'global',
+          secondary: ['clearances', 'cwt'],
+        },
+        {
+          title: 'Traction and Suspension',
+          description: 'Close traction setup, sheaves, ropes, discard criteria and suspension compliance as one engineering block.',
+          primary: 'traction-params',
+          secondary: ['sheaves', 'suspension-verify'],
+        },
+        {
+          title: 'Safety Chain',
+          description: 'Work through door locking, safety gear, governor, buffers and safety circuits in the right order.',
+          primary: 'doors',
+          secondary: ['safety', 'osg', 'buffers', 'sil'],
+        },
+        {
+          title: 'Geometry and Final Proof',
+          description: 'Finish shaft, clearances, cabin and output documents only after the core engineering sections are stable.',
+          primary: 'clearances',
+          secondary: ['shaft', 'cabin', 'memory', 'export'],
+        },
+      ];
 
-  const actionQueue = [
-    {
-      title: 'Close project assumptions',
-      detail: 'Confirm project setup before opening the mechanical verification chain.',
-      target: 'global',
-    },
-    {
-      title: 'Finish traction backbone',
-      detail: 'Review traction setup, sheaves and suspension discard logic together.',
-      target: 'traction-params',
-    },
-    {
-      title: 'Close the safety chain',
-      detail: 'Door locking, safety gear, governor, buffers and safety circuits should be aligned before output.',
-      target: 'doors',
-    },
-    {
-      title: 'Generate final memory',
-      detail: 'Only move to calculation memory and PDF when the main sections are already clean.',
-      target: 'memory',
-    },
-  ];
+  const actionQueue = workspace === 'hydraulic'
+    ? [
+        {
+          title: 'Close hydraulic assumptions',
+          detail: 'Confirm hydraulic base setup, speed cap and geometry before opening component verification.',
+          target: 'global',
+        },
+        {
+          title: 'Finish hydraulic chain',
+          detail: 'Review cylinder checks, rupture valve and buffers together.',
+          target: 'hydraulic',
+        },
+        {
+          title: 'Close the safety chain',
+          detail: 'Door locking, safety gear, safety circuits and alarms should be aligned before output.',
+          target: 'doors',
+        },
+        {
+          title: 'Generate final memory',
+          detail: 'Only move to calculation memory and PDF when the hydraulic sections are already clean.',
+          target: 'memory',
+        },
+      ]
+    : [
+        {
+          title: 'Close project assumptions',
+          detail: 'Confirm project setup before opening the mechanical verification chain.',
+          target: 'global',
+        },
+        {
+          title: 'Finish traction backbone',
+          detail: 'Review traction setup, sheaves and suspension discard logic together.',
+          target: 'traction-params',
+        },
+        {
+          title: 'Close the safety chain',
+          detail: 'Door locking, safety gear, governor, buffers and safety circuits should be aligned before output.',
+          target: 'doors',
+        },
+        {
+          title: 'Generate final memory',
+          detail: 'Only move to calculation memory and PDF when the main sections are already clean.',
+          target: 'memory',
+        },
+      ];
 
   const priorityBlocks = [
     {
@@ -119,9 +169,11 @@ export const OverviewModule = ({ modules, onSelect }: { modules: ModuleStatus[];
               Normative Control Layer
             </div>
             <div>
-              <h2 className="text-3xl font-black tracking-tight text-on-surface">ILATE Lift Compliance Cockpit</h2>
+              <h2 className="text-3xl font-black tracking-tight text-on-surface">{workspace === 'hydraulic' ? 'ILATE Hydraulic Compliance Cockpit' : 'ILATE Lift Compliance Cockpit'}</h2>
               <p className="mt-3 max-w-2xl text-sm leading-relaxed text-on-surface-variant">
-                This overview should work as the starting point of the app. The goal is simple: show what to close next, send the user to the right section, and avoid treating the product as a bag of disconnected calculators.
+                {workspace === 'hydraulic'
+                  ? 'This overview is the dedicated hydraulic workspace. It should guide the user through cylinder, valve, safety and geometry checks without inheriting traction noise.'
+                  : 'This overview should work as the starting point of the app. The goal is simple: show what to close next, send the user to the right section, and avoid treating the product as a bag of disconnected calculators.'}
               </p>
             </div>
           </div>
@@ -147,7 +199,9 @@ export const OverviewModule = ({ modules, onSelect }: { modules: ModuleStatus[];
               <span className="text-[11px] font-bold uppercase tracking-[0.2em]">Already Strong</span>
             </div>
             <p className="mt-3 text-sm leading-relaxed text-on-surface-variant">
-              ISO 8100-2 calculations, traction, safety gear, buffers, guide rails and hydraulic logic already exist as active modules.
+              {workspace === 'hydraulic'
+                ? 'Hydraulic checks, rupture-valve logic, buffers, safety gear, guide rails and the documentation stack already exist as active modules.'
+                : 'ISO 8100-2 calculations, traction, safety gear, buffers, guide rails and hydraulic logic already exist as active modules.'}
             </p>
           </div>
           <div className="border border-amber-500/20 bg-amber-950/20 p-4">
@@ -156,7 +210,9 @@ export const OverviewModule = ({ modules, onSelect }: { modules: ModuleStatus[];
               <span className="text-[11px] font-bold uppercase tracking-[0.2em]">Partially Closed</span>
             </div>
             <p className="mt-3 text-sm leading-relaxed text-on-surface-variant">
-              ISO 8100-1, EN 81-28, EN 81-70, EN 81-77 and ISO 8100-33 are present only as fragments and still need rule-driven closure.
+              {workspace === 'hydraulic'
+                ? 'ISO 8100-1, EN 81-28, EN 81-70 and EN 81-77 still need better rule-driven closure inside the hydraulic flow.'
+                : 'ISO 8100-1, EN 81-28, EN 81-70, EN 81-77 and ISO 8100-33 are present only as fragments and still need rule-driven closure.'}
             </p>
           </div>
           <div className="border border-error/20 bg-error-container/20 p-4">
@@ -165,7 +221,9 @@ export const OverviewModule = ({ modules, onSelect }: { modules: ModuleStatus[];
               <span className="text-[11px] font-bold uppercase tracking-[0.2em]">Missing Modes</span>
             </div>
             <p className="mt-3 text-sm leading-relaxed text-on-surface-variant">
-              EN 81-21, EN 81-58 and EN 81-71 still do not exist as project modes, which leaves serious product gaps for constrained and special cases.
+              {workspace === 'hydraulic'
+                ? 'Hydraulic-specific UX and proof flow still need more dedicated coverage, especially for the full power-unit chain and output structure.'
+                : 'EN 81-21, EN 81-58 and EN 81-71 still do not exist as project modes, which leaves serious product gaps for constrained and special cases.'}
             </p>
           </div>
         </div>

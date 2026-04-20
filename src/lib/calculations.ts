@@ -1,7 +1,11 @@
 export function computeLiftCalculations(data: any) {
   const g = 9.81;
   const r = parseInt(data.suspension?.split(':')[0] || '1');
-  const d_eff = data.ropeDiameter * (1 - (data.ropeWearPercentage || 0) / 100);
+  const isBeltSuspension = data.suspensionType === 'belt';
+  const supportCount = isBeltSuspension ? Math.max(data.numBelts || 0, 1) : Math.max(data.numRopes || 0, 1);
+  const nominalDiameter = isBeltSuspension ? Math.max(data.beltThickness || data.ropeDiameter || 1, 1) : Math.max(data.ropeDiameter || 1, 1);
+  const effectiveWear = isBeltSuspension ? 0 : (data.ropeWearPercentage || 0) / 100;
+  const d_eff = nominalDiameter * (1 - effectiveWear);
 
   // Traction Calculations
   const T1_static = ((data.carMass + data.ratedLoad) * g) / r;
@@ -57,24 +61,30 @@ export function computeLiftCalculations(data: any) {
 
   // Ropes
   const Fstatic_total = (data.carMass + data.ratedLoad) * g;
-  const Fstatic_per_rope = data.numRopes > 0 ? Fstatic_total / (r * data.numRopes) : 0;
+  const Fstatic_per_rope = supportCount > 0 ? Fstatic_total / (r * supportCount) : 0;
   const N_equiv = data.numSimpleBends + 4 * data.numReverseBends;
   const Dd = d_eff > 0 ? data.sheaveDiameter / d_eff : 0;
   
-  let sf_required = 12;
-  if (Dd > 0 && N_equiv > 0) {
-    const logN = Math.log10(N_equiv / (2.6834 * Math.pow(10, 6)));
+  let sf_required = isBeltSuspension ? 16 : 12;
+  if (Dd > 1 && N_equiv > 0) {
+    const logN = Math.log10(Math.max(N_equiv / (2.6834 * Math.pow(10, 6)), 1e-12));
     const logDd = Math.log10(Dd);
-    sf_required = Math.pow(10, 2.6834 - (logN / logDd));
+    if (Number.isFinite(logN) && Number.isFinite(logDd) && Math.abs(logDd) > 0.05) {
+      const calculated = Math.pow(10, 2.6834 - (logN / logDd));
+      if (Number.isFinite(calculated) && calculated > 0) {
+        sf_required = Math.min(Math.max(calculated, isBeltSuspension ? 14 : 10), isBeltSuspension ? 40 : 30);
+      }
+    }
   }
-  const sf_actual = Fstatic_per_rope > 0 ? data.ropeBreakingLoad / Fstatic_per_rope : 0;
+  const elementBreakingLoad = isBeltSuspension ? Math.max(data.beltTensileStrength || data.ropeBreakingLoad || 0, 0) : Math.max(data.ropeBreakingLoad || 0, 0);
+  const sf_actual = Fstatic_per_rope > 0 ? elementBreakingLoad / Fstatic_per_rope : 0;
   const isSfOk = sf_actual >= sf_required;
 
   // ISO 4344 Minimum Breaking Load (Fmin)
   // K is fill factor (0.356 typical for 8x19 steel core rope)
   const K = 0.356;
-  const iso4344_Fmin = K * Math.pow(data.ropeDiameter, 2) * (data.ropeGrade || 1770);
-  const isBreakingLoadOk = data.ropeBreakingLoad >= iso4344_Fmin;
+  const iso4344_Fmin = isBeltSuspension ? 0 : K * Math.pow(data.ropeDiameter, 2) * (data.ropeGrade || 1770);
+  const isBreakingLoadOk = isBeltSuspension ? elementBreakingLoad > 0 : data.ropeBreakingLoad >= iso4344_Fmin;
 
   // Guide Rails
   const lambda = (data.bracketDist) / data.railIyRadius;
@@ -142,6 +152,8 @@ export function computeLiftCalculations(data: any) {
     },
     ropes: {
       Fstatic_total, Fstatic_per_rope, N_equiv, Dd, sf_required, sf_actual, isSfOk,
+      supportCount,
+      isBeltSuspension,
       iso4344_Fmin, isBreakingLoadOk
     },
     guideRails: {

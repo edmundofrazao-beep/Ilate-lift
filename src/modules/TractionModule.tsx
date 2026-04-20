@@ -8,7 +8,8 @@ import { computeLiftCalculations } from '../lib/calculations';
 
 export const TractionModule = ({ data, onChange, view = 'all' }: { data: ProjectData, onChange: (newData: Partial<ProjectData>) => void, view?: 'all' | 'params' | 'verify' }) => {
   const calc = computeLiftCalculations(data);
-  const { T1_static, ratio_static, ratio_dynamic, isOk, DdRatio, p_groove, p_allow, expMuAlpha } = calc.traction;
+  const { ratio_static, ratio_dynamic, isOk, p_groove, p_allow, expMuAlpha } = calc.traction;
+  const isBeltSuspension = data.suspensionType === 'belt';
   
   return (
     <div className="space-y-8">
@@ -23,6 +24,11 @@ export const TractionModule = ({ data, onChange, view = 'all' }: { data: Project
                   {isOk ? 'Compliant' : 'Non-Compliant'}
                 </span>
               </h3>
+              {isBeltSuspension && (
+                <div className="mb-6 rounded-sm border border-primary/20 bg-primary/5 p-4 text-xs leading-relaxed text-on-surface-variant">
+                  Belt suspension is active. This page keeps the traction proof visible, but groove geometry and discard logic must now be read together with belt-specific fields in suspension and sheave setup.
+                </div>
+              )}
               
               <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                 <div className="space-y-4">
@@ -59,7 +65,7 @@ export const TractionModule = ({ data, onChange, view = 'all' }: { data: Project
                 <div className="flex flex-wrap items-center gap-3">
                   <span className="text-[10px] font-bold uppercase tracking-[0.18em] text-primary">4.11 Core Checks</span>
                   <code className="text-xs font-bold text-on-surface">T1/T2 ≤ e^(f·α)</code>
-                  <code className="text-xs font-bold text-on-surface">p = (T1 + T2) / (n·d·D·sin(γ/2))</code>
+                  <code className="text-xs font-bold text-on-surface">{isBeltSuspension ? 'p = interface pressure check for belt/sheave set' : 'p = (T1 + T2) / (n·d·D·sin(γ/2))'}</code>
                 </div>
               </div>
             </div>
@@ -98,6 +104,14 @@ export const TractionModule = ({ data, onChange, view = 'all' }: { data: Project
                     <LiftField label="Groove Angle (γ)" name="grooveAngle" unit="deg" data={data} onChange={onChange} min={30} max={60} required suggestion="Smaller groove angle increases friction but also rope wear." />
                     <LiftField label="Undercut Angle (β)" name="undercutAngle" unit="deg" data={data} onChange={onChange} min={0} max={105} required />
                   </>
+                )}
+                {data.suspensionType === 'belt' && (
+                  <div className="rounded-sm border border-primary/20 bg-primary/5 p-4 md:col-span-2">
+                    <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-primary">Belt interface mode</p>
+                    <p className="mt-2 text-xs leading-relaxed text-on-surface-variant">
+                      Groove angle and undercut are hidden because the selected suspension is belt-based. Tune belt thickness, count and tensile strength in <strong>Suspension Setup</strong>, then use <strong>Sheaves and Grooves</strong> to close the compatible sheave geometry.
+                    </p>
+                  </div>
                 )}
               </div>
             </div>

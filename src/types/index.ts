@@ -185,6 +185,8 @@ export interface ModuleStatus {
   category?: string;
 }
 
+export type ProjectFieldName = keyof ProjectData;
+
 export interface StandardDefinition {
   id: string;
   title: string;

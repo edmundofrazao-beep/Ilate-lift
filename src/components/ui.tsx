@@ -67,9 +67,9 @@ export const LiftField = ({
   const isInvalid = !!error && !disabled;
 
   return (
-    <div className={`space-y-1 group ${disabled ? 'opacity-50' : ''}`}>
+    <div data-field={String(name)} className={`space-y-1 group scroll-mt-28 ${disabled ? 'opacity-50' : ''}`}>
       <div className="flex justify-between items-center">
-        <label className="text-[11px] font-bold text-on-surface-variant uppercase flex items-center gap-1.5">
+        <label htmlFor={`field-${String(name)}`} className="text-[11px] font-bold text-on-surface-variant uppercase flex items-center gap-1.5">
           {label}
           {isInvalid && <AlertCircle size={10} className="text-error" />}
         </label>
@@ -77,6 +77,7 @@ export const LiftField = ({
       </div>
       <div className="relative">
         <input 
+          id={`field-${String(name)}`}
           type={type}
           disabled={disabled}
           step={step}
@@ -169,4 +170,3 @@ export const CollapsibleSection = ({ title, children, icon: Icon }: { title: str
     </div>
   );
 };
-

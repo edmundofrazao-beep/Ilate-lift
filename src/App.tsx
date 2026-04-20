@@ -20,6 +20,7 @@ import { OverspeedGovernorModule } from './modules/OverspeedGovernorModule';
 import { TractionSheavesModule } from './modules/TractionSheavesModule';
 import { CounterweightModule } from './modules/CounterweightModule';
 import { CybersecurityModule } from './modules/CybersecurityModule';
+import { CompensationModule } from './modules/CompensationModule';
 
 /**
  * @license
@@ -99,11 +100,13 @@ import { safeNumber, formatNumber, degToRad, InputGroup, LiftField, SliderField,
 
 export default function App() {
   const [activeTab, setActiveTab] = useState('overview');
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [isValidationOpen, setIsValidationOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isHelpOpen, setIsHelpOpen] = useState(false);
   const [validationResults, setValidationResults] = useState<ValidationResult[]>([]);
   const [validationModalTitle, setValidationModalTitle] = useState('Project Validation Results');
+  const [pendingFocusField, setPendingFocusField] = useState<string | null>(null);
   const [projectData, setProjectData] = useState<ProjectData>({
     type: 'electric',
     suspension: '2:1',
@@ -272,6 +275,20 @@ export default function App() {
   const handleDataChange = (newData: Partial<ProjectData>) => {
     setProjectData(prev => {
       const merged = { ...prev, ...newData };
+      if ('type' in newData && newData.type === 'hydraulic') {
+        merged.speed = Math.min(merged.speed, 1.0);
+        merged.compensationType = 'none';
+        merged.suspensionType = 'wire-rope';
+        merged.suspension = '1:1';
+        merged.cwtMass = 0;
+        merged.balanceRatio = 0;
+      }
+      if (merged.type === 'hydraulic') {
+        merged.speed = Math.min(merged.speed, 1.0);
+        merged.compensationType = 'none';
+        merged.cwtMass = 0;
+        merged.balanceRatio = 0;
+      }
       // Enforce physical constraints: Cabin cannot exceed shaft minus 200mm for clearances
       // If expanding the cabin, grow the shaft automatically.
       if ('carWidth' in newData && merged.carWidth > merged.shaftWidth - 200) {
@@ -291,12 +308,26 @@ export default function App() {
     });
   };
 
+  useEffect(() => {
+    if (!pendingFocusField) return;
+    const target = document.querySelector(`[data-field="${pendingFocusField}"]`) as HTMLElement | null;
+    if (target) {
+      target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      const input = target.querySelector('input, select, textarea') as HTMLElement | null;
+      input?.focus();
+    }
+    setPendingFocusField(null);
+  }, [activeTab, pendingFocusField]);
+
   const getValidationResults = (data: ProjectData) => {
     const calc = computeLiftCalculations(data);
     const results: ValidationResult[] = [];
     
+    const isElectric = data.type === 'electric';
+    const isHydraulic = data.type === 'hydraulic';
+
     // Traction Check (Dynamic and Static conditions from ISO 8100)
-    if (!calc.traction.isOk) {
+    if (isElectric && !calc.traction.isOk) {
       results.push({ 
         type: 'error', 
         msg: `Traction condition fails (T1/T2 > e^(f*α)). Check wrap angle or equivalent friction.`,
@@ -306,7 +337,7 @@ export default function App() {
       });
     }
 
-    if (calc.traction.p_groove > calc.traction.p_allow) {
+    if (isElectric && calc.traction.p_groove > calc.traction.p_allow) {
       results.push({
         type: 'warning',
         msg: `Specific groove pressure (${calc.traction.p_groove.toFixed(2)} MPa) exceeds allowance (${calc.traction.p_allow.toFixed(2)} MPa).`,
@@ -317,30 +348,37 @@ export default function App() {
     }
     
     // Safety Factor Check
-    if (!calc.ropes.isSfOk) {
+    if (isElectric && !calc.ropes.isSfOk) {
       results.push({ 
         type: 'error', 
         msg: `Rope safety factor (${calc.ropes.sf_actual.toFixed(1)}) is below normative limit (${calc.ropes.sf_required.toFixed(1)}).`,
         moduleId: 'suspension-verify',
-        actionLabel: 'Add Rope',
-        onAction: () => handleDataChange({ numRopes: data.numRopes + 1 })
+        fieldName: data.suspensionType === 'belt' ? 'numBelts' : 'numRopes',
+        actionLabel: data.suspensionType === 'belt' ? 'Add Belt' : 'Add Rope',
+        onAction: () => handleDataChange(
+          data.suspensionType === 'belt'
+            ? { numBelts: data.numBelts + 1 }
+            : { numRopes: data.numRopes + 1 }
+        )
       });
     }
 
-    if (data.ropeWearPercentage >= 6) {
+    if (isElectric && data.ropeWearPercentage >= 6) {
       results.push({
         type: 'warning',
         msg: `Rope diameter reduction (${data.ropeWearPercentage.toFixed(1)}%) reached the discard review threshold.`,
-        moduleId: 'suspension-verify'
+        moduleId: 'suspension-verify',
+        fieldName: 'ropeWearPercentage'
       });
     }
     
     // OSG Braking Force Check
-    if (data.osgMaxBrakingForce < data.osgTensileForce) {
+    if (isElectric && data.osgMaxBrakingForce < data.osgTensileForce) {
       results.push({
         type: 'error',
         msg: `OSG Max Braking Force (${data.osgMaxBrakingForce}N) is less than Tensile Force (${data.osgTensileForce}N).`,
         moduleId: 'osg',
+        fieldName: 'osgMaxBrakingForce',
         actionLabel: 'Match Braking Force',
         onAction: () => handleDataChange({ osgMaxBrakingForce: data.osgTensileForce })
       });
@@ -352,6 +390,7 @@ export default function App() {
         type: 'warning', 
         msg: 'Bracket distance exceeds 3000mm. Verify buckling stability.',
         moduleId: 'rails-verify',
+        fieldName: 'bracketDist',
         actionLabel: 'Reduce to 2500mm',
         onAction: () => handleDataChange({ bracketDist: 2500 })
       });
@@ -363,6 +402,7 @@ export default function App() {
         type: 'error', 
         msg: 'Energy accumulation buffers are only allowed for speeds ≤ 1.0 m/s.',
         moduleId: 'buffers',
+        fieldName: 'bufferType',
         actionLabel: 'Change to Dissipation',
         onAction: () => handleDataChange({ bufferType: 'energy-dissipation' })
       });
@@ -370,11 +410,12 @@ export default function App() {
 
     // ACOP Check
     const maxAcop = 1.15 * data.speed + 0.25;
-    if (data.acopTrippingSpeed > maxAcop) {
+    if (isElectric && data.acopTrippingSpeed > maxAcop) {
       results.push({ 
         type: 'error', 
         msg: `ACOP tripping speed (${data.acopTrippingSpeed}m/s) exceeds normative limit (${maxAcop.toFixed(2)}m/s).`,
         moduleId: 'acop-ucmp',
+        fieldName: 'acopTrippingSpeed',
         actionLabel: 'Set to Max Limit',
         onAction: () => handleDataChange({ acopTrippingSpeed: parseFloat(maxAcop.toFixed(2)) })
       });
@@ -384,7 +425,8 @@ export default function App() {
       results.push({
         type: 'warning',
         msg: 'Door locking verification is incomplete for 4.2 mechanical or electrical conditions.',
-        moduleId: 'doors'
+        moduleId: 'doors',
+        fieldName: data.doorLockingForce < 1000 ? 'doorLockingForce' : data.doorMinimumEngagement < 7 ? 'doorMinimumEngagement' : 'doorElectricalSafetyCheck'
       });
     }
 
@@ -396,8 +438,87 @@ export default function App() {
       results.push({
         type: 'warning',
         msg: 'Safety circuits evidence is incomplete for the selected SIL target.',
-        moduleId: 'sil'
+        moduleId: 'sil',
+        fieldName: pfh > silMax ? 'failureRate' : data.diagnosticCoverage < minDc ? 'diagnosticCoverage' : 'faultTolerance'
       });
+    }
+
+    const compensationReviewRequired = isElectric && (data.speed >= 2.5 || data.travel >= 45);
+    if (compensationReviewRequired && data.compensationType === 'none') {
+      results.push({
+        type: 'warning',
+        msg: 'Compensation means should be reviewed for the current speed/travel envelope.',
+        moduleId: 'compensation',
+        fieldName: 'compensationType'
+      });
+    }
+
+    if (isHydraulic) {
+      const hydraulicLoad = (data.carMass + data.ratedLoad) * 9.81 * 1.4;
+      const hydraulicInternalDiameter = data.ramDiameter + 10;
+      const hydraulicRequiredWallThickness = ((2.3 * 1.7 * data.maxPressure) / Math.max(data.materialYield, 1)) * (hydraulicInternalDiameter / 2) + 0.5;
+      const hydraulicEulerBuckling = (Math.PI * Math.PI * data.materialE * ((Math.PI * Math.pow(data.ramDiameter, 4)) / 64)) / Math.max(Math.pow(data.ramLength, 2), 1);
+
+      if (data.speed > 1.0) {
+        results.push({
+          type: 'error',
+          msg: `Hydraulic configuration cannot remain at ${data.speed.toFixed(2)} m/s. Limit this project to 1.0 m/s or below.`,
+          moduleId: 'global',
+          fieldName: 'speed',
+          actionLabel: 'Clamp to 1.0 m/s',
+          onAction: () => handleDataChange({ speed: 1.0 })
+        });
+      }
+      if (data.compensationType !== 'none') {
+        results.push({
+          type: 'warning',
+          msg: 'Compensation means are not expected in the current hydraulic configuration.',
+          moduleId: 'global',
+          fieldName: 'compensationType',
+          actionLabel: 'Clear Compensation',
+          onAction: () => handleDataChange({ compensationType: 'none' })
+        });
+      }
+      if (data.cwtMass > 0) {
+        results.push({
+          type: 'warning',
+          msg: 'Hydraulic configuration still carries counterweight data. Review project base assumptions.',
+          moduleId: 'global',
+          fieldName: 'type'
+        });
+      }
+      if (data.cylinderWallThickness < hydraulicRequiredWallThickness) {
+        results.push({
+          type: 'error',
+          msg: `Cylinder wall thickness (${data.cylinderWallThickness.toFixed(2)} mm) is below the current hydraulic requirement (${hydraulicRequiredWallThickness.toFixed(2)} mm).`,
+          moduleId: 'hydraulic',
+          fieldName: 'cylinderWallThickness'
+        });
+      }
+      if (hydraulicLoad >= hydraulicEulerBuckling / 2) {
+        results.push({
+          type: 'error',
+          msg: 'Ram buckling check is not closed for the current hydraulic load and ram length.',
+          moduleId: 'hydraulic',
+          fieldName: 'ramLength'
+        });
+      }
+      if (data.ruptureValveFlow <= 0) {
+        results.push({
+          type: 'warning',
+          msg: 'Rupture valve tripping flow is still undefined for the hydraulic safety chain.',
+          moduleId: 'rupture-valve',
+          fieldName: 'ruptureValveFlow'
+        });
+      }
+      if (data.ruptureValvePressure < data.maxPressure * 1.5) {
+        results.push({
+          type: 'warning',
+          msg: `Rupture valve pressure (${data.ruptureValvePressure.toFixed(2)} MPa) should stay at or above 1.5x the operating pressure (${(data.maxPressure * 1.5).toFixed(2)} MPa).`,
+          moduleId: 'rupture-valve',
+          fieldName: 'ruptureValvePressure'
+        });
+      }
     }
 
     return results;
@@ -417,10 +538,11 @@ export default function App() {
       buffers: ['buffers'],
       'acop-ucmp': ['acop-ucmp'],
       sil: ['sil'],
+      'rupture-valve': ['hydraulic', 'rupture-valve'],
       'rails-params': ['rails-verify'],
       'rails-forces': ['rails-verify'],
       'rails-verify': ['rails-verify'],
-      hydraulic: ['hydraulic'],
+      hydraulic: ['hydraulic', 'rupture-valve', 'buffers'],
       clearances: ['clearances', 'shaft'],
       shaft: ['shaft', 'clearances'],
       cabin: ['cabin', 'doors'],
@@ -449,7 +571,7 @@ export default function App() {
     return allValidationResults.filter(result => result.moduleId && scopedIds.has(result.moduleId));
   }, [activeTab, allValidationResults]);
 
-  const modules: ModuleStatus[] = [
+  const electricModules: ModuleStatus[] = [
     // Project Definition
     { id: 'overview', label: 'Overview', icon: LayoutDashboard, status: 'implemented', category: 'Project Setup' },
     { id: 'global', label: 'Project Parameters (4.1)', icon: Globe, status: 'implemented', category: 'Project Setup' },
@@ -503,6 +625,36 @@ export default function App() {
     { id: 'export', label: 'PDF Export', icon: FileText, status: 'implemented', category: 'Tools and Documentation' },
   ];
 
+  const hydraulicModules: ModuleStatus[] = [
+    { id: 'overview', label: 'Hydraulic Overview', icon: LayoutDashboard, status: 'implemented', category: 'Project Setup' },
+    { id: 'global', label: 'Project Parameters (4.1)', icon: Globe, status: 'implemented', category: 'Project Setup' },
+    { id: 'hydraulic', label: 'Hydraulic Core (4.15)', icon: Droplets, status: 'implemented', category: 'Hydraulic Systems' },
+    { id: 'rupture-valve', label: 'Rupture Valve (4.9)', icon: ShieldAlert, status: 'implemented', category: 'Hydraulic Systems' },
+    { id: 'doors', label: 'Door Locking (4.2)', icon: Lock, status: 'implemented', category: 'Cabin and Car' },
+    { id: 'safety', label: 'Safety Gear (4.3)', icon: ShieldCheck, status: 'implemented', category: 'Safety Components' },
+    { id: 'buffers', label: 'Buffers (4.5)', icon: Box, status: 'implemented', category: 'Safety Components' },
+    { id: 'sil', label: 'Safety Circuits (4.6)', icon: Zap, status: 'implemented', category: 'Control and Electronics' },
+    { id: 'alarms', label: 'Remote Alarms (EN 81-28)', icon: Bell, status: 'implemented', category: 'Control and Electronics' },
+    { id: 'seismic', label: 'Seismic (EN 81-77)', icon: Zap, status: 'implemented', category: 'Control and Electronics' },
+    { id: 'cybersecurity', label: 'Cybersecurity (ISO 8100-20)', icon: Lock, status: 'implemented', category: 'Control and Electronics' },
+    { id: 'clearances', label: 'Clearances (ISO 8100-1)', icon: Ruler, status: 'implemented', category: 'Hoistway and Geometry' },
+    { id: 'shaft', label: '3D Shaft', icon: Box, status: 'implemented', category: 'Hoistway and Geometry' },
+    { id: 'cabin', label: '3D Cabin', icon: Maximize2, status: 'implemented', category: 'Cabin and Car' },
+    { id: 'library', label: 'Component Library', icon: Library, status: 'implemented', category: 'Tools and Documentation' },
+    { id: 'formulas', label: 'Formula Library', icon: Calculator, status: 'implemented', category: 'Tools and Documentation' },
+    { id: 'memory', label: 'Calculation Memory', icon: History, status: 'implemented', category: 'Tools and Documentation' },
+    { id: 'export', label: 'PDF Export', icon: FileText, status: 'implemented', category: 'Tools and Documentation' },
+  ];
+
+  const modules = useMemo(() => (projectData.type === 'hydraulic' ? hydraulicModules : electricModules), [projectData.type]);
+  const visibleModules = modules;
+
+  useEffect(() => {
+    if (!visibleModules.some((module) => module.id === activeTab)) {
+      setActiveTab(projectData.type === 'hydraulic' ? 'hydraulic' : 'overview');
+    }
+  }, [activeTab, projectData.type, visibleModules]);
+
   const activeSectionStatus = activeSectionResults.some(result => result.type === 'error')
     ? { label: 'attention', tone: 'text-error bg-error-container/10 border-error/20' }
     : activeSectionResults.some(result => result.type === 'warning')
@@ -525,7 +677,7 @@ export default function App() {
 
   const renderContent = () => {
     switch (activeTab) {
-      case 'overview': return <OverviewModule modules={modules} onSelect={setActiveTab} />;
+      case 'overview': return <OverviewModule modules={modules} onSelect={setActiveTab} workspace={projectData.type} />;
       case 'global': return <GlobalProjectModule data={projectData} onChange={handleDataChange} />;
       
       case 'traction-verify': return <TractionModule data={projectData} onChange={handleDataChange} view="verify" />;
@@ -537,7 +689,7 @@ export default function App() {
       case 'suspension-params': return <RopesModule data={projectData} onChange={handleDataChange} view="params" />;
       case 'suspension-verify': return <RopesModule data={projectData} onChange={handleDataChange} view="verify" />;
       case 'suspension': return <RopesModule data={projectData} onChange={handleDataChange} view="all" />; // Fallback
-      case 'compensation': return <div className="p-8 text-center text-on-surface-variant font-bold border border-dashed border-outline-variant/30 rounded-sm bg-surface-container-low">Compensation module coming soon (analyzes lift mass, height, speed via ISO 8100 limits).</div>;
+      case 'compensation': return <CompensationModule data={projectData} onChange={handleDataChange} />;
       case 'cybersecurity': return <CybersecurityModule data={projectData} onChange={handleDataChange} />;
 
       // Safety Systems
@@ -559,7 +711,8 @@ export default function App() {
       case 'cwt': return <CounterweightModule data={projectData} onChange={handleDataChange} />;
       
       case 'sling': return <SlingModule data={projectData} onChange={handleDataChange} />;
-      case 'hydraulic': return <HydraulicModule data={projectData} />;
+      case 'hydraulic': return <HydraulicModule data={projectData} onChange={handleDataChange} />;
+      case 'rupture-valve': return <RuptureValveModule data={projectData} onChange={handleDataChange} />;
       case 'seismic': return <SeismicModule data={projectData} onChange={handleDataChange} />;
       case 'doors': return <SafetyComponentsModule data={projectData} onChange={handleDataChange} section="doors" />;
       
@@ -574,6 +727,8 @@ export default function App() {
           <div className="bg-surface-container-low p-6 rounded-sm border border-outline-variant/10">
             <h3 className="text-xl font-black uppercase tracking-tighter mb-4">3D Shaft Geometry Explorer</h3>
               <Shaft3DModule 
+              projectType={projectData.type}
+              onPresetSelect={handleDataChange}
               width={projectData.shaftWidth}
               depth={projectData.shaftDepth}
               height={projectData.shaftHeight}
@@ -622,6 +777,7 @@ export default function App() {
           <div className="bg-surface-container-low p-6 rounded-sm border border-outline-variant/10">
             <h3 className="text-xl font-black uppercase tracking-tighter mb-4">3D Cabin Interior Explorer</h3>
             <Cabin3DModule 
+              projectType={projectData.type}
               width={projectData.carWidth / 1000}
               depth={projectData.carDepth / 1000}
               height={projectData.carHeight / 1000}
@@ -674,19 +830,30 @@ export default function App() {
   return (
     <div className="flex h-screen overflow-hidden bg-surface text-on-surface font-sans">
       {/* Sidebar */}
-      <aside className="fixed left-0 top-0 h-full flex flex-col py-4 gap-1 z-40 w-64 border-r border-outline-variant/50 bg-surface-container overflow-y-auto no-scrollbar">
+      <aside className={`fixed left-0 top-0 h-full flex flex-col py-4 gap-1 z-40 border-r border-outline-variant/50 bg-surface-container overflow-y-auto no-scrollbar transition-all duration-200 ${isSidebarCollapsed ? 'w-20' : 'w-64'}`}>
         <div className="px-6 mb-8">
-          <h1 className="text-xl font-black text-primary uppercase tracking-tighter">ILATE</h1>
-          <p className="text-[10px] text-on-surface-variant font-semibold tracking-widest uppercase mt-1">Operational Cockpit</p>
+          <div className="flex items-center justify-between gap-2">
+            <div className={isSidebarCollapsed ? 'hidden' : 'block'}>
+              <h1 className="text-xl font-black text-primary uppercase tracking-tighter">ILATE</h1>
+              <p className="mt-1 text-[10px] font-semibold uppercase tracking-widest text-on-surface-variant">Operational Cockpit</p>
+            </div>
+            <button
+              onClick={() => setIsSidebarCollapsed((prev) => !prev)}
+              className="rounded-sm border border-outline-variant/20 p-2 text-on-surface-variant transition-colors hover:text-primary"
+              title={isSidebarCollapsed ? 'Expand navigation' : 'Collapse navigation'}
+            >
+              <ChevronRight size={14} className={`transition-transform ${isSidebarCollapsed ? '' : 'rotate-180'}`} />
+            </button>
+          </div>
         </div>
         
         <nav className="flex-1 flex flex-col gap-4">
-          {Array.from(new Set(modules.map(m => m.category || 'Other'))).map(category => (
+          {Array.from(new Set(visibleModules.map(m => m.category || 'Other'))).map(category => (
             <div key={category} className="flex flex-col gap-0.5">
-              <h3 className="px-6 py-1 text-[10px] font-bold tracking-widest text-on-surface-variant uppercase opacity-70">
+              <h3 className={`px-6 py-1 text-[10px] font-bold tracking-widest text-on-surface-variant uppercase opacity-70 ${isSidebarCollapsed ? 'hidden' : ''}`}>
                 {category}
               </h3>
-              {modules.filter(m => (m.category || 'Other') === category).map((item) => (
+              {visibleModules.filter(m => (m.category || 'Other') === category).map((item) => (
                 <button
                   key={item.id}
                   onClick={() => setActiveTab(item.id)}
@@ -697,7 +864,7 @@ export default function App() {
                   }`}
                 >
                   <item.icon size={14} className={activeTab === item.id ? 'text-primary' : 'text-on-surface-variant opacity-70 group-hover:opacity-100 group-hover:text-primary'} />
-                  <span className="text-[11px] font-medium uppercase tracking-wider">{item.label}</span>
+                  <span className={`text-[11px] font-medium uppercase tracking-wider ${isSidebarCollapsed ? 'hidden' : ''}`}>{item.label}</span>
                 </button>
               ))}
             </div>
@@ -716,13 +883,15 @@ export default function App() {
       </aside>
       
       {/* Main Content */}
-      <main className="ml-64 flex-1 flex flex-col h-full overflow-hidden bg-surface">
+      <main className={`${isSidebarCollapsed ? 'ml-20' : 'ml-64'} flex-1 flex flex-col h-full overflow-hidden bg-surface transition-all duration-200`}>
         {/* Header */}
         <header className="flex justify-between items-center w-full px-8 h-14 bg-surface-container-highest sticky top-0 z-50 border-b border-outline-variant/50">
           <div className="flex items-center gap-6">
-            <span className="text-sm font-bold tracking-widest text-primary uppercase">ISO 8100 ENGINE</span>
+            <span className="text-sm font-bold tracking-widest text-primary uppercase">
+              {projectData.type === 'hydraulic' ? 'ISO 8100 HYDRAULIC' : 'ISO 8100 ENGINE'}
+            </span>
             <div className="h-4 w-px bg-outline-variant" />
-            <span className="text-xs font-bold text-on-surface-variant uppercase tracking-widest">{modules.find(m => m.id === activeTab)?.label}</span>
+            <span className="text-xs font-bold text-on-surface-variant uppercase tracking-widest">{visibleModules.find(m => m.id === activeTab)?.label || modules.find(m => m.id === activeTab)?.label}</span>
             <span className={`hidden lg:inline-flex items-center rounded-full border px-3 py-1 text-[10px] font-black uppercase tracking-[0.16em] ${activeSectionStatus.tone}`}>
               {activeSectionStatus.label}
               {activeSectionResults.length > 0 ? ` · ${activeSectionResults.length}` : ' · 0'}
@@ -783,7 +952,7 @@ export default function App() {
                     <p className="text-[10px] font-black uppercase tracking-[0.2em] opacity-80">Section Validation</p>
                     <h3 className="mt-1 text-lg font-black tracking-tight">{activeSectionLabel}</h3>
                     <p className="mt-2 text-sm opacity-80">
-                      {`${activeSectionResults.length} validation point${activeSectionResults.length > 1 ? 's' : ''} detected in this section. Resolve them here before moving on.`}
+                     {`${activeSectionResults.length} validation point${activeSectionResults.length > 1 ? 's' : ''} detected in this section. Resolve them here before moving on.`}
                     </p>
                   </div>
                   <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
@@ -818,8 +987,10 @@ export default function App() {
         {/* Footer */}
         <footer className="h-10 bg-surface-container-highest border-t border-outline-variant/50 px-8 flex items-center justify-between text-[10px] text-on-surface-variant font-medium shrink-0 uppercase tracking-widest">
           <div className="flex gap-6">
-            <span>ISO 8100-2:2026 Engine v1.0.4</span>
-            <span className="text-primary opacity-80">Workspace: Global Project Alpha-7</span>
+            <span>{projectData.type === 'hydraulic' ? 'ISO 8100-2:2026 Hydraulic Workspace v1.0.4' : 'ISO 8100-2:2026 Engine v1.0.4'}</span>
+            <span className="text-primary opacity-80">
+              Workspace: {projectData.type === 'hydraulic' ? 'Hydraulic Project Workspace' : 'Traction Project Workspace'}
+            </span>
           </div>
           <div className="flex gap-4 items-center">
             <span className="flex items-center gap-1">
@@ -827,7 +998,7 @@ export default function App() {
               All Calculations Valid
             </span>
             <span className="bg-primary border border-primary-dim px-2 py-0.5 text-surface-container-lowest font-bold">
-              ILATE ENTERPRISE
+              {projectData.type === 'hydraulic' ? 'ILATE HYDRAULIC' : 'ILATE ENTERPRISE'}
             </span>
           </div>
         </footer>
@@ -838,6 +1009,7 @@ export default function App() {
         onClose={() => setIsValidationOpen(false)} 
         results={validationResults} 
         onNavigate={setActiveTab}
+        onFocusField={(fieldName) => setPendingFocusField(fieldName)}
         title={validationModalTitle}
       />
 
@@ -857,7 +1029,7 @@ export default function App() {
           </div>
           <div className="flex items-center justify-between">
             <span className="text-xs font-medium">Language</span>
-            <span className="text-xs font-bold">English (US)</span>
+            <span className="text-xs font-bold">Portuguese-ready / English UI</span>
           </div>
         </div>
       </SimpleModal>
@@ -869,10 +1041,10 @@ export default function App() {
       >
         <div className="space-y-4 text-xs leading-relaxed opacity-80">
           <p>This tool follows the <strong>ISO 8100-2:2026</strong> standard for elevator component verification.</p>
-          <p>For technical support or feature requests, contact the engineering department at <code>support@liftcalc.eng</code>.</p>
+          <p>For technical support or feature requests, contact the engineering team at <code>info@ilate.pt</code>.</p>
           <div className="p-3 bg-primary/5 border border-primary/10 rounded-sm">
             <p className="font-bold text-primary mb-1 uppercase tracking-tighter">Documentation</p>
-            <p>Full technical documentation is available in the internal engineering portal.</p>
+            <p>Project guidance, engineering notes and evolving implementation coverage should be exposed directly inside the ILATE workspace instead of a hidden external portal.</p>
           </div>
         </div>
       </SimpleModal>

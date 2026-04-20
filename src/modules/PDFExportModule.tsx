@@ -1,5 +1,5 @@
 import React from 'react';
-import { ProjectData, ModuleStatus } from '../types';
+import { ProjectData, ModuleStatus, ProjectFieldName } from '../types';
 import { safeNumber, formatNumber, degToRad, InputGroup, LiftField, SliderField, CollapsibleSection } from '../components/ui';
 import { ISO_RAIL_PROFILES, BELT_PROFILES } from '../constants';
 import { CheckCircle2, ShieldCheck, Zap, AlertTriangle, Info, ChevronRight, Calculator, FileText, Database, Activity, Package, Maximize, AlertCircle, PlayCircle, Settings, CheckSquare } from 'lucide-react';
@@ -11,6 +11,8 @@ import jsPDF from 'jspdf';
 
 export const PDFExportModule = ({ data }: { data: ProjectData }) => {
   const [isGenerating, setIsGenerating] = React.useState(false);
+  const reportLabel = data.type === 'hydraulic' ? 'Hydraulic Technical Report' : 'Technical Report Generator';
+  const reportFilename = `${data.type === 'hydraulic' ? 'ILATE_Hydraulic_Report' : 'LiftCalc_Report'}_${new Date().toISOString().split('T')[0]}.pdf`;
 
   const exportPDF = async () => {
     setIsGenerating(true);
@@ -96,7 +98,7 @@ export const PDFExportModule = ({ data }: { data: ProjectData }) => {
         heightLeft -= pageHeight;
       }
 
-      pdf.save(`LiftCalc_Report_${new Date().toISOString().split('T')[0]}.pdf`);
+      pdf.save(reportFilename);
     } catch (error) {
       console.error('PDF Export failed:', error);
     } finally {
@@ -110,9 +112,11 @@ export const PDFExportModule = ({ data }: { data: ProjectData }) => {
         <div className="w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-6">
           <FileText size={32} className="text-primary" />
         </div>
-        <h2 className="text-2xl font-black uppercase tracking-tighter mb-2">Technical Report Generator</h2>
+        <h2 className="text-2xl font-black uppercase tracking-tighter mb-2">{reportLabel}</h2>
         <p className="text-on-surface-variant mb-8 max-w-md mx-auto">
-          Generate a comprehensive PDF report containing all engineering parameters, ISO 8100-2 calculations, and compliance verifications.
+          {data.type === 'hydraulic'
+            ? 'Generate the hydraulic report with cylinder, rupture-valve, buffer and safety verification data aligned to the hydraulic workspace.'
+            : 'Generate a comprehensive PDF report containing all engineering parameters, ISO 8100-2 calculations, and compliance verifications.'}
         </p>
         
         <button 
@@ -138,7 +142,13 @@ export const PDFExportModule = ({ data }: { data: ProjectData }) => {
         <Info className="text-amber-600 shrink-0" size={20} />
         <div className="text-sm text-amber-800">
           <p className="font-bold mb-1">Export Instructions</p>
-          <p>The report is generated from the "Calculation Memory" module. Ensure all data is correctly entered before exporting. The process may take a few seconds depending on the complexity of the data.</p>
+          <p>
+            The report is generated from the "Calculation Memory" module.
+            {data.type === 'hydraulic'
+              ? ' In hydraulic mode the export follows the dedicated hydraulic memory rather than the traction chain.'
+              : ' Ensure all data is correctly entered before exporting.'}
+            {' '}The process may take a few seconds depending on the complexity of the data.
+          </p>
         </div>
       </div>
 
@@ -154,11 +164,12 @@ export type ValidationResult = {
   type: 'error' | 'warning' | 'success';
   msg: string;
   moduleId?: string;
+  fieldName?: ProjectFieldName;
   actionLabel?: string;
   onAction?: () => void;
 };
 
-export const ValidationModal = ({ isOpen, onClose, results, onNavigate, title = 'Project Validation Results' }: { isOpen: boolean, onClose: () => void, results: ValidationResult[], onNavigate?: (moduleId: string) => void, title?: string }) => {
+export const ValidationModal = ({ isOpen, onClose, results, onNavigate, onFocusField, title = 'Project Validation Results' }: { isOpen: boolean, onClose: () => void, results: ValidationResult[], onNavigate?: (moduleId: string) => void, onFocusField?: (fieldName: ProjectFieldName) => void, title?: string }) => {
   if (!isOpen) return null;
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-300">
@@ -187,6 +198,9 @@ export const ValidationModal = ({ isOpen, onClose, results, onNavigate, title = 
                 onClick={() => {
                   if (r.moduleId && onNavigate) {
                     onNavigate(r.moduleId);
+                    if (r.fieldName && onFocusField) {
+                      requestAnimationFrame(() => onFocusField(r.fieldName!));
+                    }
                     onClose();
                   }
                 }}
@@ -203,7 +217,7 @@ export const ValidationModal = ({ isOpen, onClose, results, onNavigate, title = 
                   <div className="flex items-center gap-2 mt-2">
                     {r.moduleId && onNavigate && (
                       <span className="text-[10px] uppercase font-bold text-primary/70 flex items-center gap-1 group-hover:text-primary transition-colors">
-                        Open related section
+                        {r.fieldName ? 'Open related field' : 'Open related section'}
                       </span>
                     )}
                     {r.onAction && r.actionLabel && (

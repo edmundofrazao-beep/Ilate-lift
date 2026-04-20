@@ -8,6 +8,8 @@ import { downloadFile } from '../lib/exporters';
 import { OBJExporter } from 'three/addons/exporters/OBJExporter.js';
 
 interface Shaft3DProps {
+  projectType?: 'electric' | 'hydraulic';
+  onPresetSelect?: (values: { carPositionPercent?: number }) => void;
   width: number;
   depth: number;
   height: number;
@@ -25,7 +27,19 @@ interface Shaft3DProps {
   showClearances?: boolean;
 }
 
-const ElevatorCar = ({ width, depth, height, position }: { width: number; depth: number; height: number; position: [number, number, number] }) => {
+const ElevatorCar = ({
+  width,
+  depth,
+  height,
+  position,
+  projectType,
+}: {
+  width: number;
+  depth: number;
+  height: number;
+  position: [number, number, number];
+  projectType: 'electric' | 'hydraulic';
+}) => {
   return (
     <group position={position}>
       <RoundedBox args={[width, height, depth]} radius={0.02} smoothness={4}>
@@ -43,6 +57,44 @@ const ElevatorCar = ({ width, depth, height, position }: { width: number; depth:
         <boxGeometry args={[width * 0.6, 0.2, depth * 0.6]} />
         <meshStandardMaterial color="#475569" />
       </mesh>
+      <mesh position={[0, -height / 2 - 0.22, depth / 2 - 0.035]}>
+        <boxGeometry args={[width * 0.82, 0.44, 0.05]} />
+        <meshStandardMaterial color="#1e293b" metalness={0.45} roughness={0.35} />
+      </mesh>
+      <mesh position={[0, height / 2 + 0.03, 0]}>
+        <boxGeometry args={[width * 0.92, 0.06, depth * 0.92]} />
+        <meshStandardMaterial color="#334155" metalness={0.45} roughness={0.28} />
+      </mesh>
+      <mesh position={[0, height / 2 + 0.12, -depth * 0.18]}>
+        <boxGeometry args={[width * 0.48, 0.12, depth * 0.16]} />
+        <meshStandardMaterial color="#0f172a" metalness={0.55} roughness={0.22} />
+      </mesh>
+      <mesh position={[width * 0.26, height / 2 + 0.14, depth * 0.18]}>
+        <boxGeometry args={[0.16, 0.16, 0.18]} />
+        <meshStandardMaterial color={projectType === 'hydraulic' ? '#f59e0b' : '#f97316'} metalness={0.5} roughness={0.2} />
+      </mesh>
+      <group position={[0, height / 2 + 0.17, -depth * 0.2]}>
+        <mesh position={[0, 0, 0]}>
+          <boxGeometry args={[width * 0.62, 0.03, 0.03]} />
+          <meshStandardMaterial color="#cbd5e1" metalness={0.85} roughness={0.12} />
+        </mesh>
+        <mesh position={[-width * 0.3, -0.11, 0]}>
+          <boxGeometry args={[0.03, 0.22, 0.03]} />
+          <meshStandardMaterial color="#cbd5e1" metalness={0.85} roughness={0.12} />
+        </mesh>
+        <mesh position={[width * 0.3, -0.11, 0]}>
+          <boxGeometry args={[0.03, 0.22, 0.03]} />
+          <meshStandardMaterial color="#cbd5e1" metalness={0.85} roughness={0.12} />
+        </mesh>
+        <mesh position={[-width * 0.1, -0.11, 0]}>
+          <boxGeometry args={[0.03, 0.22, 0.03]} />
+          <meshStandardMaterial color="#cbd5e1" metalness={0.85} roughness={0.12} />
+        </mesh>
+        <mesh position={[width * 0.1, -0.11, 0]}>
+          <boxGeometry args={[0.03, 0.22, 0.03]} />
+          <meshStandardMaterial color="#cbd5e1" metalness={0.85} roughness={0.12} />
+        </mesh>
+      </group>
     </group>
   );
 };
@@ -62,7 +114,23 @@ const GuideRails = ({ shaftHeight, shaftWidth }: { shaftHeight: number; shaftWid
   );
 };
 
-const ShaftStructure = ({ width, depth, height, pitDepth = 1.5 }: { width: number; depth: number; height: number; pitDepth?: number }) => {
+const ShaftStructure = ({
+  width,
+  depth,
+  height,
+  pitDepth = 1.5,
+  frontCutaway = 0,
+}: {
+  width: number;
+  depth: number;
+  height: number;
+  pitDepth?: number;
+  frontCutaway?: number;
+}) => {
+  const frontPanelWidth = width * 0.48;
+  const slideOffset = frontCutaway * width * 0.42;
+  const sideOpacity = 0.12;
+
   return (
     <group>
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -pitDepth, 0]}>
@@ -77,11 +145,31 @@ const ShaftStructure = ({ width, depth, height, pitDepth = 1.5 }: { width: numbe
         <boxGeometry args={[width, height, depth]} />
         <meshStandardMaterial color="#e2e8f0" wireframe transparent opacity={0.1} />
       </mesh>
+      <mesh position={[0, height / 2, -depth / 2 - 0.015]}>
+        <boxGeometry args={[width, height, 0.03]} />
+        <meshStandardMaterial color="#cbd5e1" transparent opacity={0.14} />
+      </mesh>
+      <mesh position={[-width / 2 - 0.015, height / 2, 0]}>
+        <boxGeometry args={[0.03, height, depth]} />
+        <meshStandardMaterial color="#cbd5e1" transparent opacity={sideOpacity} />
+      </mesh>
+      <mesh position={[width / 2 + 0.015, height / 2, 0]}>
+        <boxGeometry args={[0.03, height, depth]} />
+        <meshStandardMaterial color="#cbd5e1" transparent opacity={sideOpacity} />
+      </mesh>
+      <mesh position={[-width * 0.26 - slideOffset, height / 2, depth / 2 + 0.015]}>
+        <boxGeometry args={[frontPanelWidth, height, 0.03]} />
+        <meshStandardMaterial color="#f1f5f9" transparent opacity={0.18} />
+      </mesh>
+      <mesh position={[width * 0.26 + slideOffset, height / 2, depth / 2 + 0.015]}>
+        <boxGeometry args={[frontPanelWidth, height, 0.03]} />
+        <meshStandardMaterial color="#f1f5f9" transparent opacity={0.18} />
+      </mesh>
       {Array.from({ length: Math.floor(height / 3) + 1 }).map((_, i) => (
         <group key={i} position={[0, i * 3 + 1.05, depth / 2]}>
           <mesh>
             <planeGeometry args={[width * 0.6, 2.1]} />
-            <meshStandardMaterial color="#f1f5f9" transparent opacity={0.3} side={THREE.DoubleSide} />
+            <meshStandardMaterial color="#f1f5f9" transparent opacity={Math.max(0.08, 0.3 - frontCutaway * 0.22)} side={THREE.DoubleSide} />
           </mesh>
         </group>
       ))}
@@ -131,6 +219,51 @@ const MachineDeck = ({ shaftHeight, shaftWidth, shaftDepth }: { shaftHeight: num
   </group>
 );
 
+const HydraulicRamAssembly = ({
+  shaftHeight,
+  carY,
+  carHeight,
+  shaftDepth,
+}: {
+  shaftHeight: number;
+  carY: number;
+  carHeight: number;
+  shaftDepth: number;
+}) => {
+  const ramBaseY = -0.9;
+  const ramTopY = Math.max(carY - carHeight / 2, ramBaseY + 0.8);
+  const cylinderHeight = Math.max(ramTopY - ramBaseY - 0.35, 0.6);
+
+  return (
+    <group position={[0, 0, -shaftDepth * 0.24]}>
+      <mesh position={[0, ramBaseY + cylinderHeight / 2, 0]}>
+        <cylinderGeometry args={[0.16, 0.16, cylinderHeight, 28]} />
+        <meshStandardMaterial color="#475569" metalness={0.85} roughness={0.18} />
+      </mesh>
+      <mesh position={[0, ramTopY - 0.12, 0]}>
+        <cylinderGeometry args={[0.08, 0.08, 0.42, 24]} />
+        <meshStandardMaterial color="#cbd5e1" metalness={0.95} roughness={0.08} />
+      </mesh>
+      <mesh position={[0, ramTopY + 0.12, 0]}>
+        <boxGeometry args={[0.42, 0.08, 0.24]} />
+        <meshStandardMaterial color="#f97316" metalness={0.5} roughness={0.22} />
+      </mesh>
+      <mesh position={[0.34, -0.72, 0.22]}>
+        <boxGeometry args={[0.58, 0.34, 0.42]} />
+        <meshStandardMaterial color="#111827" metalness={0.55} roughness={0.24} />
+      </mesh>
+      <mesh position={[0.18, -0.64, 0.12]} rotation={[0, 0, Math.PI / 2]}>
+        <cylinderGeometry args={[0.03, 0.03, 0.42, 18]} />
+        <meshStandardMaterial color="#f59e0b" metalness={0.6} roughness={0.25} />
+      </mesh>
+      <mesh position={[0.06, -0.38, 0.02]} rotation={[0, 0, Math.PI / 2]}>
+        <torusGeometry args={[0.22, 0.02, 12, 36, Math.PI]} />
+        <meshStandardMaterial color="#f59e0b" metalness={0.55} roughness={0.28} />
+      </mesh>
+    </group>
+  );
+};
+
 const Buffer = ({ position }: { position: [number, number, number] }) => (
   <mesh position={position}>
     <cylinderGeometry args={[0.1, 0.1, 0.3, 16]} />
@@ -149,6 +282,88 @@ const LandingMarkers = ({ shaftHeight, shaftDepth }: { shaftHeight: number; shaf
     ))}
   </group>
 );
+
+const LandingDoors = ({
+  shaftHeight,
+  shaftWidth,
+  shaftDepth,
+  frontCutaway,
+  activeLandingIndex,
+  carPositionPercent,
+}: {
+  shaftHeight: number;
+  shaftWidth: number;
+  shaftDepth: number;
+  frontCutaway: number;
+  activeLandingIndex: number | null;
+  carPositionPercent: number;
+}) => {
+  const levels = Array.from({ length: Math.floor(shaftHeight / 3) + 1 });
+  const openingWidth = shaftWidth * 0.42;
+  const openingHeight = 2.1;
+  const basePanelWidth = openingWidth / 2 - 0.015;
+  const shellOffset = frontCutaway * shaftWidth * 0.15;
+
+  return (
+    <group>
+      {levels.map((_, i) => {
+        const y = i * 3 + openingHeight / 2;
+        const isActiveLanding = activeLandingIndex === i;
+        const activeTravelBias = isActiveLanding ? Math.min(Math.max(Math.abs(carPositionPercent - i * (100 / Math.max(levels.length - 1, 1))) / 100, 0), 1) : 1;
+        const doorOpenFactor = isActiveLanding ? Math.max(0.12, 1 - activeTravelBias * 3.2) : 0.08;
+        const panelWidth = basePanelWidth;
+        const activePanelOffset = isActiveLanding ? shellOffset + doorOpenFactor * openingWidth * 0.18 : shellOffset;
+        return (
+          <group key={i} position={[0, y, shaftDepth / 2 + 0.028]}>
+            <mesh position={[0, 0, -0.02]}>
+              <boxGeometry args={[openingWidth + 0.14, openingHeight + 0.18, 0.04]} />
+              <meshStandardMaterial color={isActiveLanding ? '#1d4ed8' : '#0f172a'} metalness={0.75} roughness={0.22} />
+            </mesh>
+            <mesh position={[-panelWidth / 2 - 0.02 - activePanelOffset, 0, 0]}>
+              <boxGeometry args={[panelWidth, openingHeight, 0.02]} />
+              <meshStandardMaterial color={isActiveLanding ? '#f8fafc' : '#e2e8f0'} metalness={0.78} roughness={0.16} transparent opacity={isActiveLanding ? 0.92 : 0.78} />
+            </mesh>
+            <mesh position={[panelWidth / 2 + 0.02 + activePanelOffset, 0, 0]}>
+              <boxGeometry args={[panelWidth, openingHeight, 0.02]} />
+              <meshStandardMaterial color={isActiveLanding ? '#eff6ff' : '#cbd5e1'} metalness={0.78} roughness={0.16} transparent opacity={isActiveLanding ? 0.92 : 0.78} />
+            </mesh>
+            {isActiveLanding && (
+              <mesh position={[0, 0, -0.005]}>
+                <planeGeometry args={[openingWidth * Math.min(0.52, doorOpenFactor * 0.9), openingHeight * 0.92]} />
+                <meshStandardMaterial color="#0b1220" transparent opacity={0.65} />
+              </mesh>
+            )}
+            <mesh position={[0, -openingHeight / 2 - 0.04, 0.015]}>
+              <boxGeometry args={[openingWidth + 0.04, 0.05, 0.08]} />
+              <meshStandardMaterial color={isActiveLanding ? '#38bdf8' : '#64748b'} metalness={0.55} roughness={0.3} />
+            </mesh>
+            <mesh position={[0, openingHeight / 2 + 0.05, -0.005]}>
+              <boxGeometry args={[openingWidth + 0.02, 0.05, 0.06]} />
+              <meshStandardMaterial color={isActiveLanding ? '#2563eb' : '#475569'} metalness={0.6} roughness={0.25} />
+            </mesh>
+            {isActiveLanding && (
+              <Html position={[0, openingHeight / 2 + 0.18, 0.02]} center>
+                <div className="flex items-center gap-2 whitespace-nowrap rounded bg-blue-600/90 px-2 py-0.5 text-[9px] font-black uppercase tracking-[0.18em] text-white">
+                  <span>Cabin Aligned</span>
+                  <span className="rounded bg-white/15 px-1.5 py-0.5 text-[8px]">
+                    {doorOpenFactor > 0.32 ? 'Door Active' : 'Door Closed'}
+                  </span>
+                </div>
+              </Html>
+            )}
+            {isActiveLanding && (
+              <Html position={[openingWidth / 2 + 0.16, 0.55, 0.025]} center>
+                <div className="rounded bg-emerald-600/90 px-2 py-0.5 text-[8px] font-black uppercase tracking-[0.18em] text-white">
+                  Landing Call
+                </div>
+              </Html>
+            )}
+          </group>
+        );
+      })}
+    </group>
+  );
+};
 
 const CameraControls = ({ onReset }: { onReset: () => void }) => {
   const { camera } = useThree();
@@ -178,6 +393,8 @@ const SceneExporter = ({ onExport }: { onExport: (scene: THREE.Scene) => void })
 };
 
 export const Shaft3DModule: React.FC<Shaft3DProps> = ({
+  projectType = 'electric',
+  onPresetSelect,
   width,
   depth,
   height,
@@ -195,6 +412,7 @@ export const Shaft3DModule: React.FC<Shaft3DProps> = ({
 }) => {
   const [resetKey, setResetKey] = useState(0);
   const [hoveredZone, setHoveredZone] = useState<string | null>(null);
+  const [frontCutaway, setFrontCutaway] = useState(0.45);
   const sceneRef = useRef<THREE.Scene | null>(null);
 
   const handleExport = () => {
@@ -212,6 +430,12 @@ export const Shaft3DModule: React.FC<Shaft3DProps> = ({
 
   const carY = carPos * (h - carHeight) + carHeight / 2;
   const carZ = d / 2 - carDepth / 2 - sG;
+  const currentLandingIndex = (() => {
+    const approx = Math.round((carY - carHeight / 2) / 3);
+    if (approx < 0) return 0;
+    const maxLanding = Math.floor(h / 3);
+    return Math.min(approx, maxLanding);
+  })();
   const actualWallGap = (w - carWidth) / 2;
   const carBackZ = carZ - carDepth / 2;
   const cwtThickness = 0.15;
@@ -233,21 +457,47 @@ export const Shaft3DModule: React.FC<Shaft3DProps> = ({
     },
     wall: { label: 'Wall Gap', value: actualWallGap * 1000, limit: '≤ 150mm', clause: 'ISO 8100-1:2026 5.2.5.2' },
     sill: { label: 'Sill Gap', value: sillGap * 1000, limit: '≤ 35mm', clause: 'ISO 8100-1:2026 5.3.4' },
-    cwt: { label: 'Car-CWT Gap', value: carToCwtDistance * 1000, limit: '≥ 50mm', clause: 'ISO 8100-1:2026 5.2.5.2' },
+    cwt: { label: projectType === 'hydraulic' ? 'Hydraulic Service Zone' : 'Car-CWT Gap', value: carToCwtDistance * 1000, limit: '≥ 50mm', clause: 'ISO 8100-1:2026 5.2.5.2' },
   };
 
   const telemetryRows = [
     { label: 'Travel Envelope', value: `${Math.max(height - pitDepth, 0).toFixed(0)} mm` },
     { label: 'Car Position', value: `${(carPos * 100).toFixed(0)} %` },
+    { label: 'Active Landing', value: `L${String(currentLandingIndex).padStart(2, '0')}` },
+    { label: 'Front Cutaway', value: `${(frontCutaway * 100).toFixed(0)} %` },
     { label: 'Wall Gap', value: `${(actualWallGap * 1000).toFixed(0)} mm` },
-    { label: 'CWT Gap', value: `${(carToCwtDistance * 1000).toFixed(0)} mm` },
+    { label: projectType === 'hydraulic' ? 'Service Zone' : 'CWT Gap', value: `${(carToCwtDistance * 1000).toFixed(0)} mm` },
   ];
+
+  const inspectionPresets = [
+    {
+      id: 'pit',
+      label: 'Pit',
+      description: 'Open the front shell and inspect buffers, refuge volume and lower service zone.',
+      cutaway: 0.72,
+      carPositionPercent: 8,
+    },
+    {
+      id: 'mid',
+      label: 'Mid Travel',
+      description: 'Use the central travel position to inspect cabin exterior, guide rails and shaft spacing.',
+      cutaway: 0.45,
+      carPositionPercent: 50,
+    },
+    {
+      id: 'headroom',
+      label: 'Headroom',
+      description: 'Push the cabin upward and widen the opening to review top clearance and roof equipment.',
+      cutaway: 0.78,
+      carPositionPercent: 90,
+    },
+  ] as const;
 
   const complianceStates = [
     { id: 'pit', label: 'Pit Refuge', ok: pitRefugeHeight * 1000 >= 500 },
     { id: 'wall', label: 'Wall Clearance', ok: actualWallGap * 1000 <= 150 },
     { id: 'sill', label: 'Landing Sill Gap', ok: sillGap * 1000 <= 35 },
-    { id: 'cwt', label: 'Car vs Counterweight', ok: carToCwtDistance * 1000 >= 50 },
+    { id: 'cwt', label: projectType === 'hydraulic' ? 'Hydraulic Service Zone' : 'Car vs Counterweight', ok: carToCwtDistance * 1000 >= 50 },
   ];
 
   return (
@@ -255,9 +505,11 @@ export const Shaft3DModule: React.FC<Shaft3DProps> = ({
       <div className="absolute left-4 top-4 z-10 flex max-w-[320px] flex-col gap-3">
         <div className="rounded border border-white/10 bg-black/80 p-4 shadow-xl backdrop-blur-md">
           <div className="mb-3 flex items-center justify-between gap-3">
-            <h4 className="text-[11px] font-black uppercase tracking-[0.2em] text-primary">Shaft Telemetry</h4>
+            <h4 className="text-[11px] font-black uppercase tracking-[0.2em] text-primary">
+              {projectType === 'hydraulic' ? 'Hydraulic Shaft Telemetry' : 'Shaft Telemetry'}
+            </h4>
             <div className="rounded-full border border-emerald-500/20 bg-emerald-500/10 px-2 py-1 text-[9px] font-black uppercase tracking-[0.18em] text-emerald-300">
-              Live geometry
+              {projectType === 'hydraulic' ? 'hydraulic geometry' : 'live geometry'}
             </div>
           </div>
           <div className="grid grid-cols-2 gap-x-6 gap-y-2">
@@ -285,6 +537,53 @@ export const Shaft3DModule: React.FC<Shaft3DProps> = ({
               </div>
             ))}
           </div>
+        </div>
+
+        <div className="rounded border border-white/10 bg-black/60 p-4 shadow-xl backdrop-blur-md">
+          <div className="mb-3 flex items-center justify-between gap-3">
+            <h4 className="text-[11px] font-black uppercase tracking-[0.2em] text-white">Inspection Cutaway</h4>
+            <span className="text-[10px] font-mono text-primary">{(frontCutaway * 100).toFixed(0)}%</span>
+          </div>
+          <input
+            type="range"
+            min={0}
+            max={100}
+            step={1}
+            value={frontCutaway * 100}
+            onChange={(e) => setFrontCutaway(Number(e.target.value) / 100)}
+            className="w-full accent-orange-500"
+          />
+          <p className="mt-2 text-[10px] leading-relaxed text-white/45">
+            Open the front shell to inspect the pit, cabin exterior, ram and safety zones without changing the camera.
+          </p>
+        </div>
+
+        <div className="rounded border border-white/10 bg-black/60 p-4 shadow-xl backdrop-blur-md">
+          <div className="mb-3 flex items-center gap-2">
+            <ShieldCheck size={12} className="text-primary" />
+            <h4 className="text-[11px] font-black uppercase tracking-[0.2em] text-white">Inspection Presets</h4>
+          </div>
+          <div className="space-y-2">
+            {inspectionPresets.map((preset) => (
+              <button
+                key={preset.id}
+                onClick={() => {
+                  setFrontCutaway(preset.cutaway);
+                  onPresetSelect?.({ carPositionPercent: preset.carPositionPercent });
+                }}
+                className="w-full rounded border border-white/10 bg-white/[0.03] p-3 text-left transition-colors hover:border-primary/40 hover:bg-primary/10"
+              >
+                <div className="flex items-center justify-between gap-3">
+                  <span className="text-[10px] font-black uppercase tracking-[0.18em] text-white">{preset.label}</span>
+                  <span className="text-[9px] font-mono text-primary">{Math.round(preset.cutaway * 100)}%</span>
+                </div>
+                <p className="mt-2 text-[10px] leading-relaxed text-white/45">{preset.description}</p>
+              </button>
+            ))}
+          </div>
+          <p className="mt-3 text-[10px] leading-relaxed text-white/45">
+            Presets open the shaft shell here. Cabin travel itself should still be tuned in the geometry controls below.
+          </p>
         </div>
 
         {hoveredZone && clearanceData[hoveredZone] && (
@@ -325,7 +624,9 @@ export const Shaft3DModule: React.FC<Shaft3DProps> = ({
             <Layers3 size={12} className="text-primary" />
             <h4 className="text-[11px] font-black uppercase tracking-[0.2em] text-white">Clearance Inspector</h4>
           </div>
-          <div className="rounded-full border border-white/10 px-2 py-1 text-[9px] font-black uppercase tracking-[0.16em] text-white/60">ISO 8100-1</div>
+          <div className="rounded-full border border-white/10 px-2 py-1 text-[9px] font-black uppercase tracking-[0.16em] text-white/60">
+            {projectType === 'hydraulic' ? 'Hydraulic shaft' : 'ISO 8100-1'}
+          </div>
         </div>
         <div className="space-y-3">
           {complianceStates.map((state) => (
@@ -352,7 +653,9 @@ export const Shaft3DModule: React.FC<Shaft3DProps> = ({
         </div>
         <div className="mt-4 flex items-center gap-2 border-t border-white/10 pt-4 text-[10px] text-white/45">
           <ArrowRightLeft size={12} />
-          Hover any clearance block in the scene to pin its normative reading.
+          {projectType === 'hydraulic'
+            ? 'Hydraulic mode reuses the shaft envelope but tracks service-zone spacing instead of traction-specific counterweight intent.'
+            : 'Hover any clearance block in the scene to pin its normative reading.'}
         </div>
       </div>
 
@@ -385,12 +688,19 @@ export const Shaft3DModule: React.FC<Shaft3DProps> = ({
           <hemisphereLight intensity={1} groundColor="#222222" />
 
           <group>
-            <ShaftStructure width={w} depth={d} height={h} pitDepth={pD} />
+            <ShaftStructure width={w} depth={d} height={h} pitDepth={pD} frontCutaway={frontCutaway} />
             <GuideRails shaftHeight={h} shaftWidth={w} />
-            <ElevatorCar width={carWidth} depth={carDepth} height={carHeight} position={[0, carY, carZ]} />
-            <SuspensionRopes shaftHeight={h} carY={carY} shaftWidth={w} carZ={carZ} />
-            <MachineDeck shaftHeight={h} shaftWidth={w} shaftDepth={d} />
+            <ElevatorCar width={carWidth} depth={carDepth} height={carHeight} position={[0, carY, carZ]} projectType={projectType} />
+            {projectType === 'electric' ? (
+              <>
+                <SuspensionRopes shaftHeight={h} carY={carY} shaftWidth={w} carZ={carZ} />
+                <MachineDeck shaftHeight={h} shaftWidth={w} shaftDepth={d} />
+              </>
+            ) : (
+              <HydraulicRamAssembly shaftHeight={h} carY={carY} carHeight={carHeight} shaftDepth={d} />
+            )}
             <LandingMarkers shaftHeight={h} shaftDepth={d} />
+            <LandingDoors shaftHeight={h} shaftWidth={w} shaftDepth={d} frontCutaway={frontCutaway} activeLandingIndex={currentLandingIndex} carPositionPercent={carPos * 100} />
 
             <Html position={[0, -0.1, d / 2 + 0.1]} center>
               <div className="whitespace-nowrap rounded bg-black/60 px-2 py-0.5 text-[10px] text-emerald-400">W: {width.toFixed(0)} mm</div>
@@ -408,19 +718,31 @@ export const Shaft3DModule: React.FC<Shaft3DProps> = ({
             <Buffer position={[-w / 4, -pD + 0.15, 0]} />
             <Buffer position={[w / 4, -pD + 0.15, 0]} />
 
-            <group position={[0, h - carY, cwtZ]}>
-              <Box args={[w * 0.7, 1.8, cwtThickness]}>
-                <meshStandardMaterial color="#ef4444" metalness={0.5} />
-              </Box>
-              <mesh position={[0, 1.0, 0]}>
-                <boxGeometry args={[w * 0.75, 0.1, 0.2]} />
-                <meshStandardMaterial color="#1e293b" />
-              </mesh>
-              <mesh position={[0, -1.05, 0]}>
-                <boxGeometry args={[w * 0.5, 0.12, 0.18]} />
-                <meshStandardMaterial color="#7f1d1d" metalness={0.4} roughness={0.45} />
-              </mesh>
-            </group>
+            {projectType === 'electric' ? (
+              <group position={[0, h - carY, cwtZ]}>
+                <Box args={[w * 0.7, 1.8, cwtThickness]}>
+                  <meshStandardMaterial color="#ef4444" metalness={0.5} />
+                </Box>
+                <mesh position={[0, 1.0, 0]}>
+                  <boxGeometry args={[w * 0.75, 0.1, 0.2]} />
+                  <meshStandardMaterial color="#1e293b" />
+                </mesh>
+                <mesh position={[0, -1.05, 0]}>
+                  <boxGeometry args={[w * 0.5, 0.12, 0.18]} />
+                  <meshStandardMaterial color="#7f1d1d" metalness={0.4} roughness={0.45} />
+                </mesh>
+              </group>
+            ) : (
+              <group position={[0, -pD + 0.16, -d * 0.24]}>
+                <mesh>
+                  <boxGeometry args={[0.86, 0.12, 0.46]} />
+                  <meshStandardMaterial color="#0f172a" metalness={0.65} roughness={0.24} />
+                </mesh>
+                <Html position={[0, 0.22, 0]} center>
+                  <div className="whitespace-nowrap rounded bg-black/60 px-2 py-0.5 text-[10px] text-orange-300">Hydraulic power unit</div>
+                </Html>
+              </group>
+            )}
 
             {showClearances && (
               <group>
