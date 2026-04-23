@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { ProjectData, ModuleStatus } from '../types';
 import { safeNumber, formatNumber, degToRad, InputGroup, LiftField, SliderField, CollapsibleSection } from '../components/ui';
 import { BELT_PROFILES, BUFFER_PRESETS, SAFETY_GEAR_PRESETS } from '../constants';
@@ -10,6 +10,18 @@ export const SafetyComponentsModule = ({ data, onChange, section = 'all' }: { da
   const [bufferTarget, setBufferTarget] = useState<'car' | 'cwt'>('car');
   const lightResultCard = 'text-slate-950';
   const lightMutedText = 'text-slate-700/75';
+  const isHydraulicProject = data.type === 'hydraulic';
+  const availableBufferPresets = BUFFER_PRESETS.filter((preset) =>
+    isHydraulicProject
+      ? preset.type === 'energy-dissipation' && preset.medium === 'hydraulic-oil'
+      : true
+  );
+
+  useEffect(() => {
+    if (isHydraulicProject && bufferTarget !== 'car') {
+      setBufferTarget('car');
+    }
+  }, [isHydraulicProject, bufferTarget]);
 
   // OSG Verification Logic
   const minTripping = 1.15 * data.speed;
@@ -33,10 +45,11 @@ export const SafetyComponentsModule = ({ data, onChange, section = 'all' }: { da
   const isRetardationOk = retardationG >= 0.2 && retardationG <= 1.0;
 
   // 4.5 Buffer Logic
-  const impactMass = bufferTarget === 'car' ? (data.carMass + data.ratedLoad) : data.cwtMass;
+  const impactMass = (isHydraulicProject || bufferTarget === 'car') ? (data.carMass + data.ratedLoad) : data.cwtMass;
   const v_impact = 1.15 * data.speed; // Impact speed is 115% of rated speed
   const h_m = data.bufferStroke / 1000;
   const { buffers } = computeLiftCalculations(data);
+  const logic = computeLiftCalculations(data).systemLogic;
   const Ek = buffers.Ek;
   const Ep = buffers.Ep;
   const Etotal = buffers.totalEnergy;
@@ -505,20 +518,29 @@ export const SafetyComponentsModule = ({ data, onChange, section = 'all' }: { da
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
               <div className="space-y-4 p-6 bg-surface-container-lowest border border-outline-variant/10">
                 <h5 className="text-[10px] font-bold uppercase text-primary mb-4 text-center">Buffer Parameters</h5>
-                <div className="flex p-1 bg-surface-container-low rounded-sm mb-4">
-                  <button 
-                    onClick={() => setBufferTarget('car')}
-                    className={`flex-1 py-1.5 text-[10px] font-bold uppercase rounded-sm transition-all ${bufferTarget === 'car' ? 'bg-primary text-white shadow-sm' : 'text-on-surface-variant hover:bg-surface-container-lowest'}`}
-                  >
-                    Car Buffer
-                  </button>
-                  <button 
-                    onClick={() => setBufferTarget('cwt')}
-                    className={`flex-1 py-1.5 text-[10px] font-bold uppercase rounded-sm transition-all ${bufferTarget === 'cwt' ? 'bg-primary text-white shadow-sm' : 'text-on-surface-variant hover:bg-surface-container-lowest'}`}
-                  >
-                    CWT Buffer
-                  </button>
-                </div>
+                {isHydraulicProject ? (
+                  <div className="rounded-sm border border-primary/20 bg-primary/5 p-4 mb-4">
+                    <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-primary">Hydraulic buffer mode</p>
+                    <p className="mt-2 text-xs leading-relaxed text-on-surface-variant">
+                      Hydraulic projects do not use counterweight buffers in this workspace. This section is locked to the <strong>car buffer</strong> and should be read together with the hydraulic chain.
+                    </p>
+                  </div>
+                ) : (
+                  <div className="flex p-1 bg-surface-container-low rounded-sm mb-4">
+                    <button
+                      onClick={() => setBufferTarget('car')}
+                      className={`flex-1 py-1.5 text-[10px] font-bold uppercase rounded-sm transition-all ${bufferTarget === 'car' ? 'bg-primary text-white shadow-sm' : 'text-on-surface-variant hover:bg-surface-container-lowest'}`}
+                    >
+                      Car Buffer
+                    </button>
+                    <button
+                      onClick={() => setBufferTarget('cwt')}
+                      className={`flex-1 py-1.5 text-[10px] font-bold uppercase rounded-sm transition-all ${bufferTarget === 'cwt' ? 'bg-primary text-white shadow-sm' : 'text-on-surface-variant hover:bg-surface-container-lowest'}`}
+                    >
+                      CWT Buffer
+                    </button>
+                  </div>
+                )}
                 <div className="space-y-4">
                   <div className="space-y-1">
                     <label className="text-[11px] font-bold text-on-surface-variant uppercase">Buffer Presets</label>
@@ -530,6 +552,7 @@ export const SafetyComponentsModule = ({ data, onChange, section = 'all' }: { da
                         onChange({
                           bufferPresetId: preset.id,
                           bufferType: preset.type as ProjectData['bufferType'],
+                          bufferMedium: (preset as any).medium || data.bufferMedium,
                           bufferIsLinear: preset.isLinear,
                           bufferStroke: preset.stroke,
                           bufferMinMass: preset.minMass,
@@ -540,7 +563,7 @@ export const SafetyComponentsModule = ({ data, onChange, section = 'all' }: { da
                       className="w-full bg-surface-container-low border border-outline-variant/20 rounded-sm px-3 py-2 text-sm outline-none"
                     >
                       <option value="">Select a preset...</option>
-                      {BUFFER_PRESETS.map((preset) => (
+                      {availableBufferPresets.map((preset) => (
                         <option key={preset.id} value={preset.id}>
                           {preset.manufacturer} {preset.model} ({preset.speedRange})
                         </option>
@@ -556,14 +579,37 @@ export const SafetyComponentsModule = ({ data, onChange, section = 'all' }: { da
                         onChange({ 
                           bufferPresetId: '',
                           bufferType: type,
+                          bufferMedium: type === 'energy-accumulation' ? 'spring' : 'hydraulic-oil',
                           bufferIsLinear: true // Reset to linear on type change for safety
                         });
                       }}
-                      className="w-full bg-surface-container-low border border-outline-variant/20 rounded-sm px-3 py-2 text-sm outline-none"
+                      disabled={isHydraulicProject}
+                      className="w-full bg-surface-container-low border border-outline-variant/20 rounded-sm px-3 py-2 text-sm outline-none disabled:opacity-60"
                     >
-                      <option value="energy-accumulation">Energy Accumulation</option>
-                      <option value="energy-dissipation">Energy Dissipation</option>
+                      {!isHydraulicProject && <option value="energy-accumulation">Energy Accumulation</option>}
+                      <option value="energy-dissipation">{isHydraulicProject ? 'Energy Dissipation / Hydraulic Oil' : 'Energy Dissipation'}</option>
                     </select>
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[11px] font-bold text-on-surface-variant uppercase">Buffer Medium</label>
+                    <select
+                      value={data.bufferMedium}
+                      onChange={(e) => onChange({ bufferPresetId: '', bufferMedium: e.target.value as ProjectData['bufferMedium'] })}
+                      disabled={isHydraulicProject}
+                      className="w-full bg-surface-container-low border border-outline-variant/20 rounded-sm px-3 py-2 text-sm outline-none disabled:opacity-60"
+                    >
+                      {!isHydraulicProject && <option value="spring">Spring</option>}
+                      {!isHydraulicProject && <option value="elastomer">Elastomer</option>}
+                      <option value="hydraulic-oil">Hydraulic Oil</option>
+                    </select>
+                  </div>
+                  <div className="rounded-sm border border-primary/20 bg-primary/5 p-4">
+                    <p className="text-[10px] font-black uppercase tracking-[0.18em] text-primary">Operating recommendation</p>
+                    <p className="mt-2 text-xs leading-relaxed text-on-surface-variant">
+                      {isHydraulicProject
+                        ? <>Hydraulic mode is isolated here: car buffer only, <strong>energy-dissipation</strong> type and <strong>hydraulic-oil</strong> medium. Counterweight buffers and compensation do not apply.</>
+                        : <>Current speed class recommends <strong>{logic.recommendedBufferType}</strong> using <strong>{logic.recommendedBufferMedium}</strong>.</>}
+                    </p>
                   </div>
                   <div className="flex items-center gap-2 py-1">
                     <input 
@@ -703,7 +749,7 @@ export const SafetyComponentsModule = ({ data, onChange, section = 'all' }: { da
                           <p className="text-[9px] opacity-40 mt-1">0.5 · m · v²</p>
                         </div>
                         <div className={`p-4 border ${isBufferMassOk ? 'bg-surface-container-low border-outline-variant/10' : 'bg-error-container/10 border-error/20'}`}>
-                          <p className="text-[10px] font-bold uppercase mb-1 opacity-50">Impact Mass ({bufferTarget === 'car' ? 'P+Q' : 'Mcwt'})</p>
+                          <p className="text-[10px] font-bold uppercase mb-1 opacity-50">Impact Mass ({isHydraulicProject || bufferTarget === 'car' ? 'P+Q' : 'Mcwt'})</p>
                           <p className="text-xl font-black">{formatNumber(impactMass)} kg</p>
                           <p className="text-[10px] opacity-50">Certified Range: {data.bufferMinMass} - {data.bufferMaxMass} kg</p>
                         </div>

@@ -11,7 +11,7 @@ const getCompensationAssessment = (data: ProjectData) => {
   const recommendedType = data.speed >= 3 ? 'rope' : 'chain';
   const selectedOk = !shouldReview
     ? data.compensationType === 'none'
-    : data.compensationType === recommendedType || data.compensationType !== 'none';
+    : data.compensationType === recommendedType;
 
   const suspendedMass = data.carMass + data.ratedLoad + (data.suspensionType === 'belt' ? data.numBelts * data.beltTensileStrength / 400 : data.numRopes * data.ropeDiameter * 2.2);
   const estimatedCompMass = data.compensationType === 'chain'
@@ -31,6 +31,64 @@ const getCompensationAssessment = (data: ProjectData) => {
 
 export const CompensationModule = ({ data, onChange }: { data: ProjectData; onChange: (newData: Partial<ProjectData>) => void }) => {
   const assessment = getCompensationAssessment(data);
+  const isHydraulic = data.type === 'hydraulic';
+
+  if (isHydraulic) {
+    return (
+      <div className="space-y-8">
+        <div className="rounded-sm border border-outline-variant/20 bg-surface-container-low p-6">
+          <div className="grid grid-cols-1 gap-4 xl:grid-cols-[1.05fr_0.95fr]">
+            <div className="rounded-sm border border-outline-variant/20 bg-gradient-to-br from-surface-container-high to-surface-container-lowest p-6">
+              <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-primary/30 bg-primary/10 px-3 py-1 text-[10px] font-black uppercase tracking-[0.22em] text-primary">
+                <Package size={12} />
+                Hydraulic lock
+              </div>
+              <h3 className="text-2xl font-black tracking-tight text-on-surface">Compensation Means Not Used</h3>
+              <p className="mt-3 max-w-2xl text-sm leading-relaxed text-on-surface-variant">
+                Hydraulic projects in this workspace do not route through compensation means. Keep this page read-only and close the hydraulic chain in the dedicated hydraulic, rupture-valve, buffers and guide-rail sections.
+              </p>
+            </div>
+            <div className="rounded-sm border border-emerald-200 bg-emerald-50 p-6">
+              <p className="text-[10px] font-black uppercase tracking-[0.22em] text-emerald-700">Current state</p>
+              <div className="mt-4 space-y-3">
+                <div className="flex items-center justify-between rounded-sm border border-emerald-200 bg-white p-3">
+                  <span className="text-[10px] font-bold uppercase tracking-[0.16em] text-slate-500">Compensation means</span>
+                  <span className="text-xs font-black uppercase text-emerald-700">none</span>
+                </div>
+                <div className="flex items-center justify-between rounded-sm border border-emerald-200 bg-white p-3">
+                  <span className="text-[10px] font-bold uppercase tracking-[0.16em] text-slate-500">Speed envelope</span>
+                  <span className="text-xs font-black uppercase text-emerald-700">≤ 1.0 m/s</span>
+                </div>
+                <div className="flex items-center justify-between rounded-sm border border-emerald-200 bg-white p-3">
+                  <span className="text-[10px] font-bold uppercase tracking-[0.16em] text-slate-500">Hydraulic status</span>
+                  <span className="text-xs font-black uppercase text-emerald-700">isolated correctly</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="mt-6 rounded-sm border border-outline-variant/20 bg-surface-container-lowest p-6">
+            <h4 className="mb-4 flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.18em] text-primary">
+              <ArrowRightLeft size={12} />
+              Continue in these sections
+            </h4>
+            <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+              {[
+                'Hydraulic Core (4.15)',
+                'Rupture Valve (4.9)',
+                'Buffers (4.5)',
+                'Guide Rail Checks',
+              ].map((item) => (
+                <div key={item} className="rounded-sm border border-outline-variant/20 bg-surface-container-low p-3 text-xs font-bold uppercase tracking-[0.14em] text-on-surface">
+                  {item}
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-8">

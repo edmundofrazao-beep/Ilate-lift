@@ -74,7 +74,7 @@ import { Cabin3DModule } from './components/Cabin3DModule';
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
 
-import { ISO_RAIL_PROFILES, BELT_PROFILES } from './constants';
+import { ISO_RAIL_PROFILES, BELT_PROFILES, SHAFT_LUMINAIRE_PRESETS } from './constants';
 
 import { safeNumber, formatNumber, degToRad, InputGroup, LiftField, SliderField, CollapsibleSection } from './components/ui';
 
@@ -101,6 +101,7 @@ import { safeNumber, formatNumber, degToRad, InputGroup, LiftField, SliderField,
 export default function App() {
   const [activeTab, setActiveTab] = useState('overview');
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+  const [isInspectorCollapsed, setIsInspectorCollapsed] = useState(false);
   const [isValidationOpen, setIsValidationOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isHelpOpen, setIsHelpOpen] = useState(false);
@@ -114,6 +115,7 @@ export default function App() {
     carMass: 1200,
     cwtMass: 1700,
     balanceRatio: 0.5,
+    cwtFillMaterial: 'cast-iron',
     speed: 1.0,
     travel: 30,
     stops: 10,
@@ -148,6 +150,28 @@ export default function App() {
     railProfile: 'ISO T89/B',
     railPresetId: 'mf-t89b',
     railLubrication: 'oiled',
+    guideInterfaceType: 'sliding',
+    guideRollerPresetId: '',
+    guideRollerWheelMaterial: 'nylon',
+    guideRollerIndependentAxes: false,
+    guideRollerClearanceX: 1.5,
+    guideRollerClearanceY: 1.5,
+    guideRollerClearanceZ: 1.0,
+    guideRollerSpringStiffness: 180,
+    driveArrangement: 'mrl',
+    machineRoomPosition: 'none',
+    controlCabinetLocation: 'top-landing',
+    drivePackageLocation: 'shaft-head',
+    controllerArchitecture: 'vvvf',
+    roofInspectionStation: true,
+    pitInspectionStation: true,
+    cabinetInspectionEnabled: true,
+    travellingCableType: 'flat',
+    travellingCableRouting: 'rear-wall',
+    shaftLightingLux: 220,
+    shaftLuminairePresetId: 'schneider-ledbar-1200',
+    shaftLuminaireSpacing: 3.0,
+    shaftLuminaireCount: 11,
     numSimpleBends: 2,
     numReverseBends: 0,
     ropeBreakingLoad: 45000,
@@ -163,6 +187,7 @@ export default function App() {
     maxPressure: 4.5,
     bufferStroke: 150,
     bufferType: 'energy-accumulation',
+    bufferMedium: 'spring',
     bufferMaxMass: 2500,
     bufferMinMass: 500,
     bufferPresetId: '',
@@ -238,6 +263,8 @@ export default function App() {
     seismicCategory: 0,
     designAcceleration: 0,
     primaryWaveDetection: false,
+    seismicRetainerEnabled: false,
+    seismicRetainerType: 'none',
     // Additional Variables from HTML Engine
     Faux: 4000,
     delta_str_x: 0.6,
@@ -256,6 +283,7 @@ export default function App() {
     headroomGeneral: 0.52,
     headroomGuideShoeZone: 0.12,
     balustradeVertical: 0.32,
+    carRoofBalustradeHeight: 1.1,
     toeBoardOutside: 0.12,
     ramHeadClearance: 0.12,
     cwtScreenBottomFromPit: 0.28,
@@ -275,6 +303,28 @@ export default function App() {
   const handleDataChange = (newData: Partial<ProjectData>) => {
     setProjectData(prev => {
       const merged = { ...prev, ...newData };
+      if ('suspensionType' in newData) {
+        if (newData.suspensionType === 'belt') {
+          merged.ropePresetId = '';
+          merged.ropeType = merged.ropeType && merged.ropeType !== 'Steel Wire' ? merged.ropeType : 'Elastomeric Belt';
+          merged.grooveType = 'semi-circular';
+          merged.undercutAngle = 0;
+          merged.grooveAngle = 0;
+          merged.numBelts = Math.max(merged.numBelts || 0, 1);
+          merged.beltWidth = Math.max(merged.beltWidth || 0, 1);
+          merged.beltThickness = Math.max(merged.beltThickness || 0, 1);
+          merged.beltTensileStrength = Math.max(merged.beltTensileStrength || merged.ropeBreakingLoad || 0, 1000);
+        } else {
+          merged.ropePresetId = '';
+          merged.ropeType = merged.ropeType && merged.ropeType !== 'Elastomeric Belt' ? merged.ropeType : 'Steel Wire';
+          merged.numRopes = Math.max(merged.numRopes || 0, 1);
+          merged.ropeDiameter = Math.max(merged.ropeDiameter || merged.beltThickness || 0, 4);
+          merged.ropeBreakingLoad = Math.max(merged.ropeBreakingLoad || merged.beltTensileStrength || 0, 1000);
+          merged.grooveType = prev.grooveType === 'semi-circular' || prev.grooveType === 'V' || prev.grooveType === 'U' ? prev.grooveType : 'semi-circular';
+          merged.grooveAngle = Math.max(merged.grooveAngle || 0, 35);
+          merged.undercutAngle = Math.max(merged.undercutAngle || 0, 80);
+        }
+      }
       if ('type' in newData && newData.type === 'hydraulic') {
         merged.speed = Math.min(merged.speed, 1.0);
         merged.compensationType = 'none';
@@ -282,12 +332,72 @@ export default function App() {
         merged.suspension = '1:1';
         merged.cwtMass = 0;
         merged.balanceRatio = 0;
+        merged.bufferPresetId = '';
+        merged.bufferType = 'energy-dissipation';
+        merged.bufferMedium = 'hydraulic-oil';
+        merged.drivePackageLocation = merged.driveArrangement === 'machine-room' ? 'machine-room' : 'landing-cabinet';
+        merged.controllerArchitecture = 'hydraulic-valve';
       }
       if (merged.type === 'hydraulic') {
         merged.speed = Math.min(merged.speed, 1.0);
         merged.compensationType = 'none';
         merged.cwtMass = 0;
         merged.balanceRatio = 0;
+        merged.suspension = '1:1';
+        merged.suspensionType = 'wire-rope';
+        if (merged.bufferMedium !== 'hydraulic-oil' || merged.bufferType !== 'energy-dissipation') {
+          merged.bufferPresetId = '';
+        }
+        merged.bufferType = 'energy-dissipation';
+        merged.bufferMedium = 'hydraulic-oil';
+        merged.controllerArchitecture = 'hydraulic-valve';
+        if (merged.driveArrangement === 'mrl') {
+          merged.machineRoomPosition = 'none';
+          if (merged.controlCabinetLocation === 'machine-room') {
+            merged.controlCabinetLocation = 'top-landing';
+          }
+          if (merged.drivePackageLocation === 'machine-room') {
+            merged.drivePackageLocation = 'landing-cabinet';
+          }
+        } else {
+          merged.controlCabinetLocation = 'machine-room';
+          merged.drivePackageLocation = 'machine-room';
+        }
+      } else if (merged.controllerArchitecture === 'hydraulic-valve') {
+        merged.controllerArchitecture = 'vvvf';
+        if (merged.driveArrangement === 'mrl' && merged.drivePackageLocation === 'landing-cabinet') {
+          merged.drivePackageLocation = 'shaft-head';
+        }
+      }
+      if ('driveArrangement' in newData) {
+        if (merged.driveArrangement === 'mrl') {
+          merged.machineRoomPosition = 'none';
+          merged.controlCabinetLocation = merged.controlCabinetLocation === 'machine-room' ? 'top-landing' : merged.controlCabinetLocation;
+          merged.drivePackageLocation = merged.type === 'hydraulic' ? 'landing-cabinet' : 'shaft-head';
+        } else {
+          if (merged.machineRoomPosition === 'none') merged.machineRoomPosition = 'overhead';
+          merged.controlCabinetLocation = 'machine-room';
+          merged.drivePackageLocation = 'machine-room';
+        }
+      }
+      if ('machineRoomPosition' in newData && merged.driveArrangement === 'mrl') {
+        merged.machineRoomPosition = 'none';
+      }
+      if ('controlCabinetLocation' in newData && merged.driveArrangement === 'machine-room') {
+        merged.controlCabinetLocation = 'machine-room';
+      }
+      if ('drivePackageLocation' in newData && merged.driveArrangement === 'machine-room') {
+        merged.drivePackageLocation = 'machine-room';
+      }
+      if ('shaftLuminairePresetId' in newData || 'shaftHeight' in newData || 'travel' in newData || 'shaftLuminaireSpacing' in newData) {
+        const luminairePreset = SHAFT_LUMINAIRE_PRESETS.find((preset) => preset.id === merged.shaftLuminairePresetId);
+        if (luminairePreset && 'shaftLuminairePresetId' in newData) {
+          merged.shaftLuminaireSpacing = luminairePreset.recommendedSpacing;
+          merged.shaftLightingLux = Math.max(merged.shaftLightingLux, luminairePreset.nominalLux);
+        }
+        const referenceHeight = Math.max((merged.shaftHeight || 0) / 1000, merged.travel || 0, 3);
+        const spacing = Math.max(merged.shaftLuminaireSpacing || luminairePreset?.recommendedSpacing || 3, 1.5);
+        merged.shaftLuminaireCount = Math.max(2, Math.ceil(referenceHeight / spacing) + 1);
       }
       // Enforce physical constraints: Cabin cannot exceed shaft minus 200mm for clearances
       // If expanding the cabin, grow the shaft automatically.
@@ -322,6 +432,7 @@ export default function App() {
   const getValidationResults = (data: ProjectData) => {
     const calc = computeLiftCalculations(data);
     const results: ValidationResult[] = [];
+    const logic = calc.systemLogic;
     
     const isElectric = data.type === 'electric';
     const isHydraulic = data.type === 'hydraulic';
@@ -340,7 +451,9 @@ export default function App() {
     if (isElectric && calc.traction.p_groove > calc.traction.p_allow) {
       results.push({
         type: 'warning',
-        msg: `Specific groove pressure (${calc.traction.p_groove.toFixed(2)} MPa) exceeds allowance (${calc.traction.p_allow.toFixed(2)} MPa).`,
+        msg: data.suspensionType === 'belt'
+          ? `Belt/sheave interface pressure (${calc.traction.p_groove.toFixed(2)} MPa) exceeds allowance (${calc.traction.p_allow.toFixed(2)} MPa).`
+          : `Specific groove pressure (${calc.traction.p_groove.toFixed(2)} MPa) exceeds allowance (${calc.traction.p_allow.toFixed(2)} MPa).`,
         moduleId: 'sheaves',
         actionLabel: 'Increase Hardness',
         onAction: () => handleDataChange({ sheaveHardness: Math.min(300, data.sheaveHardness + 20) })
@@ -351,7 +464,7 @@ export default function App() {
     if (isElectric && !calc.ropes.isSfOk) {
       results.push({ 
         type: 'error', 
-        msg: `Rope safety factor (${calc.ropes.sf_actual.toFixed(1)}) is below normative limit (${calc.ropes.sf_required.toFixed(1)}).`,
+        msg: `${data.suspensionType === 'belt' ? 'Belt' : 'Rope'} safety factor (${calc.ropes.sf_actual.toFixed(1)}) is below normative limit (${calc.ropes.sf_required.toFixed(1)}).`,
         moduleId: 'suspension-verify',
         fieldName: data.suspensionType === 'belt' ? 'numBelts' : 'numRopes',
         actionLabel: data.suspensionType === 'belt' ? 'Add Belt' : 'Add Rope',
@@ -363,7 +476,7 @@ export default function App() {
       });
     }
 
-    if (isElectric && data.ropeWearPercentage >= 6) {
+    if (isElectric && data.suspensionType !== 'belt' && data.ropeWearPercentage >= 6) {
       results.push({
         type: 'warning',
         msg: `Rope diameter reduction (${data.ropeWearPercentage.toFixed(1)}%) reached the discard review threshold.`,
@@ -443,13 +556,131 @@ export default function App() {
       });
     }
 
-    const compensationReviewRequired = isElectric && (data.speed >= 2.5 || data.travel >= 45);
-    if (compensationReviewRequired && data.compensationType === 'none') {
+    if (isElectric && logic.compensationRequired && !logic.compensationAligned) {
       results.push({
         type: 'warning',
-        msg: 'Compensation means should be reviewed for the current speed/travel envelope.',
+        msg: `Compensation means should be closed as ${logic.recommendedCompensationType} for the current speed/travel envelope.`,
         moduleId: 'compensation',
         fieldName: 'compensationType'
+      });
+    }
+
+    if (isElectric && !logic.bufferSelectionAligned) {
+      results.push({
+        type: 'warning',
+        msg: `Buffer selection should be ${logic.recommendedBufferType} with ${logic.recommendedBufferMedium} for the current speed class.`,
+        moduleId: 'buffers',
+        fieldName: 'bufferType'
+      });
+    }
+
+    if (isElectric && logic.requiresGuideRollers && !logic.guideInterfaceAligned) {
+      results.push({
+        type: 'warning',
+        msg: `Guide interface should switch to rollers for this speed/seismic envelope.`,
+        moduleId: 'rails-params',
+        fieldName: 'guideInterfaceType'
+      });
+    }
+
+    if (isElectric && logic.requiresIndependentGuideAxes && !logic.guideRollerIndependentAxesAligned) {
+      results.push({
+        type: 'warning',
+        msg: 'Independent 3-axis guide roller suspension should be active for this seismic/high-speed envelope.',
+        moduleId: 'rails-params',
+        fieldName: 'guideRollerIndependentAxes'
+      });
+    }
+
+    if (isElectric && logic.requiresSeismicRetainers && !logic.seismicRetainerAligned) {
+      results.push({
+        type: 'warning',
+        msg: 'Seismic retainers are expected for the current EN 81-77 category.',
+        moduleId: 'seismic',
+        fieldName: 'seismicRetainerEnabled'
+      });
+    }
+
+    if (isElectric && !logic.guideRollerClearanceEnvelopeOk && data.guideInterfaceType === 'roller') {
+      results.push({
+        type: 'warning',
+        msg: 'Guide roller clearances are too loose for the current speed/seismic recommendation.',
+        moduleId: 'rails-params',
+        fieldName: 'guideRollerClearanceX'
+      });
+    }
+
+    if (isElectric && !logic.balustradeHeightOk) {
+      results.push({
+        type: 'warning',
+        msg: `Car roof balustrade height should be at least ${logic.recommendedBalustradeHeight.toFixed(2)} m for the current operating envelope.`,
+        moduleId: 'clearances',
+        fieldName: 'carRoofBalustradeHeight'
+      });
+    }
+
+    if (!logic.machineRoomAligned) {
+      results.push({
+        type: 'warning',
+        msg: data.driveArrangement === 'machine-room'
+          ? 'Machine room layout is selected, but the machine room position is still undefined.'
+          : 'MRL layout is selected, but a machine room is still declared in the project base.',
+        moduleId: 'global',
+        fieldName: 'machineRoomPosition'
+      });
+    }
+
+    if (!logic.drivePackageAligned) {
+      results.push({
+        type: 'warning',
+        msg: `Drive / power unit should be closed as ${logic.recommendedDrivePackageLocation} for the current installation layout.`,
+        moduleId: 'global',
+        fieldName: 'drivePackageLocation'
+      });
+    }
+
+    if (!logic.controlCabinetAligned) {
+      results.push({
+        type: 'warning',
+        msg: `Control cabinet location should be aligned with the current ${data.driveArrangement === 'machine-room' ? 'machine-room' : 'MRL'} layout.`,
+        moduleId: 'global',
+        fieldName: 'controlCabinetLocation'
+      });
+    }
+
+    if (!logic.inspectionChainComplete) {
+      results.push({
+        type: 'warning',
+        msg: 'Inspection chain is incomplete. Close car roof, pit and cabinet inspection controls before final verification.',
+        moduleId: 'global',
+        fieldName: !data.roofInspectionStation ? 'roofInspectionStation' : !data.pitInspectionStation ? 'pitInspectionStation' : 'cabinetInspectionEnabled'
+      });
+    }
+
+    if (!logic.travellingCableAligned) {
+      results.push({
+        type: 'warning',
+        msg: 'Travelling cable definition is still missing or invalid for the current installation base.',
+        moduleId: 'global',
+        fieldName: 'travellingCableType'
+      });
+    }
+
+    if (!logic.shaftLightingCompliant) {
+      results.push({
+        type: 'warning',
+        msg: `Shaft lighting is below the maintenance target of ${logic.shaftLightingTargetLux} lx.`,
+        moduleId: 'global',
+        fieldName: 'shaftLightingLux'
+      });
+    }
+
+    if (!logic.luminaireCoverageOk) {
+      results.push({
+        type: 'warning',
+        msg: `Luminaire layout should close around ${logic.recommendedLuminaireCount} units at about ${logic.recommendedLuminaireSpacing.toFixed(1)} m spacing.`,
+        moduleId: 'global',
+        fieldName: 'shaftLuminaireCount'
       });
     }
 
@@ -477,6 +708,14 @@ export default function App() {
           fieldName: 'compensationType',
           actionLabel: 'Clear Compensation',
           onAction: () => handleDataChange({ compensationType: 'none' })
+        });
+      }
+      if (data.bufferMedium !== 'hydraulic-oil' || data.bufferType !== 'energy-dissipation') {
+        results.push({
+          type: 'warning',
+          msg: 'Hydraulic configuration should stay on hydraulic-oil energy dissipation buffers in this workspace.',
+          moduleId: 'buffers',
+          fieldName: 'bufferMedium'
         });
       }
       if (data.cwtMass > 0) {
@@ -615,9 +854,6 @@ export default function App() {
     { id: 'clearances', label: 'Clearances (ISO 8100-1)', icon: Ruler, status: 'implemented', category: 'Hoistway and Geometry' },
     { id: 'shaft', label: '3D Shaft', icon: Box, status: 'implemented', category: 'Hoistway and Geometry' },
 
-    // Hydraulic
-    { id: 'hydraulic', label: 'Hydraulic (4.15)', icon: Droplets, status: 'implemented', category: 'Hydraulic Systems' },
-    
     // Tools
     { id: 'library', label: 'Component Library', icon: Library, status: 'implemented', category: 'Tools and Documentation' },
     { id: 'formulas', label: 'Formula Library', icon: Calculator, status: 'implemented', category: 'Tools and Documentation' },
@@ -661,6 +897,16 @@ export default function App() {
       ? { label: 'review', tone: 'text-amber-700 bg-amber-50 border-amber-200' }
       : { label: 'ok', tone: 'text-emerald-700 bg-emerald-50 border-emerald-200' };
   const activeSectionLabel = modules.find(m => m.id === activeTab)?.label || 'Current Section';
+  const activeCategory = modules.find(m => m.id === activeTab)?.category || 'Current Workspace';
+  const categoryModules = modules.filter((module) => module.category === activeCategory);
+  const categoryIssueMap = useMemo(() => {
+    const counts = new Map<string, number>();
+    allValidationResults.forEach((result) => {
+      if (!result.moduleId) return;
+      counts.set(result.moduleId, (counts.get(result.moduleId) || 0) + 1);
+    });
+    return counts;
+  }, [allValidationResults]);
 
   const exportProjectData = () => {
     const dataStr = JSON.stringify(projectData, null, 2);
@@ -742,6 +988,18 @@ export default function App() {
               carToCwtDistance={projectData.carToCwtDistance}
               headroomGeneral={projectData.headroomGeneral}
               showClearances={projectData.showClearances}
+              driveArrangement={projectData.driveArrangement}
+              machineRoomPosition={projectData.machineRoomPosition}
+              controlCabinetLocation={projectData.controlCabinetLocation}
+              drivePackageLocation={projectData.drivePackageLocation}
+              travellingCableType={projectData.travellingCableType}
+              travellingCableRouting={projectData.travellingCableRouting}
+              shaftLightingLux={projectData.shaftLightingLux}
+              shaftLuminaireSpacing={projectData.shaftLuminaireSpacing}
+              shaftLuminaireCount={projectData.shaftLuminaireCount}
+              roofInspectionStation={projectData.roofInspectionStation}
+              pitInspectionStation={projectData.pitInspectionStation}
+              cabinetInspectionEnabled={projectData.cabinetInspectionEnabled}
             />
             <div className="mt-6 p-4 bg-surface-container-lowest border border-outline-variant/10 rounded-sm">
               <div className="flex justify-between items-center mb-4">
@@ -781,6 +1039,9 @@ export default function App() {
               width={projectData.carWidth / 1000}
               depth={projectData.carDepth / 1000}
               height={projectData.carHeight / 1000}
+              showSeismic={projectData.seismicRetainerEnabled || projectData.seismicCategory > 0}
+              roofInspectionStation={projectData.roofInspectionStation}
+              balustradeHeight={projectData.carRoofBalustradeHeight}
             />
             <div className="mt-6 p-4 bg-surface-container-lowest border border-outline-variant/10 rounded-sm mb-6">
               <h4 className="text-[10px] font-bold uppercase text-primary mb-4">Dimensions Controls</h4>
@@ -883,7 +1144,7 @@ export default function App() {
       </aside>
       
       {/* Main Content */}
-      <main className={`${isSidebarCollapsed ? 'ml-20' : 'ml-64'} flex-1 flex flex-col h-full overflow-hidden bg-surface transition-all duration-200`}>
+      <main className={`${isSidebarCollapsed ? 'ml-20' : 'ml-64'} ${isInspectorCollapsed ? 'mr-20' : 'mr-[320px]'} flex-1 flex flex-col h-full overflow-hidden bg-surface transition-all duration-200`}>
         {/* Header */}
         <header className="flex justify-between items-center w-full px-8 h-14 bg-surface-container-highest sticky top-0 z-50 border-b border-outline-variant/50">
           <div className="flex items-center gap-6">
@@ -1004,6 +1265,148 @@ export default function App() {
         </footer>
       </main>
 
+      <aside className={`fixed right-0 top-0 z-40 flex h-full flex-col border-l border-outline-variant/50 bg-surface-container transition-all duration-200 ${isInspectorCollapsed ? 'w-20' : 'w-[320px]'}`}>
+        <div className="border-b border-outline-variant/30 px-4 py-4">
+          <div className="flex items-start justify-between gap-3">
+            <div className={isInspectorCollapsed ? 'hidden' : 'block'}>
+              <p className="text-[10px] font-black uppercase tracking-[0.2em] text-primary">Quick Inspector</p>
+              <h3 className="mt-1 text-lg font-black tracking-tight text-on-surface">{activeCategory}</h3>
+              <p className="mt-1 text-xs leading-relaxed text-on-surface-variant">
+                Navegação curta, issues desta zona e atalho direto para o campo ou secção relevante.
+              </p>
+            </div>
+            <button
+              onClick={() => setIsInspectorCollapsed((prev) => !prev)}
+              className="rounded-sm border border-outline-variant/20 p-2 text-on-surface-variant transition-colors hover:text-primary"
+              title={isInspectorCollapsed ? 'Expand inspector' : 'Collapse inspector'}
+            >
+              <ChevronRight size={14} className={`transition-transform ${isInspectorCollapsed ? 'rotate-180' : ''}`} />
+            </button>
+          </div>
+        </div>
+
+        <div className="flex-1 overflow-y-auto px-3 py-4 no-scrollbar">
+          {isInspectorCollapsed ? (
+            <div className="flex flex-col gap-2">
+              <button
+                onClick={validateActiveSection}
+                className="flex h-12 items-center justify-center rounded-sm border border-outline-variant/20 bg-surface-container-high text-primary"
+                title="Validate current section"
+              >
+                <CheckSquare size={16} />
+              </button>
+              {categoryModules.map((module) => {
+                const Icon = module.icon;
+                const issueCount = categoryIssueMap.get(module.id) || 0;
+                return (
+                  <button
+                    key={module.id}
+                    onClick={() => setActiveTab(module.id)}
+                    className={`relative flex h-12 items-center justify-center rounded-sm border transition-colors ${
+                      activeTab === module.id
+                        ? 'border-primary/40 bg-primary/10 text-primary'
+                        : 'border-outline-variant/20 bg-surface-container-low text-on-surface-variant hover:border-primary/30 hover:text-primary'
+                    }`}
+                    title={`${module.label}${issueCount ? ` • ${issueCount} issue${issueCount > 1 ? 's' : ''}` : ''}`}
+                  >
+                    <Icon size={16} />
+                    {issueCount > 0 && (
+                      <span className="absolute right-1 top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-error px-1 text-[9px] font-black text-white">
+                        {issueCount}
+                      </span>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+          ) : (
+            <div className="space-y-4">
+              <div className="rounded-sm border border-outline-variant/20 bg-surface-container-low p-3">
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <p className="text-[10px] font-black uppercase tracking-[0.18em] text-on-surface-variant">Current section</p>
+                    <p className="mt-1 text-sm font-black text-on-surface">{activeSectionLabel}</p>
+                  </div>
+                  <span className={`inline-flex rounded-full border px-3 py-1 text-[10px] font-black uppercase tracking-[0.16em] ${activeSectionStatus.tone}`}>
+                    {activeSectionStatus.label}
+                  </span>
+                </div>
+                <button
+                  onClick={validateActiveSection}
+                  className="mt-3 w-full rounded-sm border border-primary/25 bg-primary/10 px-3 py-2 text-[10px] font-black uppercase tracking-[0.18em] text-primary transition-colors hover:border-primary/40 hover:bg-primary/15"
+                >
+                  Validate current section
+                </button>
+              </div>
+
+              <div className="rounded-sm border border-outline-variant/20 bg-surface-container-low p-3">
+                <p className="text-[10px] font-black uppercase tracking-[0.18em] text-on-surface-variant">This block</p>
+                <div className="mt-3 space-y-2">
+                  {categoryModules.map((module) => {
+                    const issueCount = categoryIssueMap.get(module.id) || 0;
+                    const Icon = module.icon;
+                    return (
+                      <button
+                        key={module.id}
+                        onClick={() => setActiveTab(module.id)}
+                        className={`flex w-full items-center justify-between rounded-sm border px-3 py-3 text-left transition-colors ${
+                          activeTab === module.id
+                            ? 'border-primary/35 bg-primary/10'
+                            : 'border-outline-variant/20 bg-surface-container-lowest hover:border-primary/25 hover:bg-surface-container'
+                        }`}
+                      >
+                        <div className="flex items-center gap-3">
+                          <Icon size={15} className={activeTab === module.id ? 'text-primary' : 'text-on-surface-variant'} />
+                          <div>
+                            <p className="text-[11px] font-black uppercase tracking-[0.14em] text-on-surface">{module.label}</p>
+                            <p className="text-[10px] text-on-surface-variant">
+                              {issueCount > 0 ? `${issueCount} issue${issueCount > 1 ? 's' : ''} flagged here` : 'section currently clean'}
+                            </p>
+                          </div>
+                        </div>
+                        <ChevronRight size={14} className={activeTab === module.id ? 'text-primary' : 'text-on-surface-variant'} />
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              <div className="rounded-sm border border-outline-variant/20 bg-surface-container-low p-3">
+                <p className="text-[10px] font-black uppercase tracking-[0.18em] text-on-surface-variant">Immediate queue</p>
+                <div className="mt-3 space-y-2">
+                  {(activeSectionResults.length > 0 ? activeSectionResults : allValidationResults.slice(0, 4)).slice(0, 4).map((result, index) => (
+                    <button
+                      key={`${result.moduleId || 'global'}-${index}`}
+                      onClick={() => {
+                        if (result.moduleId) {
+                          setActiveTab(result.moduleId);
+                        }
+                        if (result.fieldName) {
+                          setPendingFocusField(result.fieldName);
+                        }
+                      }}
+                      className="w-full rounded-sm border border-outline-variant/20 bg-surface-container-lowest px-3 py-3 text-left transition-colors hover:border-primary/25 hover:bg-surface-container"
+                    >
+                      <div className="flex items-start gap-3">
+                        <div className={`mt-0.5 rounded-full p-1 ${result.type === 'error' ? 'bg-error/15 text-error' : result.type === 'warning' ? 'bg-amber-100 text-amber-700' : 'bg-emerald-100 text-emerald-700'}`}>
+                          {result.type === 'error' ? <XCircle size={12} /> : result.type === 'warning' ? <AlertTriangle size={12} /> : <CheckCircle2 size={12} />}
+                        </div>
+                        <div className="min-w-0">
+                          <p className="text-[10px] font-black uppercase tracking-[0.16em] text-on-surface">
+                            {result.fieldName ? 'Open related field' : 'Open related section'}
+                          </p>
+                          <p className="mt-1 text-xs leading-relaxed text-on-surface-variant">{result.msg}</p>
+                        </div>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      </aside>
+
       <ValidationModal 
         isOpen={isValidationOpen} 
         onClose={() => setIsValidationOpen(false)} 
@@ -1029,7 +1432,10 @@ export default function App() {
           </div>
           <div className="flex items-center justify-between">
             <span className="text-xs font-medium">Language</span>
-            <span className="text-xs font-bold">Portuguese-ready / English UI</span>
+            <span className="text-xs font-bold">English UI / Portuguese-ready</span>
+          </div>
+          <div className="rounded-sm border border-primary/20 bg-primary/5 p-3 text-xs leading-relaxed text-on-surface-variant">
+            This workspace keeps one validated source per engineering topic. Edit each topic in its own dedicated module instead of spreading changes across multiple screens.
           </div>
         </div>
       </SimpleModal>
@@ -1041,10 +1447,10 @@ export default function App() {
       >
         <div className="space-y-4 text-xs leading-relaxed opacity-80">
           <p>This tool follows the <strong>ISO 8100-2:2026</strong> standard for elevator component verification.</p>
-          <p>For technical support or feature requests, contact the engineering team at <code>info@ilate.pt</code>.</p>
+          <p>Documentation should live inside the workspace itself: section notes, validation prompts, technical memory and PDF output.</p>
           <div className="p-3 bg-primary/5 border border-primary/10 rounded-sm">
             <p className="font-bold text-primary mb-1 uppercase tracking-tighter">Documentation</p>
-            <p>Project guidance, engineering notes and evolving implementation coverage should be exposed directly inside the ILATE workspace instead of a hidden external portal.</p>
+            <p>Use the section inspector, formula library, technical memory and PDF export as the working documentation stack. External contacts should not replace in-product guidance.</p>
           </div>
         </div>
       </SimpleModal>

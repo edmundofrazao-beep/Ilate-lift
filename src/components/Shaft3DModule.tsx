@@ -25,6 +25,18 @@ interface Shaft3DProps {
   carToCwtDistance?: number;
   headroomGeneral?: number;
   showClearances?: boolean;
+  driveArrangement?: 'mrl' | 'machine-room';
+  machineRoomPosition?: 'none' | 'overhead' | 'adjacent' | 'basement';
+  controlCabinetLocation?: 'machine-room' | 'top-landing' | 'lowest-landing' | 'jamb';
+  drivePackageLocation?: 'shaft-head' | 'machine-room' | 'landing-cabinet' | 'pit-unit';
+  travellingCableType?: 'flat' | 'round' | 'bus';
+  travellingCableRouting?: 'rear-wall' | 'side-wall';
+  shaftLightingLux?: number;
+  shaftLuminaireSpacing?: number;
+  shaftLuminaireCount?: number;
+  roofInspectionStation?: boolean;
+  pitInspectionStation?: boolean;
+  cabinetInspectionEnabled?: boolean;
 }
 
 const ElevatorCar = ({
@@ -61,6 +73,10 @@ const ElevatorCar = ({
         <boxGeometry args={[width * 0.82, 0.44, 0.05]} />
         <meshStandardMaterial color="#1e293b" metalness={0.45} roughness={0.35} />
       </mesh>
+      <mesh position={[0, -height / 2 - 0.46, depth / 2 - 0.03]}>
+        <boxGeometry args={[width * 0.7, 0.46, 0.025]} />
+        <meshStandardMaterial color="#0f172a" metalness={0.35} roughness={0.4} />
+      </mesh>
       <mesh position={[0, height / 2 + 0.03, 0]}>
         <boxGeometry args={[width * 0.92, 0.06, depth * 0.92]} />
         <meshStandardMaterial color="#334155" metalness={0.45} roughness={0.28} />
@@ -72,6 +88,10 @@ const ElevatorCar = ({
       <mesh position={[width * 0.26, height / 2 + 0.14, depth * 0.18]}>
         <boxGeometry args={[0.16, 0.16, 0.18]} />
         <meshStandardMaterial color={projectType === 'hydraulic' ? '#f59e0b' : '#f97316'} metalness={0.5} roughness={0.2} />
+      </mesh>
+      <mesh position={[width * 0.14, height / 2 + 0.16, depth * 0.14]}>
+        <boxGeometry args={[0.12, 0.12, 0.1]} />
+        <meshStandardMaterial color="#111827" metalness={0.6} roughness={0.24} />
       </mesh>
       <group position={[0, height / 2 + 0.17, -depth * 0.2]}>
         <mesh position={[0, 0, 0]}>
@@ -95,6 +115,18 @@ const ElevatorCar = ({
           <meshStandardMaterial color="#cbd5e1" metalness={0.85} roughness={0.12} />
         </mesh>
       </group>
+      <mesh position={[0, height / 2 + 0.17, depth * 0.22]}>
+        <boxGeometry args={[width * 0.34, 0.03, 0.03]} />
+        <meshStandardMaterial color="#e2e8f0" metalness={0.8} roughness={0.14} />
+      </mesh>
+      <mesh position={[-width * 0.17, height / 2 + 0.07, depth * 0.22]}>
+        <boxGeometry args={[0.03, 0.2, 0.03]} />
+        <meshStandardMaterial color="#e2e8f0" metalness={0.8} roughness={0.14} />
+      </mesh>
+      <mesh position={[width * 0.17, height / 2 + 0.07, depth * 0.22]}>
+        <boxGeometry args={[0.03, 0.2, 0.03]} />
+        <meshStandardMaterial color="#e2e8f0" metalness={0.8} roughness={0.14} />
+      </mesh>
     </group>
   );
 };
@@ -216,6 +248,174 @@ const MachineDeck = ({ shaftHeight, shaftWidth, shaftDepth }: { shaftHeight: num
       <boxGeometry args={[0.45, 0.18, 0.22]} />
       <meshStandardMaterial color="#1e293b" metalness={0.7} roughness={0.3} />
     </mesh>
+  </group>
+);
+
+const MachineRoomPod = ({
+  shaftHeight,
+  shaftWidth,
+  shaftDepth,
+  position,
+}: {
+  shaftHeight: number;
+  shaftWidth: number;
+  shaftDepth: number;
+  position: 'overhead' | 'adjacent' | 'basement';
+}) => {
+  const podPosition =
+    position === 'adjacent'
+      ? [shaftWidth * 0.72, shaftHeight * 0.72, 0]
+      : position === 'basement'
+        ? [0, -1.2, -shaftDepth * 0.72]
+        : [0, shaftHeight + 1.2, -shaftDepth * 0.15];
+  const podSize =
+    position === 'adjacent'
+      ? [shaftWidth * 0.4, 2.4, shaftDepth * 0.55]
+      : [shaftWidth * 0.82, 1.8, shaftDepth * 0.4];
+
+  return (
+    <group position={podPosition as [number, number, number]}>
+      <Box args={podSize as [number, number, number]}>
+        <meshStandardMaterial color="#0f172a" metalness={0.62} roughness={0.24} />
+      </Box>
+      <mesh position={[-0.3, 0.2, podSize[2] / 2 + 0.01]}>
+        <boxGeometry args={[0.42, 0.9, 0.03]} />
+        <meshStandardMaterial color="#1e293b" metalness={0.55} roughness={0.28} />
+      </mesh>
+      <mesh position={[0.24, 0.18, 0]}>
+        <boxGeometry args={[0.46, 0.34, 0.3]} />
+        <meshStandardMaterial color="#f97316" metalness={0.45} roughness={0.22} />
+      </mesh>
+    </group>
+  );
+};
+
+const ControlCabinet = ({
+  shaftWidth,
+  shaftDepth,
+  shaftHeight,
+  location,
+}: {
+  shaftWidth: number;
+  shaftDepth: number;
+  shaftHeight: number;
+  location: 'machine-room' | 'top-landing' | 'lowest-landing' | 'jamb';
+}) => {
+  const position =
+    location === 'machine-room'
+      ? [shaftWidth * 0.24, shaftHeight + 0.58, -shaftDepth * 0.16]
+      : location === 'top-landing'
+        ? [shaftWidth / 2 + 0.18, shaftHeight - 1.2, shaftDepth / 2 + 0.02]
+        : location === 'lowest-landing'
+          ? [shaftWidth / 2 + 0.18, 1.1, shaftDepth / 2 + 0.02]
+          : [shaftWidth / 2 + 0.06, 1.1, shaftDepth / 2 + 0.04];
+
+  return (
+    <group position={position as [number, number, number]}>
+      <mesh>
+        <boxGeometry args={[0.24, 0.62, 0.16]} />
+        <meshStandardMaterial color="#111827" metalness={0.62} roughness={0.24} />
+      </mesh>
+      <mesh position={[0, 0.1, 0.085]}>
+        <boxGeometry args={[0.16, 0.22, 0.01]} />
+        <meshStandardMaterial color="#0ea5e9" emissive="#0ea5e9" emissiveIntensity={0.55} />
+      </mesh>
+    </group>
+  );
+};
+
+const TravellingCableRun = ({
+  shaftHeight,
+  carY,
+  carHeight,
+  shaftWidth,
+  shaftDepth,
+  routing,
+}: {
+  shaftHeight: number;
+  carY: number;
+  carHeight: number;
+  shaftWidth: number;
+  shaftDepth: number;
+  routing: 'rear-wall' | 'side-wall';
+}) => {
+  const x = routing === 'side-wall' ? shaftWidth / 2 - 0.12 : -shaftWidth * 0.22;
+  const z = routing === 'side-wall' ? shaftDepth * 0.12 : -shaftDepth / 2 + 0.08;
+  return (
+    <Line
+      points={[
+        [x, shaftHeight + 0.15, z],
+        [x, carY + carHeight * 0.2, z],
+        [x + (routing === 'side-wall' ? -0.22 : 0.12), carY - carHeight * 0.12, z + (routing === 'side-wall' ? -0.08 : 0.05)],
+      ]}
+      color="#f59e0b"
+      lineWidth={2.1}
+    />
+  );
+};
+
+const ShaftLightingRun = ({
+  shaftHeight,
+  shaftWidth,
+  shaftDepth,
+  count,
+  lux,
+}: {
+  shaftHeight: number;
+  shaftWidth: number;
+  shaftDepth: number;
+  count: number;
+  lux: number;
+}) => (
+  <group>
+    {Array.from({ length: Math.max(count, 2) }).map((_, i, arr) => {
+      const y = arr.length === 1 ? shaftHeight / 2 : (i / (arr.length - 1)) * Math.max(shaftHeight - 1.4, 0) + 0.7;
+      return (
+        <group key={i} position={[-shaftWidth / 2 + 0.05, y, shaftDepth / 2 - 0.08]}>
+          <mesh rotation={[0, 0, Math.PI / 2]}>
+            <boxGeometry args={[0.44, 0.06, 0.05]} />
+            <meshStandardMaterial color="#f8fafc" emissive="#f8fafc" emissiveIntensity={lux >= 200 ? 0.8 : 0.3} />
+          </mesh>
+        </group>
+      );
+    })}
+  </group>
+);
+
+const InspectionStations = ({
+  shaftWidth,
+  shaftDepth,
+  shaftHeight,
+  roofInspectionStation,
+  pitInspectionStation,
+  cabinetInspectionEnabled,
+}: {
+  shaftWidth: number;
+  shaftDepth: number;
+  shaftHeight: number;
+  roofInspectionStation: boolean;
+  pitInspectionStation: boolean;
+  cabinetInspectionEnabled: boolean;
+}) => (
+  <group>
+    {roofInspectionStation && (
+      <mesh position={[shaftWidth * 0.26, shaftHeight - 0.8, -shaftDepth * 0.16]}>
+        <boxGeometry args={[0.22, 0.14, 0.12]} />
+        <meshStandardMaterial color="#f97316" metalness={0.55} roughness={0.22} />
+      </mesh>
+    )}
+    {pitInspectionStation && (
+      <mesh position={[-shaftWidth / 2 + 0.16, -0.4, shaftDepth / 2 - 0.08]}>
+        <boxGeometry args={[0.18, 0.14, 0.08]} />
+        <meshStandardMaterial color="#38bdf8" metalness={0.45} roughness={0.28} />
+      </mesh>
+    )}
+    {cabinetInspectionEnabled && (
+      <mesh position={[shaftWidth / 2 + 0.18, Math.min(1.5, shaftHeight - 0.8), shaftDepth / 2 + 0.02]}>
+        <boxGeometry args={[0.08, 0.08, 0.04]} />
+        <meshStandardMaterial color="#22c55e" emissive="#22c55e" emissiveIntensity={0.45} />
+      </mesh>
+    )}
   </group>
 );
 
@@ -341,6 +541,27 @@ const LandingDoors = ({
               <boxGeometry args={[openingWidth + 0.02, 0.05, 0.06]} />
               <meshStandardMaterial color={isActiveLanding ? '#2563eb' : '#475569'} metalness={0.6} roughness={0.25} />
             </mesh>
+            <mesh position={[openingWidth / 2 + 0.12, 0.2, 0.025]}>
+              <boxGeometry args={[0.08, 0.36, 0.04]} />
+              <meshStandardMaterial color={isActiveLanding ? '#0f172a' : '#1e293b'} metalness={0.65} roughness={0.28} />
+            </mesh>
+            <mesh position={[openingWidth / 2 + 0.145, 0.29, 0.048]}>
+              <boxGeometry args={[0.018, 0.018, 0.01]} />
+              <meshStandardMaterial color={isActiveLanding ? '#22c55e' : '#f8fafc'} emissive={isActiveLanding ? '#22c55e' : '#000000'} emissiveIntensity={isActiveLanding ? 0.7 : 0} />
+            </mesh>
+            <mesh position={[openingWidth / 2 + 0.145, 0.14, 0.048]}>
+              <boxGeometry args={[0.018, 0.018, 0.01]} />
+              <meshStandardMaterial color={isActiveLanding ? '#f97316' : '#cbd5e1'} emissive={isActiveLanding ? '#f97316' : '#000000'} emissiveIntensity={isActiveLanding ? 0.6 : 0} />
+            </mesh>
+            <mesh position={[0, openingHeight / 2 + 0.15, 0.018]}>
+              <boxGeometry args={[0.16, 0.08, 0.03]} />
+              <meshStandardMaterial color={isActiveLanding ? '#0f172a' : '#1e293b'} metalness={0.7} roughness={0.2} />
+            </mesh>
+            <Html position={[0, openingHeight / 2 + 0.15, 0.04]} center>
+              <div className={`rounded px-2 py-0.5 text-[8px] font-black uppercase tracking-[0.18em] ${isActiveLanding ? 'bg-emerald-500/90 text-white' : 'bg-black/60 text-white/70'}`}>
+                {`L${String(i).padStart(2, '0')}`}
+              </div>
+            </Html>
             {isActiveLanding && (
               <Html position={[0, openingHeight / 2 + 0.18, 0.02]} center>
                 <div className="flex items-center gap-2 whitespace-nowrap rounded bg-blue-600/90 px-2 py-0.5 text-[9px] font-black uppercase tracking-[0.18em] text-white">
@@ -409,10 +630,23 @@ export const Shaft3DModule: React.FC<Shaft3DProps> = ({
   carToCwtDistance = 0.06,
   headroomGeneral = 0.52,
   showClearances = true,
+  driveArrangement = 'mrl',
+  machineRoomPosition = 'none',
+  controlCabinetLocation = 'top-landing',
+  drivePackageLocation = 'shaft-head',
+  travellingCableType = 'flat',
+  travellingCableRouting = 'rear-wall',
+  shaftLightingLux = 220,
+  shaftLuminaireSpacing = 3.0,
+  shaftLuminaireCount = 6,
+  roofInspectionStation = true,
+  pitInspectionStation = true,
+  cabinetInspectionEnabled = true,
 }) => {
   const [resetKey, setResetKey] = useState(0);
   const [hoveredZone, setHoveredZone] = useState<string | null>(null);
   const [frontCutaway, setFrontCutaway] = useState(0.45);
+  const [isInspectorCollapsed, setIsInspectorCollapsed] = useState(false);
   const sceneRef = useRef<THREE.Scene | null>(null);
 
   const handleExport = () => {
@@ -458,16 +692,44 @@ export const Shaft3DModule: React.FC<Shaft3DProps> = ({
     wall: { label: 'Wall Gap', value: actualWallGap * 1000, limit: '≤ 150mm', clause: 'ISO 8100-1:2026 5.2.5.2' },
     sill: { label: 'Sill Gap', value: sillGap * 1000, limit: '≤ 35mm', clause: 'ISO 8100-1:2026 5.3.4' },
     cwt: { label: projectType === 'hydraulic' ? 'Hydraulic Service Zone' : 'Car-CWT Gap', value: carToCwtDistance * 1000, limit: '≥ 50mm', clause: 'ISO 8100-1:2026 5.2.5.2' },
+    lighting: { label: 'Shaft Lighting', value: shaftLightingLux, limit: '≥ 200 lx', clause: 'Maintenance lighting rule' },
   };
 
   const telemetryRows = [
+    { label: 'Layout', value: driveArrangement === 'machine-room' ? 'Machine room' : 'MRL' },
+    { label: 'Drive', value: drivePackageLocation },
+    { label: 'Cabinet', value: controlCabinetLocation },
     { label: 'Travel Envelope', value: `${Math.max(height - pitDepth, 0).toFixed(0)} mm` },
     { label: 'Car Position', value: `${(carPos * 100).toFixed(0)} %` },
     { label: 'Active Landing', value: `L${String(currentLandingIndex).padStart(2, '0')}` },
     { label: 'Front Cutaway', value: `${(frontCutaway * 100).toFixed(0)} %` },
     { label: 'Wall Gap', value: `${(actualWallGap * 1000).toFixed(0)} mm` },
     { label: projectType === 'hydraulic' ? 'Service Zone' : 'CWT Gap', value: `${(carToCwtDistance * 1000).toFixed(0)} mm` },
+    { label: 'Cable', value: `${travellingCableType} / ${travellingCableRouting}` },
+    { label: 'Lighting', value: `${shaftLightingLux.toFixed(0)} lx / ${shaftLuminaireCount} pcs @ ${shaftLuminaireSpacing.toFixed(1)}m` },
   ];
+  const hydraulicPowerUnitScene = (() => {
+    if (projectType !== 'hydraulic') return null;
+    if (drivePackageLocation === 'machine-room') {
+      return {
+        position: [w / 2 + 0.34, h - 0.65, -d * 0.18] as [number, number, number],
+        box: [0.72, 0.42, 0.5] as [number, number, number],
+        label: 'Power unit in machine room',
+      };
+    }
+    if (drivePackageLocation === 'pit-unit') {
+      return {
+        position: [0, -pD + 0.16, -d * 0.24] as [number, number, number],
+        box: [0.86, 0.12, 0.46] as [number, number, number],
+        label: 'Pit hydraulic power unit',
+      };
+    }
+    return {
+      position: [w / 2 + 0.28, Math.max(h - 1.35, 1.2), d / 2 - 0.2] as [number, number, number],
+      box: [0.36, 0.9, 0.24] as [number, number, number],
+      label: 'Landing cabinet power unit',
+    };
+  })();
 
   const inspectionPresets = [
     {
@@ -498,6 +760,7 @@ export const Shaft3DModule: React.FC<Shaft3DProps> = ({
     { id: 'wall', label: 'Wall Clearance', ok: actualWallGap * 1000 <= 150 },
     { id: 'sill', label: 'Landing Sill Gap', ok: sillGap * 1000 <= 35 },
     { id: 'cwt', label: projectType === 'hydraulic' ? 'Hydraulic Service Zone' : 'Car vs Counterweight', ok: carToCwtDistance * 1000 >= 50 },
+    { id: 'lighting', label: 'Shaft Lighting', ok: shaftLightingLux >= 200 },
   ];
 
   return (
@@ -553,10 +816,25 @@ export const Shaft3DModule: React.FC<Shaft3DProps> = ({
             onChange={(e) => setFrontCutaway(Number(e.target.value) / 100)}
             className="w-full accent-orange-500"
           />
-          <p className="mt-2 text-[10px] leading-relaxed text-white/45">
-            Open the front shell to inspect the pit, cabin exterior, ram and safety zones without changing the camera.
-          </p>
-        </div>
+            <p className="mt-2 text-[10px] leading-relaxed text-white/45">
+              Open the front shell to inspect the pit, cabin exterior, ram and safety zones without changing the camera.
+            </p>
+            <div className="mt-4 border-t border-white/10 pt-3">
+              <div className="mb-2 flex items-center justify-between gap-3">
+                <span className="text-[10px] font-bold uppercase text-white/45">Car travel</span>
+                <span className="font-mono text-[10px] text-primary">{Math.round(carPos * 100)}%</span>
+              </div>
+              <input
+                type="range"
+                min={0}
+                max={100}
+                step={1}
+                value={carPos * 100}
+                onChange={(e) => onPresetSelect?.({ carPositionPercent: Number(e.target.value) })}
+                className="w-full accent-orange-500"
+              />
+            </div>
+          </div>
 
         <div className="rounded border border-white/10 bg-black/60 p-4 shadow-xl backdrop-blur-md">
           <div className="mb-3 flex items-center gap-2">
@@ -615,48 +893,79 @@ export const Shaft3DModule: React.FC<Shaft3DProps> = ({
       </div>
 
       <div
-        className={`absolute right-4 top-4 z-10 w-[300px] rounded border border-white/10 bg-slate-950/75 p-4 shadow-2xl backdrop-blur-md transition-all duration-300 ${
-          hoveredZone ? 'translate-x-0 opacity-100' : 'translate-x-3 opacity-90'
-        }`}
+        className={`absolute right-4 top-4 z-10 rounded border border-white/10 bg-slate-950/75 shadow-2xl backdrop-blur-md transition-all duration-300 ${
+          isInspectorCollapsed ? 'w-16 p-2' : 'w-[300px] p-4'
+        } ${hoveredZone ? 'translate-x-0 opacity-100' : 'translate-x-3 opacity-90'}`}
       >
-        <div className="mb-4 flex items-center justify-between gap-3">
-          <div className="flex items-center gap-2">
-            <Layers3 size={12} className="text-primary" />
-            <h4 className="text-[11px] font-black uppercase tracking-[0.2em] text-white">Clearance Inspector</h4>
-          </div>
-          <div className="rounded-full border border-white/10 px-2 py-1 text-[9px] font-black uppercase tracking-[0.16em] text-white/60">
-            {projectType === 'hydraulic' ? 'Hydraulic shaft' : 'ISO 8100-1'}
-          </div>
-        </div>
-        <div className="space-y-3">
-          {complianceStates.map((state) => (
-            <div
-              key={state.id}
-              className={`rounded border p-3 transition-colors ${
-                hoveredZone === state.id ? 'border-primary/40 bg-primary/10' : 'border-white/10 bg-white/[0.03]'
-              }`}
+        <div className={`flex items-center ${isInspectorCollapsed ? 'justify-center' : 'justify-between'} gap-3`}>
+          {isInspectorCollapsed ? (
+            <button
+              onClick={() => setIsInspectorCollapsed(false)}
+              className="rounded border border-white/10 p-2 text-primary"
+              title="Expand clearance inspector"
             >
-              <div className="flex items-center justify-between gap-3">
-                <span className="text-[10px] font-bold uppercase tracking-[0.16em] text-white/75">{state.label}</span>
-                <span className={`text-[9px] font-black uppercase tracking-[0.16em] ${state.ok ? 'text-emerald-300' : 'text-rose-300'}`}>
-                  {state.ok ? 'within limit' : 'review'}
-                </span>
+              <Layers3 size={14} />
+            </button>
+          ) : (
+            <>
+              <div className="flex items-center gap-2">
+                <Layers3 size={12} className="text-primary" />
+                <h4 className="text-[11px] font-black uppercase tracking-[0.2em] text-white">Clearance Inspector</h4>
               </div>
-              {clearanceData[state.id] && (
-                <div className="mt-2 flex items-center justify-between gap-4 text-[11px]">
-                  <span className="font-mono text-white">{clearanceData[state.id].value.toFixed(0)} mm</span>
-                  <span className="text-white/45">{clearanceData[state.id].limit}</span>
+              <div className="flex items-center gap-2">
+                <div className="rounded-full border border-white/10 px-2 py-1 text-[9px] font-black uppercase tracking-[0.16em] text-white/60">
+                  {projectType === 'hydraulic' ? 'Hydraulic shaft' : 'ISO 8100-1'}
                 </div>
-              )}
+                <button
+                  onClick={() => setIsInspectorCollapsed(true)}
+                  className="rounded border border-white/10 p-1.5 text-white/60 transition-colors hover:text-primary"
+                  title="Collapse clearance inspector"
+                >
+                  <Layers3 size={12} />
+                </button>
+              </div>
+            </>
+          )}
+        </div>
+        {!isInspectorCollapsed && (
+          <>
+            <div className="mt-4 space-y-3">
+              {complianceStates.map((state) => (
+                <div
+                  key={state.id}
+                  className={`rounded border p-3 transition-colors ${
+                    hoveredZone === state.id ? 'border-primary/40 bg-primary/10' : 'border-white/10 bg-white/[0.03]'
+                  }`}
+                >
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="text-[10px] font-bold uppercase tracking-[0.16em] text-white/75">{state.label}</span>
+                    <span className={`text-[9px] font-black uppercase tracking-[0.16em] ${state.ok ? 'text-emerald-300' : 'text-rose-300'}`}>
+                      {state.ok ? 'within limit' : 'review'}
+                    </span>
+                  </div>
+                  {clearanceData[state.id] && (
+                    <div className="mt-2 flex items-center justify-between gap-4 text-[11px]">
+                      <span className="font-mono text-white">{clearanceData[state.id].value.toFixed(0)} mm</span>
+                      <span className="text-white/45">{clearanceData[state.id].limit}</span>
+                    </div>
+                  )}
+                </div>
+              ))}
             </div>
-          ))}
-        </div>
-        <div className="mt-4 flex items-center gap-2 border-t border-white/10 pt-4 text-[10px] text-white/45">
-          <ArrowRightLeft size={12} />
-          {projectType === 'hydraulic'
-            ? 'Hydraulic mode reuses the shaft envelope but tracks service-zone spacing instead of traction-specific counterweight intent.'
-            : 'Hover any clearance block in the scene to pin its normative reading.'}
-        </div>
+            <div className="mt-4 rounded border border-primary/20 bg-primary/10 p-3">
+              <p className="text-[10px] font-black uppercase tracking-[0.18em] text-primary">Scene coverage</p>
+              <p className="mt-2 text-xs leading-relaxed text-white/70">
+                Pit buffers, landing doors, machine layout, travelling cable, shaft lighting and inspection stations are now controlled from this scene.
+              </p>
+            </div>
+            <div className="mt-4 flex items-center gap-2 border-t border-white/10 pt-4 text-[10px] text-white/45">
+              <ArrowRightLeft size={12} />
+              {projectType === 'hydraulic'
+                ? 'Hydraulic mode reuses the shaft envelope but tracks service-zone spacing instead of traction-specific counterweight intent.'
+                : 'Hover any clearance block in the scene to pin its normative reading.'}
+            </div>
+          </>
+        )}
       </div>
 
       <div className="absolute left-4 top-1/2 z-10 hidden -translate-y-1/2 xl:flex">
@@ -691,13 +1000,31 @@ export const Shaft3DModule: React.FC<Shaft3DProps> = ({
             <ShaftStructure width={w} depth={d} height={h} pitDepth={pD} frontCutaway={frontCutaway} />
             <GuideRails shaftHeight={h} shaftWidth={w} />
             <ElevatorCar width={carWidth} depth={carDepth} height={carHeight} position={[0, carY, carZ]} projectType={projectType} />
+            <ShaftLightingRun shaftHeight={h} shaftWidth={w} shaftDepth={d} count={shaftLuminaireCount} lux={shaftLightingLux} />
+            <TravellingCableRun shaftHeight={h} carY={carY} carHeight={carHeight} shaftWidth={w} shaftDepth={d} routing={travellingCableRouting} />
+            <ControlCabinet shaftWidth={w} shaftDepth={d} shaftHeight={h} location={controlCabinetLocation} />
+            <InspectionStations
+              shaftWidth={w}
+              shaftDepth={d}
+              shaftHeight={h}
+              roofInspectionStation={roofInspectionStation}
+              pitInspectionStation={pitInspectionStation}
+              cabinetInspectionEnabled={cabinetInspectionEnabled}
+            />
             {projectType === 'electric' ? (
               <>
                 <SuspensionRopes shaftHeight={h} carY={carY} shaftWidth={w} carZ={carZ} />
-                <MachineDeck shaftHeight={h} shaftWidth={w} shaftDepth={d} />
+                {driveArrangement === 'machine-room'
+                  ? machineRoomPosition !== 'none' && <MachineRoomPod shaftHeight={h} shaftWidth={w} shaftDepth={d} position={machineRoomPosition as 'overhead' | 'adjacent' | 'basement'} />
+                  : <MachineDeck shaftHeight={h} shaftWidth={w} shaftDepth={d} />}
               </>
             ) : (
-              <HydraulicRamAssembly shaftHeight={h} carY={carY} carHeight={carHeight} shaftDepth={d} />
+              <>
+                <HydraulicRamAssembly shaftHeight={h} carY={carY} carHeight={carHeight} shaftDepth={d} />
+                {driveArrangement === 'machine-room' && machineRoomPosition !== 'none' && (
+                  <MachineRoomPod shaftHeight={h} shaftWidth={w} shaftDepth={d} position={machineRoomPosition as 'overhead' | 'adjacent' | 'basement'} />
+                )}
+              </>
             )}
             <LandingMarkers shaftHeight={h} shaftDepth={d} />
             <LandingDoors shaftHeight={h} shaftWidth={w} shaftDepth={d} frontCutaway={frontCutaway} activeLandingIndex={currentLandingIndex} carPositionPercent={carPos * 100} />
@@ -717,6 +1044,30 @@ export const Shaft3DModule: React.FC<Shaft3DProps> = ({
 
             <Buffer position={[-w / 4, -pD + 0.15, 0]} />
             <Buffer position={[w / 4, -pD + 0.15, 0]} />
+            <mesh position={[-w * 0.34, -pD + 0.28, -d * 0.3]}>
+              <boxGeometry args={[0.22, 0.08, 0.22]} />
+              <meshStandardMaterial color="#111827" metalness={0.5} roughness={0.35} />
+            </mesh>
+            <mesh position={[w * 0.34, -pD + 0.28, -d * 0.3]}>
+              <boxGeometry args={[0.22, 0.08, 0.22]} />
+              <meshStandardMaterial color="#1e293b" metalness={0.5} roughness={0.35} />
+            </mesh>
+            <group position={[-w / 2 + 0.12, -pD + 0.75, -d / 2 + 0.05]}>
+              <mesh position={[-0.04, 0, 0]}>
+                <boxGeometry args={[0.02, 1.5, 0.02]} />
+                <meshStandardMaterial color="#cbd5e1" metalness={0.8} roughness={0.18} />
+              </mesh>
+              <mesh position={[0.04, 0, 0]}>
+                <boxGeometry args={[0.02, 1.5, 0.02]} />
+                <meshStandardMaterial color="#cbd5e1" metalness={0.8} roughness={0.18} />
+              </mesh>
+              {Array.from({ length: 6 }).map((_, i) => (
+                <mesh key={i} position={[0, -0.62 + i * 0.25, 0]}>
+                  <boxGeometry args={[0.12, 0.015, 0.02]} />
+                  <meshStandardMaterial color="#94a3b8" metalness={0.75} roughness={0.22} />
+                </mesh>
+              ))}
+            </group>
 
             {projectType === 'electric' ? (
               <group position={[0, h - carY, cwtZ]}>
@@ -732,14 +1083,18 @@ export const Shaft3DModule: React.FC<Shaft3DProps> = ({
                   <meshStandardMaterial color="#7f1d1d" metalness={0.4} roughness={0.45} />
                 </mesh>
               </group>
-            ) : (
-              <group position={[0, -pD + 0.16, -d * 0.24]}>
+            ) : hydraulicPowerUnitScene && (
+              <group position={hydraulicPowerUnitScene.position}>
                 <mesh>
-                  <boxGeometry args={[0.86, 0.12, 0.46]} />
+                  <boxGeometry args={hydraulicPowerUnitScene.box} />
                   <meshStandardMaterial color="#0f172a" metalness={0.65} roughness={0.24} />
                 </mesh>
+                <mesh position={[0, hydraulicPowerUnitScene.box[1] / 2 + 0.08, 0]}>
+                  <boxGeometry args={[hydraulicPowerUnitScene.box[0] * 0.82, 0.045, hydraulicPowerUnitScene.box[2] * 0.7]} />
+                  <meshStandardMaterial color="#f97316" metalness={0.55} roughness={0.24} />
+                </mesh>
                 <Html position={[0, 0.22, 0]} center>
-                  <div className="whitespace-nowrap rounded bg-black/60 px-2 py-0.5 text-[10px] text-orange-300">Hydraulic power unit</div>
+                  <div className="whitespace-nowrap rounded bg-black/60 px-2 py-0.5 text-[10px] text-orange-300">{hydraulicPowerUnitScene.label}</div>
                 </Html>
               </group>
             )}
@@ -814,6 +1169,18 @@ export const Shaft3DModule: React.FC<Shaft3DProps> = ({
                     <meshStandardMaterial color={hoveredZone === 'cwt' ? '#a78bfa' : '#8b5cf6'} transparent opacity={hoveredZone === 'cwt' ? 0.4 : 0.2} />
                   </Box>
                 </group>
+                <group
+                  position={[-w / 2 + 0.08, h / 2, d / 2 - 0.08]}
+                  onPointerOver={(e) => {
+                    e.stopPropagation();
+                    setHoveredZone('lighting');
+                  }}
+                  onPointerOut={() => setHoveredZone(null)}
+                >
+                  <Box args={[0.16, h, 0.08]}>
+                    <meshStandardMaterial color={hoveredZone === 'lighting' ? '#fde68a' : '#facc15'} transparent opacity={hoveredZone === 'lighting' ? 0.3 : 0.16} />
+                  </Box>
+                </group>
               </group>
             )}
           </group>
@@ -834,7 +1201,7 @@ export const Shaft3DModule: React.FC<Shaft3DProps> = ({
           <span className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse" />
           <span className="text-[9px] font-black uppercase tracking-[0.18em] text-white/70">Animated overlay channels active</span>
         </div>
-        <div className="font-mono text-[8px] uppercase text-white/30">Vulkan Engine v4.2.0</div>
+        <div className="font-mono text-[8px] uppercase text-white/30">ILATE shaft scene v1.0</div>
       </div>
     </div>
   );

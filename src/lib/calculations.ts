@@ -4,6 +4,7 @@ export function computeLiftCalculations(data: any) {
   const isBeltSuspension = data.suspensionType === 'belt';
   const supportCount = isBeltSuspension ? Math.max(data.numBelts || 0, 1) : Math.max(data.numRopes || 0, 1);
   const nominalDiameter = isBeltSuspension ? Math.max(data.beltThickness || data.ropeDiameter || 1, 1) : Math.max(data.ropeDiameter || 1, 1);
+  const nominalWidth = isBeltSuspension ? Math.max(data.beltWidth || nominalDiameter || 1, 1) : nominalDiameter;
   const effectiveWear = isBeltSuspension ? 0 : (data.ropeWearPercentage || 0) / 100;
   const d_eff = nominalDiameter * (1 - effectiveWear);
 
@@ -37,13 +38,16 @@ export function computeLiftCalculations(data: any) {
 
   // Specific Pressure (EN 81-50 / ISO 8100-2 formulas) using effective diameter
   let p_groove = 0;
-  if (data.grooveType === 'V') {
-    p_groove = (T1_static + T2_static) / (data.numRopes * d_eff * data.sheaveDiameter * Math.sin(gamma / 2));
+  if (isBeltSuspension) {
+    const contactWidth = Math.max(nominalWidth * supportCount, 1);
+    p_groove = (T1_static + T2_static) / (contactWidth * Math.max(data.sheaveDiameter, 1));
+  } else if (data.grooveType === 'V') {
+    p_groove = (T1_static + T2_static) / (supportCount * d_eff * data.sheaveDiameter * Math.sin(gamma / 2));
   } else if (data.grooveType === 'semi-circular') {
-    p_groove = (8 * (T1_static + T2_static) * Math.cos(beta / 2)) / (data.numRopes * d_eff * data.sheaveDiameter * (Math.PI - beta - Math.sin(beta)));
+    p_groove = (8 * (T1_static + T2_static) * Math.cos(beta / 2)) / (supportCount * d_eff * data.sheaveDiameter * (Math.PI - beta - Math.sin(beta)));
   } else {
     // U-groove is essentially semi-circular with beta = 0
-    p_groove = (8 * (T1_static + T2_static)) / (data.numRopes * d_eff * data.sheaveDiameter * Math.PI);
+    p_groove = (8 * (T1_static + T2_static)) / (supportCount * d_eff * data.sheaveDiameter * Math.PI);
   }
 
   // Allowable Specific Pressure limit approximation based on material & speed
@@ -58,6 +62,61 @@ export function computeLiftCalculations(data: any) {
   
   // Scaling limit by rope speed matching typical ISO tables
   const p_allow = base_p / (1 + data.speed / 10);
+
+  // System recommendations / operating logic
+  const isHighSpeed = data.speed >= 4;
+  const isVeryHighSpeed = data.speed >= 6;
+  const compensationRequired = data.type === 'electric' && (data.speed >= 2.5 || data.travel >= 45);
+  const recommendedCompensationType = !compensationRequired
+    ? 'none'
+    : (data.speed >= 4 || data.travel >= 60 ? 'rope' : 'chain');
+  const compensationAligned = data.type === 'hydraulic'
+    ? data.compensationType === 'none'
+    : data.compensationType === recommendedCompensationType;
+
+  const recommendedBufferType = data.type === 'hydraulic'
+    ? 'energy-dissipation'
+    : (data.speed <= 1.0 ? 'energy-accumulation' : 'energy-dissipation');
+  const recommendedBufferMedium = data.type === 'hydraulic'
+    ? 'hydraulic-oil'
+    : (data.speed <= 1.0 ? 'spring' : 'hydraulic-oil');
+  const bufferSelectionAligned = data.bufferType === recommendedBufferType && (data.bufferMedium || recommendedBufferMedium) === recommendedBufferMedium;
+
+  const seismicCategory = Number(data.seismicCategory || 0);
+  const requiresGuideRollers = seismicCategory >= 2 || isHighSpeed;
+  const requiresIndependentGuideAxes = seismicCategory >= 3 || isVeryHighSpeed;
+  const requiresSeismicRetainers = seismicCategory >= 2;
+  const requiresPrimaryWaveDetection = seismicCategory >= 3;
+  const recommendedGuideInterfaceType = requiresGuideRollers ? 'roller' : 'sliding';
+  const guideInterfaceAligned = data.guideInterfaceType === recommendedGuideInterfaceType;
+  const guideRollerIndependentAxesAligned = !requiresIndependentGuideAxes || !!data.guideRollerIndependentAxes;
+  const seismicRetainerAligned = !requiresSeismicRetainers || !!data.seismicRetainerEnabled;
+  const guideRollerClearanceEnvelopeOk =
+    (data.guideRollerClearanceX || 0) <= (requiresIndependentGuideAxes ? 1.0 : 1.5) &&
+    (data.guideRollerClearanceY || 0) <= (requiresIndependentGuideAxes ? 1.0 : 1.5) &&
+    (data.guideRollerClearanceZ || 0) <= (requiresIndependentGuideAxes ? 0.8 : 1.0);
+  const recommendedBalustradeHeight = requiresSeismicRetainers || isHighSpeed ? 1.1 : 0.7;
+  const balustradeHeightOk = (data.carRoofBalustradeHeight || 0) >= recommendedBalustradeHeight;
+  const requiresMachineRoom = data.driveArrangement === 'machine-room';
+  const recommendedDrivePackageLocation = requiresMachineRoom
+    ? 'machine-room'
+    : (data.type === 'hydraulic' ? 'landing-cabinet' : 'shaft-head');
+  const drivePackageAligned = data.drivePackageLocation === recommendedDrivePackageLocation;
+  const recommendedControlCabinetLocation = requiresMachineRoom ? 'machine-room' : 'top-landing';
+  const controlCabinetAligned = requiresMachineRoom
+    ? data.controlCabinetLocation === 'machine-room'
+    : data.controlCabinetLocation !== 'machine-room';
+  const machineRoomAligned = requiresMachineRoom
+    ? data.machineRoomPosition !== 'none'
+    : data.machineRoomPosition === 'none';
+  const travellingCableRequired = true;
+  const travellingCableAligned = travellingCableRequired && ['flat', 'round', 'bus'].includes(data.travellingCableType || '');
+  const inspectionChainComplete = !!data.roofInspectionStation && !!data.pitInspectionStation && !!data.cabinetInspectionEnabled;
+  const shaftLightingCompliant = (data.shaftLightingLux || 0) >= 200;
+  const shaftLightingTargetLux = 200;
+  const luminaireCoverageOk = (data.shaftLuminaireCount || 0) >= 2 && (data.shaftLuminaireSpacing || 0) <= 3.5;
+  const recommendedLuminaireSpacing = data.type === 'hydraulic' ? 2.7 : (isHighSpeed ? 2.5 : 3.0);
+  const recommendedLuminaireCount = Math.max(2, Math.ceil(Math.max((data.shaftHeight || 0) / 1000, data.travel || 0, 3) / recommendedLuminaireSpacing) + 1);
 
   // Ropes
   const Fstatic_total = (data.carMass + data.ratedLoad) * g;
@@ -170,6 +229,41 @@ export function computeLiftCalculations(data: any) {
     },
     hydraulic: {
       A_ram, P_hyd, pressure
+    },
+    systemLogic: {
+      isHighSpeed,
+      isVeryHighSpeed,
+      compensationRequired,
+      recommendedCompensationType,
+      compensationAligned,
+      recommendedBufferType,
+      recommendedBufferMedium,
+      bufferSelectionAligned,
+      requiresGuideRollers,
+      requiresIndependentGuideAxes,
+      requiresSeismicRetainers,
+      requiresPrimaryWaveDetection,
+      recommendedGuideInterfaceType,
+      guideInterfaceAligned,
+      guideRollerIndependentAxesAligned,
+      guideRollerClearanceEnvelopeOk,
+      seismicRetainerAligned,
+      recommendedBalustradeHeight,
+      balustradeHeightOk,
+      requiresMachineRoom,
+      recommendedDrivePackageLocation,
+      drivePackageAligned,
+      recommendedControlCabinetLocation,
+      controlCabinetAligned,
+      machineRoomAligned,
+      travellingCableRequired,
+      travellingCableAligned,
+      inspectionChainComplete,
+      shaftLightingCompliant,
+      shaftLightingTargetLux,
+      luminaireCoverageOk,
+      recommendedLuminaireSpacing,
+      recommendedLuminaireCount
     }
   };
 }
