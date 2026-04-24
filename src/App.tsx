@@ -80,6 +80,162 @@ import { safeNumber, formatNumber, degToRad, InputGroup, LiftField, SliderField,
 
 // --- Modules ---
 
+const MODULE_GUIDANCE: Record<string, { owner: string; output: string; report: string; next?: string }> = {
+  overview: {
+    owner: 'Mapa de trabalho. Não editar valores técnicos aqui.',
+    output: 'Mostra a sequência recomendada e os blocos ainda por fechar.',
+    report: 'Não entra como cálculo; serve para orientar validação.',
+    next: 'Começa em Project Base.',
+  },
+  global: {
+    owner: 'Único local para tipo de elevador, velocidade, curso, pisos, geometria base e arquitetura de comando.',
+    output: 'Alimenta tração/hidráulico, guias, buffers, 3D e relatório.',
+    report: 'Parâmetros de entrada principais.',
+    next: 'Depois segue para tração ou hidráulico.',
+  },
+  cwt: {
+    owner: 'Único local para massa, razão e material do contrapeso.',
+    output: 'Define massa efetiva, volume aproximado e estado de balanço.',
+    report: 'Parâmetros e verificação do contrapeso.',
+  },
+  'traction-params': {
+    owner: 'Único local para geometria de tração, suspensão, ângulos, atrito e aceleração.',
+    output: 'Alimenta polia, aderência, pressão específica e suspensão.',
+    report: 'Base de cálculo da tração.',
+    next: 'Depois valida Sheaves and Grooves.',
+  },
+  sheaves: {
+    owner: 'Único local para polia, ranhura, material, dureza e pressão de contacto.',
+    output: 'Fecha D/d, pressão específica e compatibilidade com o sistema de suspensão.',
+    report: 'Verificação da polia e ranhuras.',
+  },
+  'traction-verify': {
+    owner: 'Página de leitura e validação. Não deve ser usada para tunar inputs base.',
+    output: 'Mostra aderência estática/dinâmica e pressão admissível.',
+    report: 'Resultados de tração.',
+  },
+  'suspension-params': {
+    owner: 'Único local para escolher cabos/cintas, quantidade, resistência e presets.',
+    output: 'Alimenta segurança de suspensão, fadiga e tração.',
+    report: 'Sistema de suspensão instalado.',
+  },
+  'suspension-verify': {
+    owner: 'Página de verificação de segurança, descarte e fadiga da suspensão.',
+    output: 'Mostra SF, vida estimada, descarte e ações de serviço.',
+    report: 'Critérios de descarte e conformidade.',
+  },
+  compensation: {
+    owner: 'Único local para meios de compensação em elevadores elétricos aplicáveis.',
+    output: 'Indica necessidade por curso, velocidade e massa.',
+    report: 'Compensação quando aplicável.',
+  },
+  'rails-params': {
+    owner: 'Único local para perfil de guia, material, fixação e rodadeiras.',
+    output: 'Alimenta esforços, flecha, EN 81-77 e 3D.',
+    report: 'Perfis e dados das guias.',
+  },
+  'rails-forces': {
+    owner: 'Página de cargas e flechas das guias. Inputs devem vir do setup de guias.',
+    output: 'Mostra esforços, flechas e sensibilidade.',
+    report: 'Resultados estruturais das guias.',
+  },
+  'rails-verify': {
+    owner: 'Página de validação final das guias.',
+    output: 'Consolida checks ISO 8100-2/EN 81-77.',
+    report: 'Estado final das guias.',
+  },
+  doors: {
+    owner: 'Único local para parâmetros de fecho, engate, continuidade e interlock.',
+    output: 'Fecha 4.2 e alimenta segurança/relatório.',
+    report: 'Verificação dos fechos de porta.',
+  },
+  safety: {
+    owner: 'Único local para paraquedas/safety gear e massa certificada.',
+    output: 'Valida desaceleração, massa e velocidade certificada.',
+    report: 'Safety gear.',
+  },
+  osg: {
+    owner: 'Único local para limitador de velocidade, fabricante, modelo e força de tração.',
+    output: 'Alimenta ACOP, safety gear e validação de segurança.',
+    report: 'Limitador de velocidade.',
+  },
+  buffers: {
+    owner: 'Único local para buffers, curso, tipo, meio e presets.',
+    output: 'Valida energia, desaceleração e massa admissível.',
+    report: 'Amortecedores/buffers.',
+  },
+  'acop-ucmp': {
+    owner: 'Único local para ACOP/UCMP, tipo de proteção e distâncias.',
+    output: 'Fecha proteção contra excesso de velocidade ascendente e movimento involuntário.',
+    report: 'ACOP e UCMP.',
+  },
+  sil: {
+    owner: 'Único local para SIL, PFH, cobertura diagnóstica e tolerância a falhas.',
+    output: 'Mostra se o circuito é aceitável ou exige arquitetura superior.',
+    report: 'Circuitos de segurança.',
+  },
+  alarms: {
+    owner: 'Único local para alarme remoto EN 81-28.',
+    output: 'Valida comunicação, bateria e filtragem.',
+    report: 'Sistema de alarme.',
+  },
+  seismic: {
+    owner: 'Único local para categoria sísmica, aceleração, retainers e lógica EN 81-77.',
+    output: 'Determina necessidade de rodadeiras, eixos independentes e retainers.',
+    report: 'Condições sísmicas.',
+  },
+  cybersecurity: {
+    owner: 'Único local para isolamento, encriptação, acesso e patching.',
+    output: 'Fecha ISO 8100-20.',
+    report: 'Cibersegurança.',
+  },
+  hydraulic: {
+    owner: 'Único local para cilindro, pressão, ram, buckling e power unit hidráulica.',
+    output: 'Alimenta rupture valve, buffers hidráulicos e relatório hidráulico.',
+    report: 'Sistema hidráulico.',
+  },
+  'rupture-valve': {
+    owner: 'Único local para válvula de rutura e parâmetros de fecho hidráulico.',
+    output: 'Valida caudal e pressão de disparo.',
+    report: 'Válvula de rutura.',
+  },
+  clearances: {
+    owner: 'Único local para folgas ISO 8100-1, poço, topo, refúgios e balaustrada.',
+    output: 'Alimenta shaft 3D e validação de geometria.',
+    report: 'Folgas e espaços de segurança.',
+  },
+  shaft: {
+    owner: 'Visualização/simulação. Medidas estruturais devem vir de Project Base e Clearances.',
+    output: 'Mostra caixa, posição da cabina e interfaces.',
+    report: 'Representação 3D quando estabilizada.',
+  },
+  cabin: {
+    owner: 'Visualização/simulação. Dimensões vêm da geometria base e acessibilidade.',
+    output: 'Mostra interior, topo da cabina e elementos de inspeção.',
+    report: 'Representação da cabina quando estabilizada.',
+  },
+  library: {
+    owner: 'Biblioteca de presets e componentes.',
+    output: 'Ajuda a escolher fabricantes/modelos.',
+    report: 'Referências dos componentes escolhidos.',
+  },
+  formulas: {
+    owner: 'Biblioteca técnica. Não edita projeto.',
+    output: 'Explica fórmulas e cláusulas.',
+    report: 'Base normativa e fórmulas.',
+  },
+  memory: {
+    owner: 'Memória de cálculo gerada a partir dos inputs validados.',
+    output: 'Pré-visualização do relatório técnico.',
+    report: 'Corpo principal do relatório.',
+  },
+  export: {
+    owner: 'Saída final. Não corrige inputs; apenas exporta o que está validado.',
+    output: 'PDF/relatório final.',
+    report: 'Entrega final.',
+  },
+};
+
 
 
 
@@ -423,6 +579,10 @@ export default function App() {
     const target = document.querySelector(`[data-field="${pendingFocusField}"]`) as HTMLElement | null;
     if (target) {
       target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      target.classList.add('ring-2', 'ring-primary', 'bg-primary/5');
+      window.setTimeout(() => {
+        target.classList.remove('ring-2', 'ring-primary', 'bg-primary/5');
+      }, 1800);
       const input = target.querySelector('input, select, textarea') as HTMLElement | null;
       input?.focus();
     }
@@ -812,74 +972,72 @@ export default function App() {
 
   const electricModules: ModuleStatus[] = [
     // Project Definition
-    { id: 'overview', label: 'Overview', icon: LayoutDashboard, status: 'implemented', category: 'Project Setup' },
-    { id: 'global', label: 'Project Parameters (4.1)', icon: Globe, status: 'implemented', category: 'Project Setup' },
+    { id: 'overview', label: 'Overview', icon: LayoutDashboard, status: 'implemented', category: 'Setup' },
+    { id: 'global', label: 'Project Base (4.1)', icon: Globe, status: 'implemented', category: 'Setup' },
+    { id: 'cwt', label: 'Counterweight', icon: Database, status: 'implemented', category: 'Setup' },
 
     // Cabin / Car
-    { id: 'doors', label: 'Door Locking (4.2)', icon: Lock, status: 'implemented', category: 'Cabin and Car' },
-    { id: 'sling', label: 'Car Frame', icon: Box, status: 'implemented', category: 'Cabin and Car' },
-    { id: 'cabin', label: '3D Cabin', icon: Maximize2, status: 'implemented', category: 'Cabin and Car' },
-
-    // Counterweight
-    { id: 'cwt', label: 'Counterweight Definition', icon: Database, status: 'implemented', category: 'Counterweight' },
+    { id: 'doors', label: 'Door Locking (4.2)', icon: Lock, status: 'implemented', category: 'Safety' },
+    { id: 'sling', label: 'Car Frame', icon: Box, status: 'implemented', category: 'Geometry & 3D' },
+    { id: 'cabin', label: '3D Cabin', icon: Maximize2, status: 'implemented', category: 'Geometry & 3D' },
 
     // Guide Rails (4.10)
-    { id: 'rails-params', label: 'Guide Rail Setup', icon: ArrowUpDown, status: 'implemented', category: 'Guide Rails (4.10)' },
-    { id: 'rails-forces', label: 'Loads and Deflection', icon: Activity, status: 'implemented', category: 'Guide Rails (4.10)' },
-    { id: 'rails-verify', label: 'Guide Rail Checks', icon: CheckSquare, status: 'implemented', category: 'Guide Rails (4.10)' },
+    { id: 'rails-params', label: 'Guide Setup', icon: ArrowUpDown, status: 'implemented', category: 'Guides' },
+    { id: 'rails-forces', label: 'Loads & Deflection', icon: Activity, status: 'implemented', category: 'Guides' },
+    { id: 'rails-verify', label: 'Guide Checks', icon: CheckSquare, status: 'implemented', category: 'Guides' },
 
     // Traction System
-    { id: 'traction-params', label: 'Traction Setup', icon: Settings2, status: 'implemented', category: 'Traction System' },
-    { id: 'sheaves', label: 'Sheaves and Grooves', icon: Settings, status: 'implemented', category: 'Traction System' },
-    { id: 'traction-verify', label: 'Traction Checks', icon: CheckSquare, status: 'implemented', category: 'Traction System' },
+    { id: 'traction-params', label: 'Traction Setup', icon: Settings2, status: 'implemented', category: 'Traction' },
+    { id: 'sheaves', label: 'Sheaves & Grooves', icon: Settings, status: 'implemented', category: 'Traction' },
+    { id: 'traction-verify', label: 'Traction Checks', icon: CheckSquare, status: 'implemented', category: 'Traction' },
     
     // Suspension & Compensation
-    { id: 'suspension-params', label: 'Suspension Setup', icon: Cable, status: 'implemented', category: 'Suspension and Compensation' },
-    { id: 'suspension-verify', label: 'Discard and Compliance', icon: CheckSquare, status: 'implemented', category: 'Suspension and Compensation' },
-    { id: 'compensation', label: 'Compensation Means', icon: Package, status: 'implemented', category: 'Suspension and Compensation' },
+    { id: 'suspension-params', label: 'Suspension Setup', icon: Cable, status: 'implemented', category: 'Traction' },
+    { id: 'suspension-verify', label: 'Discard & Compliance', icon: CheckSquare, status: 'implemented', category: 'Traction' },
+    { id: 'compensation', label: 'Compensation', icon: Package, status: 'implemented', category: 'Traction' },
 
     // Safety Systems
-    { id: 'safety', label: 'Safety Gear (4.3)', icon: ShieldCheck, status: 'implemented', category: 'Safety Components' },
-    { id: 'osg', label: 'Overspeed Governor (4.4)', icon: ShieldAlert, status: 'implemented', category: 'Safety Components' },
-    { id: 'buffers', label: 'Buffers (4.5)', icon: Box, status: 'implemented', category: 'Safety Components' },
-    { id: 'acop-ucmp', label: 'ACOP and UCMP (4.7/4.8)', icon: ShieldAlert, status: 'implemented', category: 'Safety Components' },
+    { id: 'safety', label: 'Safety Gear (4.3)', icon: ShieldCheck, status: 'implemented', category: 'Safety' },
+    { id: 'osg', label: 'Overspeed Governor', icon: ShieldAlert, status: 'implemented', category: 'Safety' },
+    { id: 'buffers', label: 'Buffers (4.5)', icon: Box, status: 'implemented', category: 'Safety' },
+    { id: 'acop-ucmp', label: 'ACOP / UCMP', icon: ShieldAlert, status: 'implemented', category: 'Safety' },
 
     // Electronics & Safety
-    { id: 'sil', label: 'Safety Circuits (4.6)', icon: Zap, status: 'implemented', category: 'Control and Electronics' },
-    { id: 'alarms', label: 'Remote Alarms (EN 81-28)', icon: Bell, status: 'implemented', category: 'Control and Electronics' },
-    { id: 'seismic', label: 'Seismic (EN 81-77)', icon: Zap, status: 'implemented', category: 'Control and Electronics' },
-    { id: 'cybersecurity', label: 'Cybersecurity (ISO 8100-20)', icon: Lock, status: 'implemented', category: 'Control and Electronics' },
+    { id: 'sil', label: 'Safety Circuits', icon: Zap, status: 'implemented', category: 'Safety' },
+    { id: 'alarms', label: 'Remote Alarms', icon: Bell, status: 'implemented', category: 'Safety' },
+    { id: 'seismic', label: 'Seismic EN 81-77', icon: Zap, status: 'implemented', category: 'Safety' },
+    { id: 'cybersecurity', label: 'Cybersecurity', icon: Lock, status: 'implemented', category: 'Safety' },
 
     // Clearances & Geometry
-    { id: 'clearances', label: 'Clearances (ISO 8100-1)', icon: Ruler, status: 'implemented', category: 'Hoistway and Geometry' },
-    { id: 'shaft', label: '3D Shaft', icon: Box, status: 'implemented', category: 'Hoistway and Geometry' },
+    { id: 'clearances', label: 'Clearances', icon: Ruler, status: 'implemented', category: 'Geometry & 3D' },
+    { id: 'shaft', label: '3D Shaft', icon: Box, status: 'implemented', category: 'Geometry & 3D' },
 
     // Tools
-    { id: 'library', label: 'Component Library', icon: Library, status: 'implemented', category: 'Tools and Documentation' },
-    { id: 'formulas', label: 'Formula Library', icon: Calculator, status: 'implemented', category: 'Tools and Documentation' },
-    { id: 'memory', label: 'Calculation Memory', icon: History, status: 'implemented', category: 'Tools and Documentation' },
-    { id: 'export', label: 'PDF Export', icon: FileText, status: 'implemented', category: 'Tools and Documentation' },
+    { id: 'library', label: 'Presets Library', icon: Library, status: 'implemented', category: 'Report' },
+    { id: 'formulas', label: 'Formula Library', icon: Calculator, status: 'implemented', category: 'Report' },
+    { id: 'memory', label: 'Calculation Memory', icon: History, status: 'implemented', category: 'Report' },
+    { id: 'export', label: 'PDF Export', icon: FileText, status: 'implemented', category: 'Report' },
   ];
 
   const hydraulicModules: ModuleStatus[] = [
-    { id: 'overview', label: 'Hydraulic Overview', icon: LayoutDashboard, status: 'implemented', category: 'Project Setup' },
-    { id: 'global', label: 'Project Parameters (4.1)', icon: Globe, status: 'implemented', category: 'Project Setup' },
-    { id: 'hydraulic', label: 'Hydraulic Core (4.15)', icon: Droplets, status: 'implemented', category: 'Hydraulic Systems' },
-    { id: 'rupture-valve', label: 'Rupture Valve (4.9)', icon: ShieldAlert, status: 'implemented', category: 'Hydraulic Systems' },
-    { id: 'doors', label: 'Door Locking (4.2)', icon: Lock, status: 'implemented', category: 'Cabin and Car' },
-    { id: 'safety', label: 'Safety Gear (4.3)', icon: ShieldCheck, status: 'implemented', category: 'Safety Components' },
-    { id: 'buffers', label: 'Buffers (4.5)', icon: Box, status: 'implemented', category: 'Safety Components' },
-    { id: 'sil', label: 'Safety Circuits (4.6)', icon: Zap, status: 'implemented', category: 'Control and Electronics' },
-    { id: 'alarms', label: 'Remote Alarms (EN 81-28)', icon: Bell, status: 'implemented', category: 'Control and Electronics' },
-    { id: 'seismic', label: 'Seismic (EN 81-77)', icon: Zap, status: 'implemented', category: 'Control and Electronics' },
-    { id: 'cybersecurity', label: 'Cybersecurity (ISO 8100-20)', icon: Lock, status: 'implemented', category: 'Control and Electronics' },
-    { id: 'clearances', label: 'Clearances (ISO 8100-1)', icon: Ruler, status: 'implemented', category: 'Hoistway and Geometry' },
-    { id: 'shaft', label: '3D Shaft', icon: Box, status: 'implemented', category: 'Hoistway and Geometry' },
-    { id: 'cabin', label: '3D Cabin', icon: Maximize2, status: 'implemented', category: 'Cabin and Car' },
-    { id: 'library', label: 'Component Library', icon: Library, status: 'implemented', category: 'Tools and Documentation' },
-    { id: 'formulas', label: 'Formula Library', icon: Calculator, status: 'implemented', category: 'Tools and Documentation' },
-    { id: 'memory', label: 'Calculation Memory', icon: History, status: 'implemented', category: 'Tools and Documentation' },
-    { id: 'export', label: 'PDF Export', icon: FileText, status: 'implemented', category: 'Tools and Documentation' },
+    { id: 'overview', label: 'Overview', icon: LayoutDashboard, status: 'implemented', category: 'Setup' },
+    { id: 'global', label: 'Project Base (4.1)', icon: Globe, status: 'implemented', category: 'Setup' },
+    { id: 'hydraulic', label: 'Hydraulic Core', icon: Droplets, status: 'implemented', category: 'Hydraulic' },
+    { id: 'rupture-valve', label: 'Rupture Valve', icon: ShieldAlert, status: 'implemented', category: 'Hydraulic' },
+    { id: 'doors', label: 'Door Locking', icon: Lock, status: 'implemented', category: 'Safety' },
+    { id: 'safety', label: 'Safety Gear', icon: ShieldCheck, status: 'implemented', category: 'Safety' },
+    { id: 'buffers', label: 'Buffers', icon: Box, status: 'implemented', category: 'Safety' },
+    { id: 'sil', label: 'Safety Circuits', icon: Zap, status: 'implemented', category: 'Safety' },
+    { id: 'alarms', label: 'Remote Alarms', icon: Bell, status: 'implemented', category: 'Safety' },
+    { id: 'seismic', label: 'Seismic EN 81-77', icon: Zap, status: 'implemented', category: 'Safety' },
+    { id: 'cybersecurity', label: 'Cybersecurity', icon: Lock, status: 'implemented', category: 'Safety' },
+    { id: 'clearances', label: 'Clearances', icon: Ruler, status: 'implemented', category: 'Geometry & 3D' },
+    { id: 'shaft', label: '3D Shaft', icon: Box, status: 'implemented', category: 'Geometry & 3D' },
+    { id: 'cabin', label: '3D Cabin', icon: Maximize2, status: 'implemented', category: 'Geometry & 3D' },
+    { id: 'library', label: 'Presets Library', icon: Library, status: 'implemented', category: 'Report' },
+    { id: 'formulas', label: 'Formula Library', icon: Calculator, status: 'implemented', category: 'Report' },
+    { id: 'memory', label: 'Calculation Memory', icon: History, status: 'implemented', category: 'Report' },
+    { id: 'export', label: 'PDF Export', icon: FileText, status: 'implemented', category: 'Report' },
   ];
 
   const modules = useMemo(() => (projectData.type === 'hydraulic' ? hydraulicModules : electricModules), [projectData.type]);
@@ -907,6 +1065,33 @@ export default function App() {
     });
     return counts;
   }, [allValidationResults]);
+  const workflowSteps = useMemo(() => (
+    projectData.type === 'hydraulic'
+      ? [
+          { id: 'setup', label: '1. Setup', target: 'global', moduleIds: ['overview', 'global'] },
+          { id: 'hydraulic', label: '2. Hydraulic', target: 'hydraulic', moduleIds: ['hydraulic', 'rupture-valve'] },
+          { id: 'safety', label: '3. Safety', target: 'doors', moduleIds: ['doors', 'safety', 'buffers', 'sil', 'alarms', 'seismic', 'cybersecurity'] },
+          { id: 'geometry', label: '4. Geometry', target: 'clearances', moduleIds: ['clearances', 'shaft', 'cabin'] },
+          { id: 'report', label: '5. Report', target: 'memory', moduleIds: ['library', 'formulas', 'memory', 'export'] },
+        ]
+      : [
+          { id: 'setup', label: '1. Setup', target: 'global', moduleIds: ['overview', 'global', 'cwt'] },
+          { id: 'traction', label: '2. Traction', target: 'traction-params', moduleIds: ['traction-params', 'sheaves', 'traction-verify', 'suspension-params', 'suspension-verify', 'compensation'] },
+          { id: 'guides', label: '3. Guides', target: 'rails-params', moduleIds: ['rails-params', 'rails-forces', 'rails-verify'] },
+          { id: 'safety', label: '4. Safety', target: 'doors', moduleIds: ['doors', 'safety', 'osg', 'buffers', 'acop-ucmp', 'sil', 'alarms', 'seismic', 'cybersecurity'] },
+          { id: 'geometry', label: '5. Geometry', target: 'clearances', moduleIds: ['sling', 'clearances', 'shaft', 'cabin'] },
+          { id: 'report', label: '6. Report', target: 'memory', moduleIds: ['library', 'formulas', 'memory', 'export'] },
+        ]
+  ), [projectData.type]);
+  const activeWorkflowStep = workflowSteps.find((step) => step.moduleIds.includes(activeTab)) || workflowSteps[0];
+  const activeGuidance = MODULE_GUIDANCE[activeTab] || {
+    owner: 'Este módulo ainda não tem ownership definido.',
+    output: 'Rever outputs antes de fechar relatório.',
+    report: 'A confirmar.',
+  };
+  const totalErrors = allValidationResults.filter((result) => result.type === 'error').length;
+  const totalWarnings = allValidationResults.filter((result) => result.type === 'warning').length;
+  const getWorkflowIssueCount = (moduleIds: string[]) => moduleIds.reduce((sum, moduleId) => sum + (categoryIssueMap.get(moduleId) || 0), 0);
 
   const exportProjectData = () => {
     const dataStr = JSON.stringify(projectData, null, 2);
@@ -1157,6 +1342,9 @@ export default function App() {
               {activeSectionStatus.label}
               {activeSectionResults.length > 0 ? ` · ${activeSectionResults.length}` : ' · 0'}
             </span>
+            <span className="hidden xl:inline-flex items-center rounded-full border border-outline-variant/30 bg-surface-container px-3 py-1 text-[10px] font-black uppercase tracking-[0.16em] text-on-surface-variant">
+              {activeWorkflowStep.label}
+            </span>
           </div>
           
           <div className="flex items-center gap-4">
@@ -1193,15 +1381,49 @@ export default function App() {
         {/* Scrollable Body */}
         <div className="flex-1 overflow-y-auto p-8 no-scrollbar bg-surface">
           <div className="max-w-7xl mx-auto">
-            {activeSectionResults.length === 0 ? (
-              <div className="mb-6 flex flex-col gap-3 rounded-sm border border-emerald-200 bg-emerald-50 p-4 lg:flex-row lg:items-center lg:justify-between">
+            <div className="mb-6 rounded-sm border border-outline-variant/20 bg-surface-container-low p-3">
+              <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
                 <div>
-                  <p className="text-[10px] font-black uppercase tracking-[0.2em] text-emerald-700/80">Section Validation</p>
-                  <p className="mt-1 text-sm font-bold text-emerald-800">{activeSectionLabel} is currently clear.</p>
+                  <p className="text-[10px] font-black uppercase tracking-[0.2em] text-primary">Guided workflow</p>
+                  <p className="mt-1 text-xs leading-relaxed text-on-surface-variant">
+                    Edita cada tema no seu dono. As outras páginas leem e validam, não duplicam inputs.
+                  </p>
+                </div>
+                <div className="flex gap-2 overflow-x-auto pb-1 xl:pb-0">
+                  {workflowSteps.map((step) => {
+                    const issueCount = getWorkflowIssueCount(step.moduleIds);
+                    const isActive = step.id === activeWorkflowStep.id;
+                    return (
+                      <button
+                        key={step.id}
+                        onClick={() => setActiveTab(step.target)}
+                        className={`shrink-0 rounded-sm border px-3 py-2 text-left transition-colors ${
+                          isActive
+                            ? 'border-primary/40 bg-primary/10 text-primary'
+                            : issueCount > 0
+                              ? 'border-error/25 bg-error-container/10 text-error hover:border-error/40'
+                              : 'border-outline-variant/20 bg-surface-container-lowest text-on-surface-variant hover:border-primary/30 hover:text-primary'
+                        }`}
+                      >
+                        <span className="block text-[10px] font-black uppercase tracking-[0.16em]">{step.label}</span>
+                        <span className="mt-1 block text-[9px] font-bold uppercase tracking-[0.12em] opacity-70">
+                          {issueCount > 0 ? `${issueCount} issue${issueCount > 1 ? 's' : ''}` : 'clear'}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+            {activeSectionResults.length === 0 ? (
+              <div className="mb-6 flex flex-col gap-3 rounded-sm border border-emerald-500/20 bg-emerald-950/20 p-3 lg:flex-row lg:items-center lg:justify-between">
+                <div>
+                  <p className="text-[10px] font-black uppercase tracking-[0.2em] text-emerald-300">Section Validation</p>
+                  <p className="mt-1 text-sm font-bold text-emerald-100">{activeSectionLabel} is currently clear.</p>
                 </div>
                 <button
                   onClick={validateActiveSection}
-                  className="px-4 py-2 bg-white text-emerald-800 rounded-sm border border-emerald-200 hover:border-emerald-400 transition-colors text-[10px] font-black uppercase tracking-[0.18em]"
+                  className="px-4 py-2 bg-surface-container-lowest text-emerald-200 rounded-sm border border-emerald-500/20 hover:border-emerald-400 transition-colors text-[10px] font-black uppercase tracking-[0.18em]"
                 >
                   Check Section
                 </button>
@@ -1255,8 +1477,22 @@ export default function App() {
           </div>
           <div className="flex gap-4 items-center">
             <span className="flex items-center gap-1">
-              <CheckCircle2 size={12} className="text-emerald-500" /> 
-              All Calculations Valid
+              {totalErrors > 0 ? (
+                <>
+                  <XCircle size={12} className="text-error" />
+                  {totalErrors} error{totalErrors > 1 ? 's' : ''}
+                </>
+              ) : totalWarnings > 0 ? (
+                <>
+                  <AlertTriangle size={12} className="text-amber-500" />
+                  {totalWarnings} warning{totalWarnings > 1 ? 's' : ''}
+                </>
+              ) : (
+                <>
+                  <CheckCircle2 size={12} className="text-emerald-500" />
+                  All Calculations Valid
+                </>
+              )}
             </span>
             <span className="bg-primary border border-primary-dim px-2 py-0.5 text-surface-container-lowest font-bold">
               {projectData.type === 'hydraulic' ? 'ILATE HYDRAULIC' : 'ILATE ENTERPRISE'}
@@ -1326,6 +1562,7 @@ export default function App() {
                   <div>
                     <p className="text-[10px] font-black uppercase tracking-[0.18em] text-on-surface-variant">Current section</p>
                     <p className="mt-1 text-sm font-black text-on-surface">{activeSectionLabel}</p>
+                    <p className="mt-1 text-[10px] font-bold uppercase tracking-[0.14em] text-primary">{activeWorkflowStep.label}</p>
                   </div>
                   <span className={`inline-flex rounded-full border px-3 py-1 text-[10px] font-black uppercase tracking-[0.16em] ${activeSectionStatus.tone}`}>
                     {activeSectionStatus.label}
@@ -1337,6 +1574,24 @@ export default function App() {
                 >
                   Validate current section
                 </button>
+              </div>
+
+              <div className="rounded-sm border border-primary/20 bg-primary/5 p-3">
+                <p className="text-[10px] font-black uppercase tracking-[0.18em] text-primary">Source of truth</p>
+                <p className="mt-2 text-xs leading-relaxed text-on-surface">{activeGuidance.owner}</p>
+                <div className="mt-3 grid gap-2">
+                  <div className="rounded-sm border border-outline-variant/20 bg-surface-container-lowest p-2">
+                    <p className="text-[9px] font-black uppercase tracking-[0.16em] text-on-surface-variant">Output</p>
+                    <p className="mt-1 text-xs leading-relaxed text-on-surface-variant">{activeGuidance.output}</p>
+                  </div>
+                  <div className="rounded-sm border border-outline-variant/20 bg-surface-container-lowest p-2">
+                    <p className="text-[9px] font-black uppercase tracking-[0.16em] text-on-surface-variant">Report</p>
+                    <p className="mt-1 text-xs leading-relaxed text-on-surface-variant">{activeGuidance.report}</p>
+                  </div>
+                </div>
+                {activeGuidance.next && (
+                  <p className="mt-3 text-[10px] font-bold uppercase tracking-[0.14em] text-primary/80">{activeGuidance.next}</p>
+                )}
               </div>
 
               <div className="rounded-sm border border-outline-variant/20 bg-surface-container-low p-3">

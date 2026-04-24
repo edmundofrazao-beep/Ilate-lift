@@ -171,16 +171,35 @@ export type ValidationResult = {
 
 export const ValidationModal = ({ isOpen, onClose, results, onNavigate, onFocusField, title = 'Project Validation Results' }: { isOpen: boolean, onClose: () => void, results: ValidationResult[], onNavigate?: (moduleId: string) => void, onFocusField?: (fieldName: ProjectFieldName) => void, title?: string }) => {
   if (!isOpen) return null;
+  const errorCount = results.filter((result) => result.type === 'error').length;
+  const warningCount = results.filter((result) => result.type === 'warning').length;
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-300">
-      <div className="bg-surface-container-low w-full max-w-lg rounded-sm shadow-2xl border border-outline-variant/20 overflow-hidden animate-in zoom-in-95 duration-300">
+      <div className="bg-surface-container-low w-full max-w-3xl rounded-sm shadow-2xl border border-outline-variant/20 overflow-hidden animate-in zoom-in-95 duration-300">
         <div className="p-6 border-b border-outline-variant/10 flex items-center justify-between bg-surface-container">
-          <h3 className="text-lg font-black uppercase tracking-tighter">{title}</h3>
+          <div>
+            <p className="text-[10px] font-black uppercase tracking-[0.22em] text-primary">Validation report</p>
+            <h3 className="mt-1 text-lg font-black uppercase tracking-tighter">{title}</h3>
+          </div>
           <button onClick={onClose} className="p-1 hover:bg-surface-container-high rounded-full transition-colors">
             <XCircle size={20} className="text-on-surface-variant" />
           </button>
         </div>
-        <div className="p-6 space-y-4 max-h-[60vh] overflow-y-auto">
+        <div className="grid grid-cols-3 gap-3 border-b border-outline-variant/10 bg-surface-container-lowest p-4 text-center">
+          <div className="rounded-sm border border-error/20 bg-error-container/10 p-3">
+            <p className="text-[10px] font-black uppercase tracking-[0.16em] text-error">Errors</p>
+            <p className="mt-1 text-2xl font-black text-error">{errorCount}</p>
+          </div>
+          <div className="rounded-sm border border-amber-500/20 bg-amber-950/20 p-3">
+            <p className="text-[10px] font-black uppercase tracking-[0.16em] text-amber-300">Warnings</p>
+            <p className="mt-1 text-2xl font-black text-amber-300">{warningCount}</p>
+          </div>
+          <div className="rounded-sm border border-emerald-500/20 bg-emerald-950/20 p-3">
+            <p className="text-[10px] font-black uppercase tracking-[0.16em] text-emerald-300">State</p>
+            <p className="mt-1 text-lg font-black uppercase text-on-surface">{errorCount > 0 ? 'Attention' : warningCount > 0 ? 'Review' : 'OK'}</p>
+          </div>
+        </div>
+        <div className="p-6 space-y-4 max-h-[62vh] overflow-y-auto">
           {results.length === 0 ? (
             <div className="flex flex-col items-center py-8 text-center">
               <CheckCircle2 size={48} className="text-emerald-500 mb-4" />
@@ -191,9 +210,9 @@ export const ValidationModal = ({ isOpen, onClose, results, onNavigate, onFocusF
             results.map((r, i) => (
               <div 
                 key={i} 
-                className={`p-4 border-l-4 flex gap-4 transition-colors ${r.moduleId && onNavigate ? 'cursor-pointer hover:bg-black/5 hover:border-l-8' : ''} ${
+                className={`p-4 border-l-4 flex gap-4 transition-colors ${r.moduleId && onNavigate ? 'cursor-pointer hover:bg-surface-container hover:border-l-8' : ''} ${
                 r.type === 'error' ? 'bg-error-container/10 border-error' : 
-                r.type === 'warning' ? 'bg-amber-50 border-amber-400' : 'bg-emerald-50 border-emerald-500'
+                r.type === 'warning' ? 'bg-amber-950/20 border-amber-400' : 'bg-emerald-950/20 border-emerald-500'
               }`}
                 onClick={() => {
                   if (r.moduleId && onNavigate) {
@@ -211,7 +230,7 @@ export const ValidationModal = ({ isOpen, onClose, results, onNavigate, onFocusF
                 <div className="flex-1">
                   <p className={`text-xs font-bold uppercase ${
                     r.type === 'error' ? 'text-error' : 
-                    r.type === 'warning' ? 'text-amber-700' : 'text-emerald-700'
+                    r.type === 'warning' ? 'text-amber-300' : 'text-emerald-300'
                   }`}>{r.type}</p>
                   <p className="text-sm text-on-surface font-medium mb-2">{r.msg}</p>
                   {(r.moduleId || r.fieldName) && (
