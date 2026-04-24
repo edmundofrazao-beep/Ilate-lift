@@ -1,0 +1,29 @@
+.DS_Store
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.venv/
+venv/
+
+# Runtime payloads are large and can be regenerated or backed up separately.
+runtime/organized_v7/**
+!runtime/organized_v7/
+!runtime/organized_v7/README_ORGANIZACAO.md
+runtime/inbox_next_batch/**
+runtime/state/**
+runtime/logs/**
+
+# Large streaming artifacts from full scans/classification.
+runtime/data/classifications.jsonl
+runtime/data/clusters.jsonl
+runtime/data/dedupe_relations.jsonl
+runtime/data/scan_records.jsonl
+runtime/data/organized_v5_api_queue*
+runtime/data/organized_v5_baseline_manifest*
+runtime/data/organized_v5_semantic_api_results*
+runtime/data/organized_v5_theme_plan*
+runtime/data/organized_v6_semantic_mapping.csv
+runtime/data/organized_v7_semantic_mapping.csv
+
