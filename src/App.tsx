@@ -236,6 +236,39 @@ const MODULE_GUIDANCE: Record<string, { owner: string; output: string; report: s
   },
 };
 
+const MODULE_EDIT_OWNER: Record<string, string> = {
+  overview: 'global',
+  global: 'global',
+  cwt: 'cwt',
+  'traction-params': 'traction-params',
+  sheaves: 'sheaves',
+  'traction-verify': 'traction-params',
+  'suspension-params': 'suspension-params',
+  'suspension-verify': 'suspension-params',
+  compensation: 'compensation',
+  'rails-params': 'rails-params',
+  'rails-forces': 'rails-params',
+  'rails-verify': 'rails-params',
+  doors: 'doors',
+  safety: 'safety',
+  osg: 'osg',
+  buffers: 'buffers',
+  'acop-ucmp': 'acop-ucmp',
+  sil: 'sil',
+  alarms: 'alarms',
+  seismic: 'seismic',
+  cybersecurity: 'cybersecurity',
+  hydraulic: 'hydraulic',
+  'rupture-valve': 'rupture-valve',
+  clearances: 'clearances',
+  shaft: 'clearances',
+  cabin: 'global',
+  library: 'library',
+  formulas: 'formulas',
+  memory: 'global',
+  export: 'memory',
+};
+
 
 
 
@@ -261,6 +294,7 @@ export default function App() {
   const [isValidationOpen, setIsValidationOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isHelpOpen, setIsHelpOpen] = useState(false);
+  const [is3DPreviewEnabled, setIs3DPreviewEnabled] = useState(false);
   const [validationResults, setValidationResults] = useState<ValidationResult[]>([]);
   const [validationModalTitle, setValidationModalTitle] = useState('Project Validation Results');
   const [pendingFocusField, setPendingFocusField] = useState<string | null>(null);
@@ -1089,9 +1123,20 @@ export default function App() {
     output: 'Rever outputs antes de fechar relatório.',
     report: 'A confirmar.',
   };
+  const activeEditOwnerId = MODULE_EDIT_OWNER[activeTab] || activeTab;
+  const activeEditOwner = modules.find((module) => module.id === activeEditOwnerId);
+  const isReadOnlyStage = activeEditOwnerId !== activeTab;
   const totalErrors = allValidationResults.filter((result) => result.type === 'error').length;
   const totalWarnings = allValidationResults.filter((result) => result.type === 'warning').length;
   const getWorkflowIssueCount = (moduleIds: string[]) => moduleIds.reduce((sum, moduleId) => sum + (categoryIssueMap.get(moduleId) || 0), 0);
+  const activeModule = modules.find((module) => module.id === activeTab) || modules[0];
+  const activeStepModules = modules.filter((module) => activeWorkflowStep.moduleIds.includes(module.id));
+  const shellState = totalErrors > 0
+    ? { label: 'ATTENTION', className: 'border-error/35 bg-error-container/20 text-error' }
+    : totalWarnings > 0
+      ? { label: 'REVIEW', className: 'border-amber-500/35 bg-amber-950/25 text-amber-300' }
+      : { label: 'READY', className: 'border-emerald-500/35 bg-emerald-950/25 text-emerald-300' };
+  const v2ShellDraft = true;
 
   const exportProjectData = () => {
     const dataStr = JSON.stringify(projectData, null, 2);
@@ -1272,6 +1317,321 @@ export default function App() {
       default: return <div className="p-8 text-center opacity-50">Module in development.</div>;
     }
   };
+
+  const renderV2Content = () => {
+    if ((activeTab === 'shaft' || activeTab === 'cabin') && !is3DPreviewEnabled) {
+      return (
+        <div className="rounded-sm border border-primary/20 bg-primary/5 p-8">
+          <div className="max-w-3xl">
+            <p className="text-[10px] font-black uppercase tracking-[0.24em] text-primary">3D parked for final pass</p>
+            <h3 className="mt-3 text-2xl font-black tracking-tight text-on-surface">
+              {activeTab === 'shaft' ? 'Shaft 3D is preserved, but not driving v2.0 yet.' : 'Cabin 3D is preserved, but not driving v2.0 yet.'}
+            </h3>
+            <p className="mt-3 text-sm leading-relaxed text-on-surface-variant">
+              Nesta reconstrução, a prioridade é fechar funcionalidade, ownership dos inputs, validação e relatório. O 3D fica como camada visual reaproveitável para encaixar no fim sem voltar a tornar a app crowded.
+            </p>
+          </div>
+          <div className="mt-6 grid grid-cols-1 gap-3 md:grid-cols-3">
+            <div className="rounded-sm border border-outline-variant/20 bg-surface-container-lowest p-4">
+              <p className="text-[10px] font-black uppercase tracking-[0.16em] text-primary">Source</p>
+              <p className="mt-2 text-xs leading-relaxed text-on-surface-variant">
+                Geometria vem de Project Base e Clearances, não do 3D.
+              </p>
+            </div>
+            <div className="rounded-sm border border-outline-variant/20 bg-surface-container-lowest p-4">
+              <p className="text-[10px] font-black uppercase tracking-[0.16em] text-primary">Validation</p>
+              <p className="mt-2 text-xs leading-relaxed text-on-surface-variant">
+                A aprovação continua nos checks técnicos, não na aparência da cena.
+              </p>
+            </div>
+            <div className="rounded-sm border border-outline-variant/20 bg-surface-container-lowest p-4">
+              <p className="text-[10px] font-black uppercase tracking-[0.16em] text-primary">Final pass</p>
+              <p className="mt-2 text-xs leading-relaxed text-on-surface-variant">
+                Depois encaixamos camadas, animação e realismo por componente.
+              </p>
+            </div>
+          </div>
+          <button
+            onClick={() => setIs3DPreviewEnabled(true)}
+            className="mt-6 rounded-sm border border-primary/35 bg-primary/10 px-4 py-2 text-[10px] font-black uppercase tracking-[0.18em] text-primary transition-colors hover:bg-primary/15"
+          >
+            Abrir preview 3D legado
+          </button>
+        </div>
+      );
+    }
+
+    return renderContent();
+  };
+
+  if (v2ShellDraft) {
+    return (
+      <div className="h-screen overflow-hidden bg-[#070b14] text-on-surface font-sans">
+        <header className="h-[74px] border-b border-outline-variant/30 bg-surface-container-highest/95 px-6 backdrop-blur">
+          <div className="flex h-full items-center justify-between gap-6">
+            <div className="flex items-center gap-5">
+              <div>
+                <p className="text-[10px] font-black uppercase tracking-[0.28em] text-primary">ILATE v2.0 draft</p>
+                <h1 className="text-lg font-black tracking-tight text-on-surface">
+                  {projectData.type === 'hydraulic' ? 'Hydraulic Compliance Workspace' : 'Lift Compliance Workspace'}
+                </h1>
+              </div>
+              <span className={`rounded-full border px-3 py-1 text-[10px] font-black uppercase tracking-[0.18em] ${shellState.className}`}>
+                {shellState.label} · {totalErrors}E / {totalWarnings}W
+              </span>
+            </div>
+
+            <div className="flex items-center gap-3">
+              <button
+                onClick={validateActiveSection}
+                className="rounded-sm border border-outline-variant/30 bg-surface-container px-4 py-2 text-[10px] font-black uppercase tracking-[0.18em] text-on-surface transition-colors hover:border-primary/40 hover:text-primary"
+              >
+                Validate Section
+              </button>
+              <button
+                onClick={validateProject}
+                className="rounded-sm bg-primary px-4 py-2 text-[10px] font-black uppercase tracking-[0.18em] text-surface-container-lowest transition-opacity hover:opacity-90"
+              >
+                Validate Project
+              </button>
+            </div>
+          </div>
+        </header>
+
+        <div className="grid h-[calc(100vh-74px)] grid-cols-[88px_minmax(0,1fr)_340px]">
+          <nav className="border-r border-outline-variant/25 bg-surface-container/95 p-3">
+            <div className="flex h-full flex-col gap-2">
+              {workflowSteps.map((step) => {
+                const issueCount = getWorkflowIssueCount(step.moduleIds);
+                const isActive = step.id === activeWorkflowStep.id;
+                return (
+                  <button
+                    key={step.id}
+                    onClick={() => setActiveTab(step.target)}
+                    className={`group relative flex min-h-[70px] flex-col items-center justify-center rounded-sm border text-center transition-colors ${
+                      isActive
+                        ? 'border-primary/45 bg-primary/10 text-primary'
+                        : issueCount > 0
+                          ? 'border-error/25 bg-error-container/10 text-error hover:border-error/45'
+                          : 'border-outline-variant/20 bg-surface-container-low text-on-surface-variant hover:border-primary/30 hover:text-primary'
+                    }`}
+                    title={step.label}
+                  >
+                    <span className="text-xs font-black">{step.label.split('.')[0]}</span>
+                    <span className="mt-1 text-[8px] font-black uppercase tracking-[0.12em]">
+                      {step.label.replace(/^\d+\.\s*/, '')}
+                    </span>
+                    {issueCount > 0 && (
+                      <span className="absolute right-1 top-1 rounded-full bg-error px-1.5 py-0.5 text-[9px] font-black text-white">
+                        {issueCount}
+                      </span>
+                    )}
+                  </button>
+                );
+              })}
+              <div className="mt-auto rounded-sm border border-outline-variant/20 bg-surface-container-low p-2 text-center">
+                <p className="text-[8px] font-black uppercase tracking-[0.16em] text-on-surface-variant">Mode</p>
+                <p className="mt-1 text-[10px] font-black uppercase text-primary">{projectData.type}</p>
+              </div>
+            </div>
+          </nav>
+
+          <main className="min-w-0 overflow-y-auto">
+            <div className="border-b border-outline-variant/20 bg-surface px-6 py-5">
+              <div className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
+                <div>
+                  <p className="text-[10px] font-black uppercase tracking-[0.24em] text-primary">{activeWorkflowStep.label}</p>
+                  <h2 className="mt-1 text-3xl font-black tracking-tight text-on-surface">{activeModule?.label}</h2>
+                  <p className="mt-2 max-w-3xl text-sm leading-relaxed text-on-surface-variant">{activeGuidance.owner}</p>
+                </div>
+                <div className="flex flex-col gap-3 xl:items-end">
+                  {isReadOnlyStage && activeEditOwner && (
+                    <button
+                      onClick={() => setActiveTab(activeEditOwnerId)}
+                      className="rounded-sm border border-primary/35 bg-primary/10 px-4 py-2 text-[10px] font-black uppercase tracking-[0.18em] text-primary transition-colors hover:bg-primary/15"
+                    >
+                      Editar em {activeEditOwner.label}
+                    </button>
+                  )}
+                  <div className="flex flex-wrap gap-2">
+                    {activeStepModules.map((module) => {
+                      const Icon = module.icon;
+                      const issueCount = categoryIssueMap.get(module.id) || 0;
+                      const isActive = module.id === activeTab;
+                      const isOwner = module.id === activeEditOwnerId;
+                      return (
+                        <button
+                          key={module.id}
+                          onClick={() => setActiveTab(module.id)}
+                          className={`inline-flex items-center gap-2 rounded-sm border px-3 py-2 text-[10px] font-black uppercase tracking-[0.14em] transition-colors ${
+                            isActive
+                              ? 'border-primary/45 bg-primary/10 text-primary'
+                              : issueCount > 0
+                                ? 'border-error/25 bg-error-container/10 text-error hover:border-error/45'
+                                : 'border-outline-variant/25 bg-surface-container-low text-on-surface-variant hover:border-primary/30 hover:text-primary'
+                          }`}
+                        >
+                          <Icon size={13} />
+                          {module.label}
+                          {isOwner && <span className="rounded-full border border-primary/20 px-1.5 py-0.5 text-[8px] text-primary">OWNER</span>}
+                          {issueCount > 0 && <span className="rounded-full bg-error px-1.5 py-0.5 text-[9px] text-white">{issueCount}</span>}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="p-6">
+              <section className="mb-6 grid grid-cols-1 gap-3 xl:grid-cols-3">
+                <div className="rounded-sm border border-outline-variant/20 bg-surface-container-low p-4">
+                  <p className="text-[10px] font-black uppercase tracking-[0.18em] text-primary">Input owner</p>
+                  <p className="mt-2 text-sm leading-relaxed text-on-surface-variant">{activeGuidance.owner}</p>
+                  <div className="mt-3 flex items-center justify-between gap-3 rounded-sm border border-outline-variant/20 bg-surface-container-lowest px-3 py-2">
+                    <span className="text-[10px] font-black uppercase tracking-[0.14em] text-on-surface-variant">Edit owner</span>
+                    <button
+                      onClick={() => setActiveTab(activeEditOwnerId)}
+                      className="text-[10px] font-black uppercase tracking-[0.14em] text-primary"
+                    >
+                      {activeEditOwner?.label || activeEditOwnerId}
+                    </button>
+                  </div>
+                </div>
+                <div className="rounded-sm border border-outline-variant/20 bg-surface-container-low p-4">
+                  <p className="text-[10px] font-black uppercase tracking-[0.18em] text-primary">Dynamic output</p>
+                  <p className="mt-2 text-sm leading-relaxed text-on-surface-variant">{activeGuidance.output}</p>
+                </div>
+                <div className="rounded-sm border border-outline-variant/20 bg-surface-container-low p-4">
+                  <p className="text-[10px] font-black uppercase tracking-[0.18em] text-primary">Report evidence</p>
+                  <p className="mt-2 text-sm leading-relaxed text-on-surface-variant">{activeGuidance.report}</p>
+                </div>
+              </section>
+
+              <section className="rounded-sm border border-outline-variant/20 bg-surface-container-low/40 p-5">
+                {renderV2Content()}
+              </section>
+            </div>
+          </main>
+
+          <aside className="border-l border-outline-variant/25 bg-surface-container/95">
+            <div className="border-b border-outline-variant/25 p-5">
+              <p className="text-[10px] font-black uppercase tracking-[0.22em] text-primary">Validation & Evidence</p>
+              <h3 className="mt-2 text-xl font-black text-on-surface">{activeSectionStatus.label.toUpperCase()}</h3>
+              <p className="mt-2 text-xs leading-relaxed text-on-surface-variant">
+                Este painel é o árbitro: mostra o que falha, para onde ir, e se esta secção já pode entrar no relatório.
+              </p>
+            </div>
+
+            <div className="space-y-4 overflow-y-auto p-4">
+              <div className="grid grid-cols-3 gap-2 text-center">
+                <div className="rounded-sm border border-error/20 bg-error-container/10 p-3">
+                  <p className="text-[9px] font-black uppercase text-error">Errors</p>
+                  <p className="mt-1 text-xl font-black text-error">{activeSectionResults.filter((r) => r.type === 'error').length}</p>
+                </div>
+                <div className="rounded-sm border border-amber-500/20 bg-amber-950/20 p-3">
+                  <p className="text-[9px] font-black uppercase text-amber-300">Warn</p>
+                  <p className="mt-1 text-xl font-black text-amber-300">{activeSectionResults.filter((r) => r.type === 'warning').length}</p>
+                </div>
+                <div className="rounded-sm border border-emerald-500/20 bg-emerald-950/20 p-3">
+                  <p className="text-[9px] font-black uppercase text-emerald-300">Step</p>
+                  <p className="mt-1 text-xl font-black text-emerald-300">{getWorkflowIssueCount(activeWorkflowStep.moduleIds)}</p>
+                </div>
+              </div>
+
+              <div className="rounded-sm border border-outline-variant/20 bg-surface-container-low p-3">
+                <p className="text-[10px] font-black uppercase tracking-[0.18em] text-on-surface-variant">Process gates</p>
+                <div className="mt-3 space-y-2">
+                  {workflowSteps.map((step) => {
+                    const issueCount = getWorkflowIssueCount(step.moduleIds);
+                    const isActive = step.id === activeWorkflowStep.id;
+                    return (
+                      <button
+                        key={step.id}
+                        onClick={() => setActiveTab(step.target)}
+                        className={`flex w-full items-center justify-between rounded-sm border px-3 py-2 text-left transition-colors ${
+                          isActive
+                            ? 'border-primary/35 bg-primary/10'
+                            : issueCount > 0
+                              ? 'border-error/20 bg-error-container/10 hover:border-error/35'
+                              : 'border-outline-variant/20 bg-surface-container-lowest hover:border-primary/25'
+                        }`}
+                      >
+                        <span>
+                          <span className="block text-[10px] font-black uppercase tracking-[0.14em] text-on-surface">{step.label}</span>
+                          <span className="mt-0.5 block text-[9px] font-bold uppercase tracking-[0.12em] text-on-surface-variant">
+                            {issueCount > 0 ? 'resolve before report' : 'ready for next step'}
+                          </span>
+                        </span>
+                        <span className={`rounded-full border px-2 py-1 text-[9px] font-black uppercase ${
+                          issueCount > 0
+                            ? 'border-error/30 text-error'
+                            : 'border-emerald-500/30 text-emerald-300'
+                        }`}>
+                          {issueCount > 0 ? issueCount : 'ok'}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              <div className="rounded-sm border border-outline-variant/20 bg-surface-container-low p-3">
+                <p className="text-[10px] font-black uppercase tracking-[0.18em] text-on-surface-variant">Immediate actions</p>
+                <div className="mt-3 space-y-2">
+                  {(activeSectionResults.length > 0 ? activeSectionResults : allValidationResults.slice(0, 5)).slice(0, 5).map((result, index) => (
+                    <button
+                      key={`${result.moduleId || 'global'}-${index}`}
+                      onClick={() => {
+                        if (result.moduleId) setActiveTab(result.moduleId);
+                        if (result.fieldName) setPendingFocusField(result.fieldName);
+                      }}
+                      className="w-full rounded-sm border border-outline-variant/20 bg-surface-container-lowest p-3 text-left transition-colors hover:border-primary/30"
+                    >
+                      <div className="flex items-start gap-3">
+                        <div className={`mt-0.5 rounded-full p-1 ${
+                          result.type === 'error' ? 'bg-error/15 text-error' : result.type === 'warning' ? 'bg-amber-500/15 text-amber-300' : 'bg-emerald-500/15 text-emerald-300'
+                        }`}>
+                          {result.type === 'error' ? <XCircle size={12} /> : result.type === 'warning' ? <AlertTriangle size={12} /> : <CheckCircle2 size={12} />}
+                        </div>
+                        <div>
+                          <p className="text-[10px] font-black uppercase tracking-[0.14em] text-on-surface">
+                            {result.fieldName ? `Field · ${result.fieldName}` : result.moduleId || 'Project'}
+                          </p>
+                          <p className="mt-1 text-xs leading-relaxed text-on-surface-variant">{result.msg}</p>
+                        </div>
+                      </div>
+                    </button>
+                  ))}
+                  {activeSectionResults.length === 0 && allValidationResults.length === 0 && (
+                    <div className="rounded-sm border border-emerald-500/20 bg-emerald-950/20 p-3">
+                      <p className="text-xs font-bold text-emerald-300">Sem ações pendentes neste estado.</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              <div className="rounded-sm border border-primary/20 bg-primary/5 p-3">
+                <p className="text-[10px] font-black uppercase tracking-[0.18em] text-primary">Draft verdict</p>
+                <p className="mt-2 text-xs leading-relaxed text-on-surface-variant">
+                  Se este esqueleto funcionar, a próxima iteração é mover cada grupo para páginas mais limpas e reduzir inputs duplicados dentro dos módulos.
+                </p>
+              </div>
+            </div>
+          </aside>
+        </div>
+
+        <ValidationModal
+          isOpen={isValidationOpen}
+          onClose={() => setIsValidationOpen(false)}
+          results={validationResults}
+          onNavigate={setActiveTab}
+          onFocusField={(fieldName) => setPendingFocusField(fieldName)}
+          title={validationModalTitle}
+        />
+      </div>
+    );
+  }
 
   return (
     <div className="flex h-screen overflow-hidden bg-surface text-on-surface font-sans">
