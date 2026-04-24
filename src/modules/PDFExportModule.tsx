@@ -214,10 +214,24 @@ export const ValidationModal = ({ isOpen, onClose, results, onNavigate, onFocusF
                     r.type === 'warning' ? 'text-amber-700' : 'text-emerald-700'
                   }`}>{r.type}</p>
                   <p className="text-sm text-on-surface font-medium mb-2">{r.msg}</p>
+                  {(r.moduleId || r.fieldName) && (
+                    <div className="mb-2 flex flex-wrap gap-2">
+                      {r.moduleId && (
+                        <span className="rounded-sm border border-primary/20 bg-primary/10 px-2 py-1 text-[10px] font-black uppercase tracking-[0.14em] text-primary">
+                          section: {r.moduleId}
+                        </span>
+                      )}
+                      {r.fieldName && (
+                        <span className="rounded-sm border border-outline-variant/20 bg-surface-container-high px-2 py-1 text-[10px] font-black uppercase tracking-[0.14em] text-on-surface-variant">
+                          field: {r.fieldName}
+                        </span>
+                      )}
+                    </div>
+                  )}
                   <div className="flex items-center gap-2 mt-2">
                     {r.moduleId && onNavigate && (
-                      <span className="text-[10px] uppercase font-bold text-primary/70 flex items-center gap-1 group-hover:text-primary transition-colors">
-                        {r.fieldName ? 'Open related field' : 'Open related section'}
+                      <span className="rounded-sm border border-primary/20 bg-primary/10 px-2 py-1 text-[10px] uppercase font-black tracking-[0.14em] text-primary transition-colors">
+                        {r.fieldName ? 'Jump to exact field' : 'Open related section'}
                       </span>
                     )}
                     {r.onAction && r.actionLabel && (

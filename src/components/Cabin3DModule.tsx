@@ -15,6 +15,8 @@ interface Cabin3DProps {
   showAccessibility?: boolean;
   showCybersecurity?: boolean;
   showSeismic?: boolean;
+  roofInspectionStation?: boolean;
+  balustradeHeight?: number;
 }
 
 const Handrail = ({ position, width }: { position: [number, number, number]; width: number }) => (
@@ -177,8 +179,12 @@ export const Cabin3DModule: React.FC<Cabin3DProps> = ({
   showAccessibility = true,
   showCybersecurity = true,
   showSeismic = true,
+  roofInspectionStation = true,
+  balustradeHeight = 1.1,
 }) => {
   const [hoveredFeature, setHoveredFeature] = useState<string | null>(null);
+  const [doorOpenRatio, setDoorOpenRatio] = useState(0.35);
+  const [isInspectorCollapsed, setIsInspectorCollapsed] = useState(false);
   const sceneRef = useRef<THREE.Scene | null>(null);
 
   const handleExport = () => {
@@ -197,6 +203,9 @@ export const Cabin3DModule: React.FC<Cabin3DProps> = ({
     'Seismic Snags': 'EN 81-77: retaining elements preventing guide-shoe escape during seismic action.',
     'Ventilation Grille': 'Cabin comfort and airflow element, visually integrated into the technical fit-out.',
     Skirting: 'Protective lower wall skirting and kick zone to make the cabin envelope read more like a physical product.',
+    Apron: 'Cabin apron / toe guard under the sill area to protect the pit interface below the car entrance.',
+    'Inspection Box': 'Top-of-car inspection control box represented as a dedicated service element instead of a generic block.',
+    'Landing Panel': 'Landing pushbutton and indicator zone to make the entrance side readable as a real boarding interface.',
   };
 
   const checklist = [
@@ -204,6 +213,8 @@ export const Cabin3DModule: React.FC<Cabin3DProps> = ({
     { label: 'Control device zone', ok: true },
     { label: 'Secure telemetry point', ok: showCybersecurity },
     { label: 'Seismic retainers', ok: showSeismic },
+    { label: 'Roof inspection box', ok: roofInspectionStation },
+    { label: 'Balustrade height', ok: balustradeHeight >= 1.1 },
     ...(projectType === 'hydraulic' ? [{ label: 'Hydraulic service interface', ok: true }] : []),
   ];
 
@@ -259,6 +270,21 @@ export const Cabin3DModule: React.FC<Cabin3DProps> = ({
               <span className="font-bold uppercase text-white/45">Height</span>
               <span className="font-mono text-white">{(height * 1000).toFixed(0)} mm</span>
             </div>
+            <div className="pt-2 border-t border-white/10">
+              <div className="mb-2 flex items-center justify-between gap-3">
+                <span className="font-bold uppercase text-white/45">Door Opening</span>
+                <span className="font-mono text-primary">{Math.round(doorOpenRatio * 100)}%</span>
+              </div>
+              <input
+                type="range"
+                min={0}
+                max={100}
+                step={1}
+                value={doorOpenRatio * 100}
+                onChange={(e) => setDoorOpenRatio(Number(e.target.value) / 100)}
+                className="w-full accent-orange-500"
+              />
+            </div>
           </div>
         </div>
 
@@ -278,33 +304,64 @@ export const Cabin3DModule: React.FC<Cabin3DProps> = ({
         </button>
       </div>
 
-      <div className={`absolute right-4 top-4 z-10 w-[300px] rounded border border-white/10 bg-slate-950/75 p-4 shadow-2xl backdrop-blur-md transition-all duration-300 ${hoveredFeature ? 'translate-x-0 opacity-100' : 'translate-x-3 opacity-90'}`}>
-        <div className="mb-4 flex items-center justify-between gap-3">
-          <div className="flex items-center gap-2">
-            <Layers3 size={12} className="text-primary" />
-            <h4 className="text-[11px] font-black uppercase tracking-[0.2em] text-white">Feature Inspector</h4>
-          </div>
-          <div className="rounded-full border border-white/10 px-2 py-1 text-[9px] font-black uppercase tracking-[0.16em] text-white/60">
-            {projectType === 'hydraulic' ? 'Hydraulic cabin' : 'Cabin mode'}
-          </div>
-        </div>
-        <div className="space-y-3">
-          {checklist.map((item) => (
-            <div key={item.label} className="rounded border border-white/10 bg-white/[0.03] p-3">
-              <div className="flex items-center justify-between gap-3">
-                <span className="text-[10px] font-bold uppercase tracking-[0.16em] text-white/75">{item.label}</span>
-                <span className={`text-[9px] font-black uppercase tracking-[0.16em] ${item.ok ? 'text-emerald-300' : 'text-rose-300'}`}>
-                  {item.ok ? 'active' : 'review'}
-                </span>
+      <div className={`absolute right-4 top-4 z-10 rounded border border-white/10 bg-slate-950/75 shadow-2xl backdrop-blur-md transition-all duration-300 ${isInspectorCollapsed ? 'w-16 p-2' : 'w-[300px] p-4'} ${hoveredFeature ? 'translate-x-0 opacity-100' : 'translate-x-3 opacity-90'}`}>
+        <div className={`flex items-center ${isInspectorCollapsed ? 'justify-center' : 'justify-between'} gap-3`}>
+          {isInspectorCollapsed ? (
+            <button
+              onClick={() => setIsInspectorCollapsed(false)}
+              className="rounded border border-white/10 p-2 text-primary"
+              title="Expand feature inspector"
+            >
+              <Layers3 size={14} />
+            </button>
+          ) : (
+            <>
+              <div className="flex items-center gap-2">
+                <Layers3 size={12} className="text-primary" />
+                <h4 className="text-[11px] font-black uppercase tracking-[0.2em] text-white">Feature Inspector</h4>
               </div>
+              <div className="flex items-center gap-2">
+                <div className="rounded-full border border-white/10 px-2 py-1 text-[9px] font-black uppercase tracking-[0.16em] text-white/60">
+                  {projectType === 'hydraulic' ? 'Hydraulic cabin' : 'Cabin mode'}
+                </div>
+                <button
+                  onClick={() => setIsInspectorCollapsed(true)}
+                  className="rounded border border-white/10 p-1.5 text-white/60 transition-colors hover:text-primary"
+                  title="Collapse feature inspector"
+                >
+                  <Layers3 size={12} />
+                </button>
+              </div>
+            </>
+          )}
+        </div>
+        {!isInspectorCollapsed && (
+          <>
+            <div className="mt-4 space-y-3">
+              {checklist.map((item) => (
+                <div key={item.label} className="rounded border border-white/10 bg-white/[0.03] p-3">
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="text-[10px] font-bold uppercase tracking-[0.16em] text-white/75">{item.label}</span>
+                    <span className={`text-[9px] font-black uppercase tracking-[0.16em] ${item.ok ? 'text-emerald-300' : 'text-rose-300'}`}>
+                      {item.ok ? 'active' : 'review'}
+                    </span>
+                  </div>
+                </div>
+              ))}
             </div>
-          ))}
-        </div>
-        <div className="mt-4 border-t border-white/10 pt-4 text-[10px] leading-relaxed text-white/45">
-          {projectType === 'hydraulic'
-            ? 'Hydraulic mode keeps the same cabin envelope, but should guide the user through service and safety layout without traction-specific assumptions.'
-            : 'Hover interior components to reveal the associated engineering or compliance note.'}
-        </div>
+            <div className="mt-4 rounded border border-primary/20 bg-primary/10 p-3">
+              <p className="text-[10px] font-black uppercase tracking-[0.18em] text-primary">Door package</p>
+              <p className="mt-2 text-xs leading-relaxed text-white/70">
+                2-panel centre opening, animated opening ratio, visible landing station, interior COP and service-top intent kept in a single cabin scene.
+              </p>
+            </div>
+            <div className="mt-4 border-t border-white/10 pt-4 text-[10px] leading-relaxed text-white/45">
+              {projectType === 'hydraulic'
+                ? 'Hydraulic mode keeps the same cabin envelope, but should guide the user through service and safety layout without traction-specific assumptions.'
+                : 'Hover interior components to reveal the associated engineering or compliance note.'}
+            </div>
+          </>
+        )}
       </div>
 
       <Canvas shadows>
@@ -344,9 +401,37 @@ export const Cabin3DModule: React.FC<Cabin3DProps> = ({
             <CeilingLights width={width} depth={depth} height={height} />
             <group onPointerOver={() => setHoveredFeature('Door System')} onPointerOut={() => setHoveredFeature(null)}>
               <CabinDoorAssembly width={width} height={height} depth={depth} />
+              <mesh position={[-(width * 0.78 / 4) - doorOpenRatio * width * 0.14, height * 0.51, depth / 2 - 0.004]}>
+                <boxGeometry args={[width * 0.78 / 2 - 0.02, height * 0.78, 0.015]} />
+                <meshStandardMaterial color="#cbd5e1" metalness={0.88} roughness={0.14} />
+              </mesh>
+              <mesh position={[(width * 0.78 / 4) + doorOpenRatio * width * 0.14, height * 0.51, depth / 2 - 0.004]}>
+                <boxGeometry args={[width * 0.78 / 2 - 0.02, height * 0.78, 0.015]} />
+                <meshStandardMaterial color="#dbe4f0" metalness={0.88} roughness={0.14} />
+              </mesh>
+            </group>
+            <group onPointerOver={() => setHoveredFeature('Landing Panel')} onPointerOut={() => setHoveredFeature(null)}>
+              <mesh position={[-width * 0.44, 1.15, depth / 2 + 0.012]}>
+                <boxGeometry args={[0.08, 0.38, 0.05]} />
+                <meshStandardMaterial color="#111827" metalness={0.6} roughness={0.25} />
+              </mesh>
+              <mesh position={[-width * 0.44, 1.26, depth / 2 + 0.04]}>
+                <cylinderGeometry args={[0.018, 0.018, 0.012, 16]} />
+                <meshStandardMaterial color="#22c55e" emissive="#22c55e" emissiveIntensity={0.7} />
+              </mesh>
+              <mesh position={[-width * 0.44, 1.12, depth / 2 + 0.04]}>
+                <cylinderGeometry args={[0.018, 0.018, 0.012, 16]} />
+                <meshStandardMaterial color="#f97316" emissive="#f97316" emissiveIntensity={0.55} />
+              </mesh>
             </group>
             <group onPointerOver={() => setHoveredFeature('Skirting')} onPointerOut={() => setHoveredFeature(null)}>
               <BaseSkirting width={width} depth={depth} />
+            </group>
+            <group onPointerOver={() => setHoveredFeature('Apron')} onPointerOut={() => setHoveredFeature(null)}>
+              <mesh position={[0, -0.18, depth / 2 - 0.048]}>
+                <boxGeometry args={[width * 0.68, 0.42, 0.03]} />
+                <meshStandardMaterial color="#0f172a" metalness={0.45} roughness={0.35} />
+              </mesh>
             </group>
 
             <mesh position={[0, height * 0.5, depth / 2 - 0.045]}>
@@ -384,6 +469,15 @@ export const Cabin3DModule: React.FC<Cabin3DProps> = ({
             {showAccessibility && (
               <group onPointerOver={() => setHoveredFeature('Control Panel')} onPointerOut={() => setHoveredFeature(null)}>
                 <ControlPanel position={[width / 2 - 0.02, 1.1, depth / 4]} />
+              </group>
+            )}
+
+            {roofInspectionStation && (
+              <group onPointerOver={() => setHoveredFeature('Inspection Box')} onPointerOut={() => setHoveredFeature(null)}>
+                <mesh position={[width * 0.24, height - 0.18, -depth * 0.18]}>
+                  <boxGeometry args={[0.2, 0.14, 0.12]} />
+                  <meshStandardMaterial color="#f97316" metalness={0.55} roughness={0.22} />
+                </mesh>
               </group>
             )}
 

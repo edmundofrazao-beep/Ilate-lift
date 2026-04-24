@@ -20,6 +20,13 @@ export const OverspeedGovernorModule = ({ data, onChange }: { data: ProjectData,
   const osgSafetyFactor = data.osgBreakingLoad / Ft;
   const isOsgSfOk = osgSafetyFactor >= 8.0;
   const isBrakingForceOk = F_max >= Ft;
+  const suggestedPresets = OSG_PRESETS.filter((preset) => {
+    const [min, max] = preset.speedRange.replace(' m/s', '').split('-').map((value) => Number(value.replace('<= ', '').trim()));
+    if (preset.speedRange.includes('<=')) {
+      return v <= max;
+    }
+    return v >= min && v <= max;
+  }).slice(0, 4);
 
   return (
     <div className="space-y-8">
@@ -62,6 +69,31 @@ export const OverspeedGovernorModule = ({ data, onChange }: { data: ProjectData,
                     </option>
                   ))}
                 </select>
+              </div>
+              <div className="rounded-sm border border-primary/20 bg-primary/5 p-4">
+                <p className="text-[10px] font-black uppercase tracking-[0.18em] text-primary">Suggested presets for current speed</p>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  {suggestedPresets.map((preset) => (
+                    <button
+                      key={preset.id}
+                      onClick={() => onChange({
+                        osgPresetId: preset.id,
+                        osgManufacturer: preset.manufacturer,
+                        osgModel: preset.model,
+                        osgTrippingSpeed: preset.trippingSpeed,
+                        osgTensileForce: preset.tensileForce,
+                        osgMaxBrakingForce: preset.maxBrakingForce,
+                        osgBreakingLoad: preset.ropeBreakingLoad,
+                      })}
+                      className="rounded-sm border border-outline-variant/20 bg-surface-container px-3 py-2 text-[10px] font-black uppercase tracking-[0.14em] text-on-surface transition-colors hover:border-primary/30 hover:text-primary"
+                    >
+                      {preset.manufacturer} {preset.model}
+                    </button>
+                  ))}
+                  {suggestedPresets.length === 0 && (
+                    <span className="text-[10px] uppercase tracking-[0.14em] text-on-surface-variant">No direct speed-range preset. Use manual values or nearest certified model.</span>
+                  )}
+                </div>
               </div>
               <LiftField label="Rated Speed (v)" name="speed" unit="m/s" data={data} onChange={onChange} />
               <LiftField label="Tripping Speed (vt)" name="osgTrippingSpeed" unit="m/s" data={data} onChange={(newData) => onChange({ osgPresetId: '', ...newData })} min={0} max={5} step={0.01} />

@@ -6,6 +6,7 @@ export interface ProjectData {
   carMass: number; // P (kg)
   cwtMass: number; // Mcwt (kg)
   balanceRatio: number; // 0-1 target counterweight balance ratio
+  cwtFillMaterial: 'cast-iron' | 'steel' | 'concrete';
   speed: number; // v (m/s)
   travel: number; // H (m)
   stops: number;
@@ -41,6 +42,29 @@ export interface ProjectData {
   railProfile: string;
   railPresetId: string;
   railLubrication: 'dry' | 'oiled' | 'machined';
+  guideInterfaceType: 'sliding' | 'roller';
+  guideRollerPresetId: string;
+  guideRollerWheelMaterial: 'nylon' | 'polyurethane' | 'steel';
+  guideRollerIndependentAxes: boolean;
+  guideRollerClearanceX: number; // mm
+  guideRollerClearanceY: number; // mm
+  guideRollerClearanceZ: number; // mm
+  guideRollerSpringStiffness: number; // N/mm
+  // Installation & Control
+  driveArrangement: 'mrl' | 'machine-room';
+  machineRoomPosition: 'none' | 'overhead' | 'adjacent' | 'basement';
+  controlCabinetLocation: 'machine-room' | 'top-landing' | 'lowest-landing' | 'jamb';
+  drivePackageLocation: 'shaft-head' | 'machine-room' | 'landing-cabinet' | 'pit-unit';
+  controllerArchitecture: 'vvvf' | 'hydraulic-valve' | 'relay-hybrid';
+  roofInspectionStation: boolean;
+  pitInspectionStation: boolean;
+  cabinetInspectionEnabled: boolean;
+  travellingCableType: 'flat' | 'round' | 'bus';
+  travellingCableRouting: 'rear-wall' | 'side-wall';
+  shaftLightingLux: number; // lx
+  shaftLuminairePresetId: string;
+  shaftLuminaireSpacing: number; // m
+  shaftLuminaireCount: number;
   // Rope Advanced Properties
   numSimpleBends: number; // Nps
   numReverseBends: number; // Npr
@@ -61,6 +85,7 @@ export interface ProjectData {
   // Buffers
   bufferStroke: number; // h (mm)
   bufferType: 'energy-accumulation' | 'energy-dissipation';
+  bufferMedium: 'spring' | 'elastomer' | 'hydraulic-oil';
   bufferMaxMass: number; // kg
   bufferMinMass: number; // kg
   bufferPresetId: string;
@@ -143,6 +168,8 @@ export interface ProjectData {
   seismicCategory: 0 | 1 | 2 | 3;
   designAcceleration: number; // ad (m/s2)
   primaryWaveDetection: boolean;
+  seismicRetainerEnabled: boolean;
+  seismicRetainerType: 'none' | 'car' | 'car-and-cwt' | 'full-3-axis';
   // Additional Variables from HTML Engine
   Faux: number; // N
   delta_str_x: number; // mm
@@ -161,6 +188,7 @@ export interface ProjectData {
   headroomGeneral: number; // m
   headroomGuideShoeZone: number; // m
   balustradeVertical: number; // m
+  carRoofBalustradeHeight: number; // m
   toeBoardOutside: number; // m
   ramHeadClearance: number; // m
   cwtScreenBottomFromPit: number; // m

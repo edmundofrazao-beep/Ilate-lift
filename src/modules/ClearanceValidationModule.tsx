@@ -13,6 +13,7 @@ export const ClearanceValidationModule = ({ data, onChange }: { data: ProjectDat
     { key: "carToCwtDistance", clause: "4.2.5.5.3", value: data.carToCwtDistance, limit: 0.05, op: ">=", unit: "m", note: "Car and associated parts to counterweight", max: 0.3 },
     { key: "headroomGeneral", clause: "4.2.5.7.2(a)", value: data.headroomGeneral, limit: 0.50, op: ">=", unit: "m", note: "General headroom above car roof fixed parts", max: 3.0 },
     { key: "headroomGuideShoeZone", clause: "4.2.5.7.2(b)", value: data.headroomGuideShoeZone, limit: 0.10, op: ">=", unit: "m", note: "Guide shoes/suspension terminations zone", max: 1.0 },
+    { key: "carRoofBalustradeHeight", clause: "car roof safety barrier", value: data.carRoofBalustradeHeight, limit: 1.10, op: ">=", unit: "m", note: "Top of car balustrade minimum operating height for high-risk envelope", max: 1.5 },
     { key: "balustradeVertical", clause: "4.2.5.7.2(c)1", value: data.balustradeVertical, limit: 0.30, op: ">=", unit: "m", note: "Vertical above balustrade zone", max: 1.0 },
     { key: "toeBoardOutside", clause: "4.2.5.7.2(d)2", value: data.toeBoardOutside, limit: 0.10, op: ">=", unit: "m", note: "Outside toe board vertical clearance", max: 0.5 },
     { key: "ramHeadClearance", clause: "4.2.5.7.4", value: data.ramHeadClearance, limit: 0.10, op: ">=", unit: "m", note: "Ceiling to ram-head assembly", max: 1.0 },

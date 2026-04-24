@@ -1,7 +1,7 @@
 import React from 'react';
 import { ProjectData, ModuleStatus } from '../types';
 import { safeNumber, formatNumber, degToRad, InputGroup, LiftField, SliderField, CollapsibleSection } from '../components/ui';
-import { GUIDE_RAIL_PRESETS, BELT_PROFILES } from '../constants';
+import { GUIDE_RAIL_PRESETS, GUIDE_ROLLER_PRESETS, BELT_PROFILES } from '../constants';
 import { CheckCircle2, ShieldCheck, Zap, AlertTriangle, Info, ChevronRight, Calculator, FileText, Database, Activity, Package, Maximize, AlertCircle, PlayCircle, Settings, CheckSquare, XCircle, Settings2 } from 'lucide-react';
 import { BlockMath, InlineMath } from 'react-katex';
 import { computeLiftCalculations } from '../lib/calculations';
@@ -12,6 +12,7 @@ export const GuideRailsModule = ({ data, onChange, view = 'all' }: { data: Proje
   const l = data.bracketDist;
   
   const { guideRails } = computeLiftCalculations(data);
+  const logic = computeLiftCalculations(data).systemLogic;
   
   // 1. Bending Stress (Combined X and Y)
   const Fh = (data.ratedLoad + data.carMass) * g * 0.1;
@@ -74,6 +75,7 @@ export const GuideRailsModule = ({ data, onChange, view = 'all' }: { data: Proje
   const bucklingUtilization = (sigma_k / data.materialYield) * 100;
   const combinedUtilization = (sigma_combined / data.materialYield) * 100;
   const deflectionUtilization = (delta / deflectionLimit) * 100;
+  const isSetupView = view === 'all' || view === 'params';
   const cockpitMetrics = [
     { label: 'Profile', value: data.railProfile || data.guideType || 'Custom' },
     { label: 'Combined Stress', value: `${formatNumber(sigma_combined)} N/mm²` },
@@ -133,6 +135,7 @@ export const GuideRailsModule = ({ data, onChange, view = 'all' }: { data: Proje
             <p className="text-[10px] font-bold uppercase opacity-50 mb-1">Rail Preset Selection</p>
             <select 
               value={data.railPresetId || (data.railProfile === 'Custom' ? 'Custom' : '')}
+              disabled={!isSetupView}
               onChange={(e) => {
                 const profile = GUIDE_RAIL_PRESETS.find((preset) => preset.id === e.target.value);
                 if (profile) {
@@ -157,7 +160,7 @@ export const GuideRailsModule = ({ data, onChange, view = 'all' }: { data: Proje
                   });
                 }
               }}
-              className="w-full bg-transparent text-xl font-black outline-none cursor-pointer text-primary"
+              className={`w-full bg-transparent text-xl font-black outline-none text-primary ${isSetupView ? 'cursor-pointer' : 'cursor-not-allowed opacity-70'}`}
             >
               <option value="">Select Profile...</option>
               {GUIDE_RAIL_PRESETS.map((preset) => (
@@ -169,6 +172,15 @@ export const GuideRailsModule = ({ data, onChange, view = 'all' }: { data: Proje
             </select>
           </div>
         </div>
+
+        {!isSetupView && (
+          <div className="mb-8 rounded-sm border border-primary/20 bg-primary/5 p-4">
+            <p className="text-[10px] font-black uppercase tracking-[0.18em] text-primary">Single source of truth</p>
+            <p className="mt-2 text-xs leading-relaxed text-on-surface-variant">
+              Rail profile selection is locked in this view. Change presets and section properties only in <strong>Guide Rail Setup</strong>; this tab is read-only for interpretation and verification.
+            </p>
+          </div>
+        )}
 
         {(view === 'all' || view === 'params') && (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8">
@@ -201,6 +213,80 @@ export const GuideRailsModule = ({ data, onChange, view = 'all' }: { data: Proje
                 <option value="machined">Special Machined (Greased)</option>
               </select>
             </div>
+            <div className="md:col-span-2 mt-4 rounded-sm border border-primary/20 bg-primary/5 p-4">
+              <p className="text-[10px] font-black uppercase tracking-[0.18em] text-primary">Guide interface logic</p>
+              <p className="mt-2 text-xs leading-relaxed text-on-surface-variant">
+                Current operating envelope recommends <strong>{logic.recommendedGuideInterfaceType}</strong>.
+                {logic.requiresGuideRollers ? ' Rollers are expected for seismic/high-speed duty.' : ' Sliding guides remain acceptable in this envelope.'}
+              </p>
+            </div>
+            <div className="space-y-1 md:col-span-2">
+              <label className="text-[11px] font-bold text-on-surface-variant uppercase">Guide Interface</label>
+              <select
+                value={data.guideInterfaceType}
+                onChange={(e) => onChange({ guideInterfaceType: e.target.value as ProjectData['guideInterfaceType'] })}
+                className="w-full bg-surface-container-lowest border border-outline-variant/20 rounded-sm px-3 py-2 text-sm outline-none"
+              >
+                <option value="sliding">Sliding Guide Shoes</option>
+                <option value="roller">Guide Rollers / Rodadeiras</option>
+              </select>
+            </div>
+            {data.guideInterfaceType === 'roller' && (
+              <>
+                <div className="space-y-1 md:col-span-2">
+                  <label className="text-[11px] font-bold text-on-surface-variant uppercase">Guide Roller Preset</label>
+                  <select
+                    value={data.guideRollerPresetId || ''}
+                    onChange={(e) => {
+                      const preset = GUIDE_ROLLER_PRESETS.find((item) => item.id === e.target.value);
+                      if (!preset) return;
+                      onChange({
+                        guideRollerPresetId: preset.id,
+                        guideRollerWheelMaterial: preset.wheelMaterial as ProjectData['guideRollerWheelMaterial'],
+                        guideRollerIndependentAxes: preset.independentAxes,
+                        guideRollerClearanceX: preset.clearanceX,
+                        guideRollerClearanceY: preset.clearanceY,
+                        guideRollerClearanceZ: preset.clearanceZ,
+                        guideRollerSpringStiffness: preset.springStiffness,
+                      });
+                    }}
+                    className="w-full bg-surface-container-lowest border border-outline-variant/20 rounded-sm px-3 py-2 text-sm outline-none"
+                  >
+                    <option value="">Select guide roller...</option>
+                    {GUIDE_ROLLER_PRESETS.map((preset) => (
+                      <option key={preset.id} value={preset.id}>
+                        {preset.manufacturer} {preset.model}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div className="space-y-1">
+                  <label className="text-[11px] font-bold text-on-surface-variant uppercase">Wheel Material</label>
+                  <select
+                    value={data.guideRollerWheelMaterial}
+                    onChange={(e) => onChange({ guideRollerPresetId: '', guideRollerWheelMaterial: e.target.value as ProjectData['guideRollerWheelMaterial'] })}
+                    className="w-full bg-surface-container-lowest border border-outline-variant/20 rounded-sm px-3 py-2 text-sm outline-none"
+                  >
+                    <option value="nylon">Nylon</option>
+                    <option value="polyurethane">Polyurethane</option>
+                    <option value="steel">Steel</option>
+                  </select>
+                </div>
+                <div className="flex items-center gap-3 rounded-sm border border-outline-variant/20 bg-surface-container-lowest p-3">
+                  <input
+                    type="checkbox"
+                    checked={data.guideRollerIndependentAxes}
+                    onChange={(e) => onChange({ guideRollerPresetId: '', guideRollerIndependentAxes: e.target.checked })}
+                    className="rounded-sm border-outline-variant/30 text-primary focus:ring-primary"
+                  />
+                  <label className="text-[11px] font-bold text-on-surface-variant uppercase">Independent 3-Axis Suspension</label>
+                </div>
+                <LiftField label="Roller Clearance X" name="guideRollerClearanceX" unit="mm" data={data} onChange={(newData) => onChange({ guideRollerPresetId: '', ...newData })} min={0.2} max={5} step={0.1} />
+                <LiftField label="Roller Clearance Y" name="guideRollerClearanceY" unit="mm" data={data} onChange={(newData) => onChange({ guideRollerPresetId: '', ...newData })} min={0.2} max={5} step={0.1} />
+                <LiftField label="Roller Clearance Z" name="guideRollerClearanceZ" unit="mm" data={data} onChange={(newData) => onChange({ guideRollerPresetId: '', ...newData })} min={0.2} max={5} step={0.1} />
+                <LiftField label="Spring Stiffness" name="guideRollerSpringStiffness" unit="N/mm" data={data} onChange={(newData) => onChange({ guideRollerPresetId: '', ...newData })} min={50} max={1000} step={10} />
+              </>
+            )}
           </InputGroup>
         </div>
         )}
@@ -367,15 +453,15 @@ export const GuideRailsModule = ({ data, onChange, view = 'all' }: { data: Proje
               Profile Properties ({data.guideType})
             </h4>
             <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-              <LiftField label="Area (A)" name="railArea" unit="mm²" data={data} onChange={onChange} min={0} max={10000} />
-              <LiftField label="Inertia (Iy)" name="railIy" unit="mm⁴" data={data} onChange={onChange} min={0} max={10000000} />
-              <LiftField label="Inertia (Ix)" name="railIx" unit="mm⁴" data={data} onChange={onChange} min={0} max={10000000} />
-              <LiftField label="Radius (iy)" name="railIyRadius" unit="mm" data={data} onChange={onChange} min={0} max={100} />
-              <LiftField label="Radius (ix)" name="railIxRadius" unit="mm" data={data} onChange={onChange} min={0} max={100} />
-              <LiftField label="Modulus (Wy)" name="railWy" unit="mm³" data={data} onChange={onChange} min={0} max={100000} />
-              <LiftField label="Modulus (Wx)" name="railWx" unit="mm³" data={data} onChange={onChange} min={0} max={100000} />
-              <LiftField label="Weight (q1)" name="railWeight" unit="kg/m" data={data} onChange={onChange} min={0} max={100} />
-              <LiftField label="Bracket Dist. (l)" name="bracketDist" unit="mm" data={data} onChange={onChange} min={0} max={5000} />
+              <LiftField disabled={!isSetupView || data.railProfile !== 'Custom'} label="Area (A)" name="railArea" unit="mm²" data={data} onChange={onChange} min={0} max={10000} />
+              <LiftField disabled={!isSetupView || data.railProfile !== 'Custom'} label="Inertia (Iy)" name="railIy" unit="mm⁴" data={data} onChange={onChange} min={0} max={10000000} />
+              <LiftField disabled={!isSetupView || data.railProfile !== 'Custom'} label="Inertia (Ix)" name="railIx" unit="mm⁴" data={data} onChange={onChange} min={0} max={10000000} />
+              <LiftField disabled={!isSetupView || data.railProfile !== 'Custom'} label="Radius (iy)" name="railIyRadius" unit="mm" data={data} onChange={onChange} min={0} max={100} />
+              <LiftField disabled={!isSetupView || data.railProfile !== 'Custom'} label="Radius (ix)" name="railIxRadius" unit="mm" data={data} onChange={onChange} min={0} max={100} />
+              <LiftField disabled={!isSetupView || data.railProfile !== 'Custom'} label="Modulus (Wy)" name="railWy" unit="mm³" data={data} onChange={onChange} min={0} max={100000} />
+              <LiftField disabled={!isSetupView || data.railProfile !== 'Custom'} label="Modulus (Wx)" name="railWx" unit="mm³" data={data} onChange={onChange} min={0} max={100000} />
+              <LiftField disabled={!isSetupView || data.railProfile !== 'Custom'} label="Weight (q1)" name="railWeight" unit="kg/m" data={data} onChange={onChange} min={0} max={100} />
+              <LiftField disabled={!isSetupView} label="Bracket Dist. (l)" name="bracketDist" unit="mm" data={data} onChange={onChange} min={0} max={5000} />
             </div>
           </div>
 

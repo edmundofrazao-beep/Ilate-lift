@@ -8,7 +8,7 @@ import { computeLiftCalculations } from '../lib/calculations';
 
 export const RopesModule = ({ data, onChange, view = 'all' }: { data: ProjectData, onChange: (newData: Partial<ProjectData>) => void, view?: 'all' | 'params' | 'verify' }) => {
   const calc = computeLiftCalculations(data);
-  const { Fstatic_per_rope, N_equiv, sf_required, sf_actual, isSfOk, iso4344_Fmin, isBreakingLoadOk } = calc.ropes;
+  const { Fstatic_per_rope, N_equiv, sf_required, sf_actual, isSfOk, iso4344_Fmin, isBreakingLoadOk, supportCount, isBeltSuspension } = calc.ropes;
 
   // Placeholder Lifetime Estimation (refined)
   const lifetime_est = useMemo(() => {
@@ -25,7 +25,7 @@ export const RopesModule = ({ data, onChange, view = 'all' }: { data: ProjectDat
   const reverseBendSeverity = data.numReverseBends >= 4 ? 'high' : data.numReverseBends >= 2 ? 'medium' : 'low';
   const fatigueReserveYears = data.loadCycles > 0 ? lifetime_est / data.loadCycles : 0;
   const fatigueReserveLow = fatigueReserveYears > 0 && fatigueReserveYears < 1;
-  const discardRequiresAction = discardWearReached || !isBreakingLoadOk || !isSfOk;
+  const discardRequiresAction = !isBeltSuspension && (discardWearReached || !isBreakingLoadOk || !isSfOk);
   const discardStatusTone = discardRequiresAction ? 'bg-error-container/10 border-error/20' : fatigueReserveLow || reverseBendSeverity !== 'low' ? 'bg-amber-50 border-amber-200' : 'bg-emerald-50 border-emerald-200';
   const discardStatusLabel = discardRequiresAction ? 'replace / investigate' : fatigueReserveLow || reverseBendSeverity !== 'low' ? 'service review' : 'serviceable';
 
@@ -33,7 +33,7 @@ export const RopesModule = ({ data, onChange, view = 'all' }: { data: ProjectDat
     <div className="space-y-8">
       <div className="bg-surface-container-low p-8 border-t-2 border-tertiary">
         <div className="flex items-center justify-between mb-8">
-          <h3 className="text-xl font-bold">Evaluation of Safety Factor of Ropes (4.12)</h3>
+          <h3 className="text-xl font-bold">{isBeltSuspension ? 'Evaluation of Safety Factor of Belts (4.12)' : 'Evaluation of Safety Factor of Ropes (4.12)'}</h3>
           <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full uppercase ${isSfOk ? 'bg-emerald-100 text-emerald-700' : 'bg-error-container/20 text-error'}`}>
             {isSfOk ? 'Implemented - OK' : 'Implemented - NOK'}
           </span>
@@ -42,7 +42,7 @@ export const RopesModule = ({ data, onChange, view = 'all' }: { data: ProjectDat
         {(view === 'all' || view === 'verify') && (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           <div className="p-4 bg-surface-container-lowest border border-outline-variant/10">
-            <p className="text-[10px] font-bold text-on-surface-variant uppercase mb-1">Static Load / Rope</p>
+            <p className="text-[10px] font-bold text-on-surface-variant uppercase mb-1">{isBeltSuspension ? 'Static Load / Belt' : 'Static Load / Rope'}</p>
             <p className="text-xl font-black">{formatNumber(Fstatic_per_rope)} <span className="text-xs font-normal opacity-50">N</span></p>
           </div>
           <div className="p-4 bg-surface-container-lowest border border-outline-variant/10">
@@ -54,8 +54,8 @@ export const RopesModule = ({ data, onChange, view = 'all' }: { data: ProjectDat
             <p className={`text-xl font-black ${isSfOk ? 'text-emerald-600' : 'text-error'}`}>{formatNumber(sf_actual)}</p>
           </div>
           <div className="p-4 bg-surface-container-lowest border border-outline-variant/10">
-            <p className="text-[10px] font-bold text-on-surface-variant uppercase mb-1">Lifetime Est. (Cycles)</p>
-            <p className="text-xl font-black">{formatNumber(lifetime_est, 0)}</p>
+            <p className="text-[10px] font-bold text-on-surface-variant uppercase mb-1">{isBeltSuspension ? 'Installed Belts' : 'Lifetime Est. (Cycles)'}</p>
+            <p className="text-xl font-black">{isBeltSuspension ? supportCount : formatNumber(lifetime_est, 0)}</p>
           </div>
           
           <div className="p-4 bg-surface-container-lowest border border-outline-variant/10 md:col-span-2">
@@ -64,7 +64,7 @@ export const RopesModule = ({ data, onChange, view = 'all' }: { data: ProjectDat
               value={data.suspensionType}
               onChange={(e) => {
                 const type = e.target.value as any;
-                onChange({ suspensionType: type, ropePresetId: '', ropeType: '' });
+                onChange({ suspensionType: type });
               }}
               className="w-full bg-transparent text-xl font-black outline-none cursor-pointer text-primary"
             >
@@ -87,10 +87,9 @@ export const RopesModule = ({ data, onChange, view = 'all' }: { data: ProjectDat
                     ropeType: belt.label,
                     beltWidth: belt.width,
                     beltThickness: belt.thickness,
-                    numBelts: 1, // Reset to 1 by default for a single belt profile unless specified
+                    numBelts: Math.max(data.numBelts || 0, 1),
                     beltTensileStrength: belt.mbf,
-                    ropeBreakingLoad: belt.mbf,
-                    ropeDiameter: belt.thickness // For D/d calculation
+                    ropeBreakingLoad: belt.mbf
                   });
                 } else if (rope) {
                   onChange({
@@ -182,6 +181,12 @@ export const RopesModule = ({ data, onChange, view = 'all' }: { data: ProjectDat
             <LiftField label="Tensile Strength / Belt" name="beltTensileStrength" unit="N" data={data} onChange={(newData) => onChange({ ropePresetId: '', ...newData })} min={1000} max={100000} />
             <LiftField label="Simple Pulleys (Nps)" name="numSimpleBends" data={data} onChange={onChange} min={0} max={20} required />
             <LiftField label="Reverse Pulleys (Npr)" name="numReverseBends" data={data} onChange={onChange} min={0} max={10} required suggestion="Reverse bends significantly reduce rope lifetime." />
+            <div className="rounded-sm border border-primary/20 bg-primary/5 p-4">
+              <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-primary">Belt mode active</p>
+              <p className="mt-2 text-xs leading-relaxed text-on-surface-variant">
+                The active support count is <strong>{supportCount}</strong>. Traction and sheave pressure now respond to belt width, thickness and quantity instead of rope count.
+              </p>
+            </div>
           </InputGroup>
           )}
 
@@ -232,14 +237,18 @@ export const RopesModule = ({ data, onChange, view = 'all' }: { data: ProjectDat
                   min={0}
                   max={15}
                   step={0.5}
-                  suggestion="A reduction above 6% should immediately trigger rope replacement review."
+                  suggestion={isBeltSuspension ? 'Wear-based rope discard is not used for belt suspension.' : 'A reduction above 6% should immediately trigger rope replacement review.'}
                 />
                 <div className="rounded-sm border border-outline-variant/20 bg-surface-container-lowest p-4">
                   <p className="text-[10px] font-bold uppercase text-on-surface-variant">Discard Snapshot</p>
                   <p className={`mt-2 text-2xl font-black ${discardRequiresAction ? 'text-error' : fatigueReserveLow || reverseBendSeverity !== 'low' ? 'text-amber-600' : 'text-emerald-600'}`}>
                     {discardRequiresAction ? 'REJECT' : fatigueReserveLow || reverseBendSeverity !== 'low' ? 'REVIEW' : 'OK'}
                   </p>
-                  <p className="mt-2 text-[10px] leading-relaxed text-on-surface-variant">Decision is driven by wear, breaking load, safety factor and reverse bends.</p>
+                  <p className="mt-2 text-[10px] leading-relaxed text-on-surface-variant">
+                    {isBeltSuspension
+                      ? 'Decision is driven by belt tensile capacity, safety factor and bending duty.'
+                      : 'Decision is driven by wear, breaking load, safety factor and reverse bends.'}
+                  </p>
                 </div>
               </div>
 
@@ -248,19 +257,19 @@ export const RopesModule = ({ data, onChange, view = 'all' }: { data: ProjectDat
                   <div className={`w-5 h-5 rounded flex items-center justify-center border ${!discardWearReached ? 'bg-emerald-600 border-emerald-600' : 'border-error bg-error/80'}`}>
                     {!discardWearReached ? <CheckSquare size={14} className="text-white" /> : <AlertTriangle size={12} className="text-white" />}
                   </div>
-                  <span className="text-xs font-medium">Nominal diameter reduction remains below 6%.</span>
+                  <span className="text-xs font-medium">{isBeltSuspension ? 'Diameter-based discard is disabled for belt suspension.' : 'Nominal diameter reduction remains below 6%.'}</span>
                 </div>
                 <div className="flex items-center gap-3">
                   <div className={`w-5 h-5 rounded flex items-center justify-center border ${isBreakingLoadOk ? 'bg-emerald-600 border-emerald-600' : 'border-error bg-error/80'}`}>
                     {isBreakingLoadOk ? <CheckSquare size={14} className="text-white" /> : <AlertTriangle size={12} className="text-white" />}
                   </div>
-                  <span className="text-xs font-medium">Measured breaking load still satisfies the ISO 4344 minimum reference.</span>
+                  <span className="text-xs font-medium">{isBeltSuspension ? 'Installed belt tensile resistance covers the current support count.' : 'Measured breaking load still satisfies the ISO 4344 minimum reference.'}</span>
                 </div>
                 <div className="flex items-center gap-3">
                   <div className={`w-5 h-5 rounded flex items-center justify-center border ${isSfOk ? 'bg-emerald-600 border-emerald-600' : 'border-error bg-error/80'}`}>
                     {isSfOk ? <CheckSquare size={14} className="text-white" /> : <AlertTriangle size={12} className="text-white" />}
                   </div>
-                  <span className="text-xs font-medium">Current suspension safety factor still covers the installed duty.</span>
+                  <span className="text-xs font-medium">{isBeltSuspension ? 'Current belt safety factor still covers the installed duty.' : 'Current suspension safety factor still covers the installed duty.'}</span>
                 </div>
                 <div className="flex items-center gap-3">
                   <div className={`w-5 h-5 rounded flex items-center justify-center border ${reverseBendSeverity === 'low' ? 'bg-emerald-600 border-emerald-600' : reverseBendSeverity === 'medium' ? 'bg-amber-500 border-amber-500' : 'border-error bg-error/80'}`}>
@@ -277,8 +286,8 @@ export const RopesModule = ({ data, onChange, view = 'all' }: { data: ProjectDat
                 <div className="mt-3 grid grid-cols-1 md:grid-cols-3 gap-3 text-xs">
                   <div>
                     <p className="font-bold text-on-surface-variant uppercase text-[10px]">Wear</p>
-                    <p className={discardWearReached ? 'text-error font-bold' : 'text-emerald-600 font-bold'}>
-                      {formatNumber(data.ropeWearPercentage, 1)}%
+                    <p className={isBeltSuspension ? 'text-on-surface font-bold' : discardWearReached ? 'text-error font-bold' : 'text-emerald-600 font-bold'}>
+                      {isBeltSuspension ? 'n/a' : `${formatNumber(data.ropeWearPercentage, 1)}%`}
                     </p>
                   </div>
                   <div>
@@ -307,15 +316,25 @@ export const RopesModule = ({ data, onChange, view = 'all' }: { data: ProjectDat
               <div className="space-y-4">
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-1">
-                    <label className="text-[11px] font-bold text-on-surface-variant uppercase">Rope Type</label>
+                    <label className="text-[11px] font-bold text-on-surface-variant uppercase">{isBeltSuspension ? 'Suspension Family' : 'Rope Type'}</label>
                     <select 
                       value={data.ropeType}
                       onChange={(e) => onChange({ ropeType: e.target.value })}
                       className="w-full bg-surface-container-low border border-outline-variant/20 rounded-sm px-3 py-2 text-sm focus:ring-1 focus:ring-primary outline-none"
                     >
-                      <option value="Steel Wire">Steel (Standard)</option>
-                      <option value="Coated">Coated (Synthetic)</option>
-                      <option value="High Performance">Alta Performance</option>
+                      {isBeltSuspension ? (
+                        <>
+                          <option value="Elastomeric Belt">Elastomeric Belt</option>
+                          <option value="Steel-Cord Belt">Steel-Cord Belt</option>
+                          <option value="High Performance Belt">High Performance Belt</option>
+                        </>
+                      ) : (
+                        <>
+                          <option value="Steel Wire">Steel (Standard)</option>
+                          <option value="Coated">Coated (Synthetic)</option>
+                          <option value="High Performance">Alta Performance</option>
+                        </>
+                      )}
                     </select>
                   </div>
                   <LiftField label="Cycles/Year" name="loadCycles" data={data} onChange={onChange} min={1000} required />

@@ -65,6 +65,14 @@ export const SEISMIC_CATEGORIES = [
   { id: 3, label: 'Category 3 (ad > 4 m/s²)' },
 ];
 
+export const GUIDE_ROLLER_PRESETS = [
+  { id: 'wittur-gr-std', manufacturer: 'Wittur', model: 'GR-STD', wheelMaterial: 'nylon', independentAxes: false, clearanceX: 1.5, clearanceY: 1.5, clearanceZ: 1.0, springStiffness: 180 },
+  { id: 'wittur-gr-hs', manufacturer: 'Wittur', model: 'GR-HS', wheelMaterial: 'polyurethane', independentAxes: true, clearanceX: 1.0, clearanceY: 1.0, clearanceZ: 0.8, springStiffness: 260 },
+  { id: 'dynatech-sr-3x', manufacturer: 'Dynatech', model: 'SR-3X', wheelMaterial: 'polyurethane', independentAxes: true, clearanceX: 0.9, clearanceY: 0.9, clearanceZ: 0.7, springStiffness: 280 },
+  { id: 'savera-rx-seismic', manufacturer: 'Savera', model: 'RX-Seismic', wheelMaterial: 'nylon', independentAxes: true, clearanceX: 1.0, clearanceY: 1.0, clearanceZ: 0.8, springStiffness: 240 },
+  { id: 'cobianchi-vr-hs', manufacturer: 'Cobianchi', model: 'VR-HS', wheelMaterial: 'steel', independentAxes: true, clearanceX: 0.8, clearanceY: 0.8, clearanceZ: 0.6, springStiffness: 320 },
+];
+
 export const SAFETY_GEAR_PRESETS = [
   // Instantaneous (Speeds <= 0.63 m/s)
   { id: 'dynatech-in-3000', manufacturer: 'Dynatech', model: 'IN-3000', name: 'Dynatech IN-3000 (Instantaneous)', type: 'instantaneous', maxMass: 3000, brakingForce: 35000, certifiedSpeed: 0.63 },
@@ -112,15 +120,25 @@ export const OSG_PRESETS = [
 ];
 
 export const BUFFER_PRESETS = [
-  { id: 'wittur-bea-150', manufacturer: 'Wittur', model: 'BEA-150', type: 'energy-accumulation', isLinear: true, stroke: 150, minMass: 450, maxMass: 1800, speedRange: '<= 1.0 m/s' },
-  { id: 'wittur-bea-200', manufacturer: 'Wittur', model: 'BEA-200', type: 'energy-accumulation', isLinear: true, stroke: 200, minMass: 650, maxMass: 2200, speedRange: '<= 1.0 m/s' },
-  { id: 'wittur-bed-200', manufacturer: 'Wittur', model: 'BED-200', type: 'energy-dissipation', isLinear: true, stroke: 200, minMass: 700, maxMass: 2500, speedRange: '1.0-1.6 m/s' },
-  { id: 'wittur-bed-250', manufacturer: 'Wittur', model: 'BED-250', type: 'energy-dissipation', isLinear: true, stroke: 250, minMass: 900, maxMass: 3200, speedRange: '1.2-2.0 m/s' },
-  { id: 'dynatech-hd-250', manufacturer: 'Dynatech', model: 'HD-250', type: 'energy-dissipation', isLinear: true, stroke: 250, minMass: 900, maxMass: 3200, speedRange: '1.0-2.0 m/s' },
-  { id: 'dynatech-hd-300', manufacturer: 'Dynatech', model: 'HD-300', type: 'energy-dissipation', isLinear: true, stroke: 300, minMass: 1200, maxMass: 4200, speedRange: '1.6-2.5 m/s' },
-  { id: 'dynatech-hd-400', manufacturer: 'Dynatech', model: 'HD-400', type: 'energy-dissipation', isLinear: true, stroke: 400, minMass: 1800, maxMass: 6500, speedRange: '2.0-3.5 m/s' },
-  { id: 'cobianchi-nl-300', manufacturer: 'Cobianchi', model: 'NL-300', type: 'energy-dissipation', isLinear: false, stroke: 300, minMass: 1200, maxMass: 4500, speedRange: '1.6-2.5 m/s' },
-  { id: 'cobianchi-nl-400', manufacturer: 'Cobianchi', model: 'NL-400', type: 'energy-dissipation', isLinear: false, stroke: 400, minMass: 2000, maxMass: 7000, speedRange: '2.0-3.5 m/s' },
-  { id: 'pfb-bd-220', manufacturer: 'PFB', model: 'BD-220', type: 'energy-dissipation', isLinear: true, stroke: 220, minMass: 750, maxMass: 2600, speedRange: '1.0-1.6 m/s' },
-  { id: 'pfb-bd-320', manufacturer: 'PFB', model: 'BD-320', type: 'energy-dissipation', isLinear: true, stroke: 320, minMass: 1400, maxMass: 4800, speedRange: '1.6-2.8 m/s' },
+  { id: 'wittur-bea-150', manufacturer: 'Wittur', model: 'BEA-150', type: 'energy-accumulation', medium: 'spring', isLinear: true, stroke: 150, minMass: 450, maxMass: 1800, speedRange: '<= 1.0 m/s' },
+  { id: 'wittur-bea-200', manufacturer: 'Wittur', model: 'BEA-200', type: 'energy-accumulation', medium: 'spring', isLinear: true, stroke: 200, minMass: 650, maxMass: 2200, speedRange: '<= 1.0 m/s' },
+  { id: 'wittur-bed-200', manufacturer: 'Wittur', model: 'BED-200', type: 'energy-dissipation', medium: 'hydraulic-oil', isLinear: true, stroke: 200, minMass: 700, maxMass: 2500, speedRange: '1.0-1.6 m/s' },
+  { id: 'wittur-bed-250', manufacturer: 'Wittur', model: 'BED-250', type: 'energy-dissipation', medium: 'hydraulic-oil', isLinear: true, stroke: 250, minMass: 900, maxMass: 3200, speedRange: '1.2-2.0 m/s' },
+  { id: 'dynatech-hd-250', manufacturer: 'Dynatech', model: 'HD-250', type: 'energy-dissipation', medium: 'hydraulic-oil', isLinear: true, stroke: 250, minMass: 900, maxMass: 3200, speedRange: '1.0-2.0 m/s' },
+  { id: 'dynatech-hd-300', manufacturer: 'Dynatech', model: 'HD-300', type: 'energy-dissipation', medium: 'hydraulic-oil', isLinear: true, stroke: 300, minMass: 1200, maxMass: 4200, speedRange: '1.6-2.5 m/s' },
+  { id: 'dynatech-hd-400', manufacturer: 'Dynatech', model: 'HD-400', type: 'energy-dissipation', medium: 'hydraulic-oil', isLinear: true, stroke: 400, minMass: 1800, maxMass: 6500, speedRange: '2.0-3.5 m/s' },
+  { id: 'cobianchi-nl-300', manufacturer: 'Cobianchi', model: 'NL-300', type: 'energy-dissipation', medium: 'hydraulic-oil', isLinear: false, stroke: 300, minMass: 1200, maxMass: 4500, speedRange: '1.6-2.5 m/s' },
+  { id: 'cobianchi-nl-400', manufacturer: 'Cobianchi', model: 'NL-400', type: 'energy-dissipation', medium: 'hydraulic-oil', isLinear: false, stroke: 400, minMass: 2000, maxMass: 7000, speedRange: '2.0-3.5 m/s' },
+  { id: 'pfb-bd-220', manufacturer: 'PFB', model: 'BD-220', type: 'energy-dissipation', medium: 'hydraulic-oil', isLinear: true, stroke: 220, minMass: 750, maxMass: 2600, speedRange: '1.0-1.6 m/s' },
+  { id: 'pfb-bd-320', manufacturer: 'PFB', model: 'BD-320', type: 'energy-dissipation', medium: 'hydraulic-oil', isLinear: true, stroke: 320, minMass: 1400, maxMass: 4800, speedRange: '1.6-2.8 m/s' },
+  { id: 'wittur-hdb-500', manufacturer: 'Wittur', model: 'HDB-500', type: 'energy-dissipation', medium: 'hydraulic-oil', isLinear: false, stroke: 500, minMass: 2500, maxMass: 8500, speedRange: '2.5-4.0 m/s' },
+  { id: 'dynatech-hdb-650', manufacturer: 'Dynatech', model: 'HDB-650', type: 'energy-dissipation', medium: 'hydraulic-oil', isLinear: false, stroke: 650, minMass: 3500, maxMass: 12000, speedRange: '4.0-6.0 m/s' },
+  { id: 'cobianchi-hdb-800', manufacturer: 'Cobianchi', model: 'HDB-800', type: 'energy-dissipation', medium: 'hydraulic-oil', isLinear: false, stroke: 800, minMass: 5000, maxMass: 18000, speedRange: '6.0-10.0 m/s' },
+];
+
+export const SHAFT_LUMINAIRE_PRESETS = [
+  { id: 'schneider-ledbar-1200', manufacturer: 'Schneider Electric', model: 'LED Bar 1200', label: 'Schneider LED Bar 1200', nominalLux: 220, recommendedSpacing: 3.0, mounting: 'wall-linear' },
+  { id: 'legrand-shaftline-18w', manufacturer: 'Legrand', model: 'ShaftLine 18W', label: 'Legrand ShaftLine 18W', nominalLux: 260, recommendedSpacing: 2.7, mounting: 'wall-linear' },
+  { id: 'philips-coreline-tight', manufacturer: 'Philips', model: 'CoreLine Tight', label: 'Philips CoreLine Tight', nominalLux: 300, recommendedSpacing: 2.5, mounting: 'ceiling-linear' },
+  { id: 'zumtobel-protecta', manufacturer: 'Zumtobel', model: 'Protecta X', label: 'Zumtobel Protecta X', nominalLux: 340, recommendedSpacing: 2.4, mounting: 'ceiling-linear' },
 ];
