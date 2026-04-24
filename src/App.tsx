@@ -75,6 +75,7 @@ import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
 
 import { ISO_RAIL_PROFILES, BELT_PROFILES, SHAFT_LUMINAIRE_PRESETS } from './constants';
+import { RuntimeTextConfig, loadRuntimeTextConfig } from './lib/runtimeConfig';
 
 import { safeNumber, formatNumber, degToRad, InputGroup, LiftField, SliderField, CollapsibleSection } from './components/ui';
 
@@ -264,6 +265,7 @@ export default function App() {
   const [validationResults, setValidationResults] = useState<ValidationResult[]>([]);
   const [validationModalTitle, setValidationModalTitle] = useState('Project Validation Results');
   const [pendingFocusField, setPendingFocusField] = useState<string | null>(null);
+  const [runtimeText, setRuntimeText] = useState<RuntimeTextConfig | null>(null);
   const [projectData, setProjectData] = useState<ProjectData>({
     type: 'electric',
     suspension: '2:1',
@@ -573,6 +575,12 @@ export default function App() {
       return merged;
     });
   };
+
+  useEffect(() => {
+    loadRuntimeTextConfig().then((config) => {
+      if (config) setRuntimeText(config);
+    });
+  }, []);
 
   useEffect(() => {
     if (!pendingFocusField) return;
@@ -1054,7 +1062,8 @@ export default function App() {
     : activeSectionResults.some(result => result.type === 'warning')
       ? { label: 'review', tone: 'text-amber-700 bg-amber-50 border-amber-200' }
       : { label: 'ok', tone: 'text-emerald-700 bg-emerald-50 border-emerald-200' };
-  const activeSectionLabel = modules.find(m => m.id === activeTab)?.label || 'Current Section';
+  const getModuleLabel = (module?: ModuleStatus) => module ? (runtimeText?.modules?.[module.id]?.label || module.label) : '';
+  const activeSectionLabel = getModuleLabel(modules.find(m => m.id === activeTab)) || 'Current Section';
   const activeCategory = modules.find(m => m.id === activeTab)?.category || 'Current Workspace';
   const categoryModules = modules.filter((module) => module.category === activeCategory);
   const categoryIssueMap = useMemo(() => {
@@ -1084,10 +1093,14 @@ export default function App() {
         ]
   ), [projectData.type]);
   const activeWorkflowStep = workflowSteps.find((step) => step.moduleIds.includes(activeTab)) || workflowSteps[0];
-  const activeGuidance = MODULE_GUIDANCE[activeTab] || {
+  const activeGuidanceBase = MODULE_GUIDANCE[activeTab] || {
     owner: 'Este módulo ainda não tem ownership definido.',
     output: 'Rever outputs antes de fechar relatório.',
     report: 'A confirmar.',
+  };
+  const activeGuidance = {
+    ...activeGuidanceBase,
+    ...(runtimeText?.modules?.[activeTab] || {}),
   };
   const totalErrors = allValidationResults.filter((result) => result.type === 'error').length;
   const totalWarnings = allValidationResults.filter((result) => result.type === 'warning').length;
@@ -1280,8 +1293,8 @@ export default function App() {
         <div className="px-6 mb-8">
           <div className="flex items-center justify-between gap-2">
             <div className={isSidebarCollapsed ? 'hidden' : 'block'}>
-              <h1 className="text-xl font-black text-primary uppercase tracking-tighter">ILATE</h1>
-              <p className="mt-1 text-[10px] font-semibold uppercase tracking-widest text-on-surface-variant">Operational Cockpit</p>
+              <h1 className="text-xl font-black text-primary uppercase tracking-tighter">{runtimeText?.app?.title || 'ILATE'}</h1>
+              <p className="mt-1 text-[10px] font-semibold uppercase tracking-widest text-on-surface-variant">{runtimeText?.app?.subtitle || 'Operational Cockpit'}</p>
             </div>
             <button
               onClick={() => setIsSidebarCollapsed((prev) => !prev)}
@@ -1310,7 +1323,7 @@ export default function App() {
                   }`}
                 >
                   <item.icon size={14} className={activeTab === item.id ? 'text-primary' : 'text-on-surface-variant opacity-70 group-hover:opacity-100 group-hover:text-primary'} />
-                  <span className={`text-[11px] font-medium uppercase tracking-wider ${isSidebarCollapsed ? 'hidden' : ''}`}>{item.label}</span>
+                  <span className={`text-[11px] font-medium uppercase tracking-wider ${isSidebarCollapsed ? 'hidden' : ''}`}>{getModuleLabel(item)}</span>
                 </button>
               ))}
             </div>
@@ -1334,10 +1347,10 @@ export default function App() {
         <header className="flex justify-between items-center w-full px-8 h-14 bg-surface-container-highest sticky top-0 z-50 border-b border-outline-variant/50">
           <div className="flex items-center gap-6">
             <span className="text-sm font-bold tracking-widest text-primary uppercase">
-              {projectData.type === 'hydraulic' ? 'ISO 8100 HYDRAULIC' : 'ISO 8100 ENGINE'}
+              {projectData.type === 'hydraulic' ? (runtimeText?.app?.workspaceHydraulic || 'ISO 8100 HYDRAULIC') : (runtimeText?.app?.workspaceElectric || 'ISO 8100 ENGINE')}
             </span>
             <div className="h-4 w-px bg-outline-variant" />
-            <span className="text-xs font-bold text-on-surface-variant uppercase tracking-widest">{visibleModules.find(m => m.id === activeTab)?.label || modules.find(m => m.id === activeTab)?.label}</span>
+            <span className="text-xs font-bold text-on-surface-variant uppercase tracking-widest">{getModuleLabel(visibleModules.find(m => m.id === activeTab) || modules.find(m => m.id === activeTab))}</span>
             <span className={`hidden lg:inline-flex items-center rounded-full border px-3 py-1 text-[10px] font-black uppercase tracking-[0.16em] ${activeSectionStatus.tone}`}>
               {activeSectionStatus.label}
               {activeSectionResults.length > 0 ? ` · ${activeSectionResults.length}` : ' · 0'}
@@ -1470,7 +1483,7 @@ export default function App() {
         {/* Footer */}
         <footer className="h-10 bg-surface-container-highest border-t border-outline-variant/50 px-8 flex items-center justify-between text-[10px] text-on-surface-variant font-medium shrink-0 uppercase tracking-widest">
           <div className="flex gap-6">
-            <span>{projectData.type === 'hydraulic' ? 'ISO 8100-2:2026 Hydraulic Workspace v1.0.4' : 'ISO 8100-2:2026 Engine v1.0.4'}</span>
+            <span>{projectData.type === 'hydraulic' ? (runtimeText?.app?.footerHydraulic || 'ISO 8100-2:2026 Hydraulic Workspace v1.0.4') : (runtimeText?.app?.footerElectric || 'ISO 8100-2:2026 Engine v1.0.4')}</span>
             <span className="text-primary opacity-80">
               Workspace: {projectData.type === 'hydraulic' ? 'Hydraulic Project Workspace' : 'Traction Project Workspace'}
             </span>
@@ -1543,7 +1556,7 @@ export default function App() {
                         ? 'border-primary/40 bg-primary/10 text-primary'
                         : 'border-outline-variant/20 bg-surface-container-low text-on-surface-variant hover:border-primary/30 hover:text-primary'
                     }`}
-                    title={`${module.label}${issueCount ? ` • ${issueCount} issue${issueCount > 1 ? 's' : ''}` : ''}`}
+                    title={`${getModuleLabel(module)}${issueCount ? ` • ${issueCount} issue${issueCount > 1 ? 's' : ''}` : ''}`}
                   >
                     <Icon size={16} />
                     {issueCount > 0 && (
@@ -1613,7 +1626,7 @@ export default function App() {
                         <div className="flex items-center gap-3">
                           <Icon size={15} className={activeTab === module.id ? 'text-primary' : 'text-on-surface-variant'} />
                           <div>
-                            <p className="text-[11px] font-black uppercase tracking-[0.14em] text-on-surface">{module.label}</p>
+                            <p className="text-[11px] font-black uppercase tracking-[0.14em] text-on-surface">{getModuleLabel(module)}</p>
                             <p className="text-[10px] text-on-surface-variant">
                               {issueCount > 0 ? `${issueCount} issue${issueCount > 1 ? 's' : ''} flagged here` : 'section currently clean'}
                             </p>

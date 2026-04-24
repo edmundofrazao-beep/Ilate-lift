@@ -1,0 +1,13 @@
+{
+  "meta": {
+    "runtimeVersion": "1.1.0",
+    "description": "Editable manufacturer preset layer. v1.1 starts by storing extra data here before deeper migration."
+  },
+  "overspeedGovernors": [],
+  "buffers": [],
+  "guideRails": [],
+  "guideRollers": [],
+  "ropes": [],
+  "belts": [],
+  "luminaires": []
+}

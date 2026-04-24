@@ -1,0 +1,11 @@
+{
+  "meta": {
+    "runtimeVersion": "1.1.0",
+    "description": "Editable validation language. Formula execution remains in TypeScript until the calculation engine is extracted."
+  },
+  "messages": {
+    "pfhFailure": "PFH is above the selected SIL target. Review failure rate, diagnostic coverage or circuit architecture.",
+    "beltDiscardReview": "Belt suspension must be reviewed using belt-specific criteria, not rope diameter reduction.",
+    "hydraulicSpeedLimit": "Hydraulic configuration must remain at or below 1.0 m/s."
+  }
+}

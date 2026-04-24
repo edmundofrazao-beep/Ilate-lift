@@ -1,0 +1,20 @@
+{
+  "meta": {
+    "runtimeVersion": "1.1.0",
+    "description": "Editable report text blocks for the v1.1 runtime bridge."
+  },
+  "blocks": [
+    {
+      "id": "project-inputs",
+      "title": "Project Input Parameters",
+      "enabled": true,
+      "note": "Main project assumptions and input parameters."
+    },
+    {
+      "id": "validation-summary",
+      "title": "Validation Summary",
+      "enabled": true,
+      "note": "Errors, warnings and accepted checks before final issue."
+    }
+  ]
+}

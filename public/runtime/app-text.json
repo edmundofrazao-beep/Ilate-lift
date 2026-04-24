@@ -1,0 +1,52 @@
+{
+  "meta": {
+    "runtimeVersion": "1.1.0",
+    "description": "Editable text, labels and ownership guidance consumed by ILATE Lift v1.1."
+  },
+  "app": {
+    "title": "ILATE",
+    "subtitle": "Runtime Cockpit",
+    "workspaceElectric": "ISO 8100 Engine",
+    "workspaceHydraulic": "ISO 8100 Hydraulic",
+    "footerElectric": "ISO 8100-2:2026 Engine v1.1",
+    "footerHydraulic": "ISO 8100-2:2026 Hydraulic Workspace v1.1"
+  },
+  "modules": {
+    "global": {
+      "label": "Project Base (4.1)",
+      "owner": "Edit lift type, speed, travel, stops, geometry base and control architecture only here.",
+      "output": "Feeds traction/hydraulic logic, guides, buffers, 3D and report.",
+      "report": "Main project input parameters."
+    },
+    "traction-params": {
+      "label": "Traction Setup",
+      "owner": "Edit traction geometry, suspension ratio, friction and acceleration only here.",
+      "output": "Feeds sheaves, traction checks and suspension verification.",
+      "report": "Traction calculation base."
+    },
+    "suspension-params": {
+      "label": "Suspension Setup",
+      "owner": "Edit ropes/belts, quantity, resistance and manufacturer preset only here.",
+      "output": "Feeds safety factor, fatigue and discard checks.",
+      "report": "Installed suspension system."
+    },
+    "buffers": {
+      "label": "Buffers (4.5)",
+      "owner": "Edit buffer type, medium, stroke and manufacturer preset only here.",
+      "output": "Validates impact energy, deceleration and admissible mass.",
+      "report": "Buffer verification."
+    },
+    "sil": {
+      "label": "Safety Circuits",
+      "owner": "Edit SIL, PFH, diagnostic coverage and fault tolerance only here.",
+      "output": "Shows if safety circuit architecture is acceptable.",
+      "report": "Safety circuit verification."
+    },
+    "memory": {
+      "label": "Calculation Memory",
+      "owner": "Generated evidence from validated inputs. Do not tune project values here.",
+      "output": "Preview of the final report structure.",
+      "report": "Main technical report body."
+    }
+  }
+}

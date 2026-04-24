@@ -8,6 +8,7 @@
     "dev": "npm run build:styles && vite --port=3000 --host=0.0.0.0",
     "build": "npm run build:styles && vite build",
     "preview": "vite preview",
+    "runtime:editor": "node tools/runtime-editor/server.mjs",
     "clean": "rm -rf dist",
     "lint": "tsc --noEmit"
   },
